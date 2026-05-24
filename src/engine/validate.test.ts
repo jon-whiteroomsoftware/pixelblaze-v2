@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { validateSource } from './validate'
-import { SEED_PATTERN } from '@/pixelblaze/seedPattern'
 
 // ── Valid Pixelblaze ─────────────────────────────────────────────────────────
 
@@ -47,8 +46,12 @@ describe('valid Pixelblaze code', () => {
     expect(validateSource('var i = 0\nwhile (i < 10) { i = i + 1 }')).toEqual([])
   })
 
-  it('accepts the full seed pattern without errors', () => {
-    expect(validateSource(SEED_PATTERN)).toEqual([])
+  it('accepts a realistic multi-function pattern without errors', () => {
+    const src = `export var speed = 0.5
+var t1, t2
+function beforeRender(delta) { t1 = time(0.05 * speed); t2 = time(0.13 * speed) }
+export function render2D(index, x, y) { var d = x - 0.5; hsv(t1 + d, 1, clamp(1 - abs(d) * 6, 0, 1)) }`
+    expect(validateSource(src)).toEqual([])
   })
 
   // Arrow / lambda functions: explicitly listed as a supported form in the language reference
