@@ -63,6 +63,8 @@ export default function App() {
   const compileStatus = useEditorStore((s) => s.compileStatus)
   const setSource = useEditorStore((s) => s.setSource)
   const setIsReadOnly = useEditorStore((s) => s.setIsReadOnly)
+  const setPreviewSource = useEditorStore((s) => s.setPreviewSource)
+  const setPreviewPatternName = useEditorStore((s) => s.setPreviewPatternName)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -92,7 +94,7 @@ export default function App() {
         return
       }
       const { userPatterns, addPattern, setActivePattern } = usePatternStore.getState()
-      const { setSource, setIsReadOnly } = useEditorStore.getState()
+      const { setSource, setIsReadOnly, setPreviewSource, setPreviewPatternName } = useEditorStore.getState()
       const id = generateId()
       const existingNames = userPatterns.map((p) => p.name)
       const name = uniquePatternName(parsed.name, existingNames)
@@ -107,6 +109,8 @@ export default function App() {
       setActivePattern(id)
       setSource(record.src)
       setIsReadOnly(false)
+      setPreviewSource(record.src)
+      setPreviewPatternName(record.name)
     }
     reader.readAsText(file)
   }, [showImportError])
@@ -126,7 +130,9 @@ export default function App() {
     setActivePattern(id)
     setSource(record.src)
     setIsReadOnly(false)
-  }, [userPatterns, addPattern, setActivePattern, setSource, setIsReadOnly])
+    setPreviewSource(record.src)
+    setPreviewPatternName(record.name)
+  }, [userPatterns, addPattern, setActivePattern, setSource, setIsReadOnly, setPreviewSource, setPreviewPatternName])
 
   const [copied, setCopied] = useState(false)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
