@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Editor } from '@/components/Editor'
 import { CompileStatusBadge } from '@/components/CompileStatusBadge'
@@ -8,6 +8,8 @@ import { PaneHeader } from '@/components/PaneHeader'
 import { usePreviewStore } from '@/store/previewStore'
 import { usePatternStore } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
+import { bundle } from '@/engine/bundle'
+import { LIBRARIES } from '@/pixelblaze/libs'
 
 function Splitter({ onDrag }: { onDrag: (dx: number) => void }) {
   const lastX = useRef(0)
@@ -47,6 +49,21 @@ export default function App() {
   const activeDemoName = usePatternStore((s) => s.activeDemoName)
   const userPatterns = usePatternStore((s) => s.userPatterns)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
+  const source = useEditorStore((s) => s.source)
+  const compileStatus = useEditorStore((s) => s.compileStatus)
+
+  const [copied, setCopied] = useState(false)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current) }, [])
+
+  const handleCopy = useCallback(() => {
+    const { code } = bundle(source, LIBRARIES)
+    navigator.clipboard.writeText(code)
+    setCopied(true)
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500)
+  }, [source])
 
   const [leftWidth, setLeftWidth] = useState(224)
   const [rightWidth, setRightWidth] = useState(320)
@@ -81,6 +98,16 @@ export default function App() {
               <span className="truncate">{activeFileName}</span>
               {activePatternId !== null && <CompileStatusBadge />}
             </span>
+            {activePatternId !== null && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={compileStatus === 'broken'}
+                onClick={handleCopy}
+              >
+                {copied ? 'Copied!' : 'Copy Code'}
+              </Button>
+            )}
           </PaneHeader>
           <div className="flex-1 overflow-hidden">
             <Editor />
