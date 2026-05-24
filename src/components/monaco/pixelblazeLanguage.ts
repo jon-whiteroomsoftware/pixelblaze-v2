@@ -1,24 +1,15 @@
 import type * as monacoType from 'monaco-editor'
+import { BUILTIN_FUNCTIONS, BUILTIN_CONSTANTS } from '@/engine/builtins'
+import { registerProviders } from './providers'
 
 export const PIXELBLAZE_LANG_ID = 'pixelblaze'
 
-const RENDER_FNS = ['render', 'render2D', 'beforeRender', 'afterRender']
-
-const COLOR_FNS = ['hsv', 'rgb']
-
-const WAVEFORM_FNS = ['time', 'wave', 'triangle', 'square', 'clamp', 'map']
-
-const MATH_FNS = [
-  'sin', 'cos', 'tan', 'asin', 'acos', 'atan2',
-  'abs', 'floor', 'ceil', 'round', 'sqrt', 'pow', 'log', 'log2',
-  'min', 'max', 'random',
-]
-
-const CONSTANTS = ['PI', 'E', 'pixelCount']
-
 const NAMESPACES = ['sdf', 'color', 'noise', 'coord', 'anim']
 
-const BUILTINS = [...RENDER_FNS, ...COLOR_FNS, ...WAVEFORM_FNS, ...MATH_FNS, ...CONSTANTS]
+const BUILTINS = [
+  ...BUILTIN_FUNCTIONS.map((f) => f.name),
+  ...BUILTIN_CONSTANTS.map((c) => c.name),
+]
 
 const JS_KEYWORDS = [
   'break', 'case', 'catch', 'continue', 'debugger', 'default', 'delete',
@@ -124,4 +115,6 @@ export function registerPixelblazeLanguage(monaco: typeof monacoType): void {
       'editor.inactiveSelectionBackground': '#3A3D41',
     },
   })
+
+  registerProviders(monaco)
 }

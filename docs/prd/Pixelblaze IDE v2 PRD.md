@@ -293,8 +293,8 @@ Arrays are shown with each element and its index. The data is sampled at the end
 17. Error squiggles — syntax checker results as Monaco markers
 18. Good/Broken compile status indicator — real-time badge in the header
 19. Library ref validation — unknown `lib.fn` references flagged as warnings
-20. Autocomplete — Pixelblaze built-ins + library functions
-21. Signature hints — parameter names on `(` after a library function call
+20. Autocomplete — Pixelblaze built-ins + library functions; backed by `builtins.ts` manifest; snippet insertion with tab-through params
+21. Signature hints — parameter names on `(`; active param advances on `,`; backed by `resolveSignatureContext()` in `builtins.ts`
 
 ### Phase 6 — Pattern storage and file list
 21. IndexedDB CRUD — tested with `fake-indexeddb`
