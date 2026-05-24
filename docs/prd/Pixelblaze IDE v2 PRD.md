@@ -291,9 +291,10 @@ Arrays are shown with each element and its index. The data is sampled at the end
 ### Phase 5 — Monaco editor
 16. Monaco integration — JS mode + Pixelblaze language config
 17. Error squiggles — syntax checker results as Monaco markers
-18. Library ref validation — unknown `lib.fn` references flagged as warnings
-19. Autocomplete — Pixelblaze built-ins + library functions
-20. Signature hints — parameter names on `(` after a library function call
+18. Good/Broken compile status indicator — real-time badge in the header
+19. Library ref validation — unknown `lib.fn` references flagged as warnings
+20. Autocomplete — Pixelblaze built-ins + library functions
+21. Signature hints — parameter names on `(` after a library function call
 
 ### Phase 6 — Pattern storage and file list
 21. IndexedDB CRUD — tested with `fake-indexeddb`
@@ -324,8 +325,7 @@ Arrays are shown with each element and its index. The data is sampled at the end
 
 ### Phase 11 — Polish
 39. Vertical splitter — drag to resize editor/preview panes
-40. Good/Broken compile status indicator
-41. Pattern preview dims when paused
+40. Pattern preview dims when paused
 
 ---
 
