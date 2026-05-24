@@ -14,6 +14,11 @@ describe('bundle — no library refs', () => {
     expect(metadata.exportedVars).toEqual(['speed', 'hue'])
   })
 
+  it('extracts all vars from a multi-declarator export', () => {
+    const { metadata } = bundle('export var x = 0, y = 0, z = 0', {})
+    expect(metadata.exportedVars).toEqual(['x', 'y', 'z'])
+  })
+
   it('detects render functions', () => {
     const src = `
       export function beforeRender(delta) {}
@@ -37,6 +42,48 @@ describe('bundle — no library refs', () => {
     expect(metadata.controls).toEqual([
       { exportName: 'sliderBrightness', kind: 'slider', label: 'Brightness' },
     ])
+  })
+
+  it('extracts toggle controls', () => {
+    const src = `export function toggleLoop(v) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.controls).toEqual([
+      { exportName: 'toggleLoop', kind: 'toggle', label: 'Loop' },
+    ])
+  })
+
+  it('extracts hsvPicker controls', () => {
+    const src = `export function hsvPickerColor(h, s, v) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.controls).toEqual([
+      { exportName: 'hsvPickerColor', kind: 'hsvPicker', label: 'Color' },
+    ])
+  })
+
+  it('extracts rgbPicker controls', () => {
+    const src = `export function rgbPickerColor(r, g, b) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.controls).toEqual([
+      { exportName: 'rgbPickerColor', kind: 'rgbPicker', label: 'Color' },
+    ])
+  })
+
+  it('ignores exported functions with unrecognized prefixes', () => {
+    const src = `export function fooBarBaz(v) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.controls).toHaveLength(0)
+  })
+
+  it('ignores a function named exactly as a prefix with no suffix', () => {
+    const src = `export function slider(v) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.controls).toHaveLength(0)
+  })
+
+  it('generates a space-separated label from a multi-word camelCase suffix', () => {
+    const src = `export function sliderMyPlaybackSpeed(v) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.controls[0].label).toBe('My Playback Speed')
   })
 })
 
