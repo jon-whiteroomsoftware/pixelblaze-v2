@@ -20,7 +20,7 @@ interface PreviewState {
 }
 
 export const previewInitialState = {
-  isRunning: false,
+  isRunning: true,
   speed: 1,
   brightness: 1,
   grid: {

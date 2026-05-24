@@ -8,7 +8,6 @@ interface Props {
   onMouseLeave: () => void
 }
 
-const SIDEBAR_W = 224  // w-56
 const PREVIEW_W = 320  // w-80
 const MAX_HEIGHT = 520
 

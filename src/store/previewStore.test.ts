@@ -6,15 +6,15 @@ beforeEach(() => {
 })
 
 describe('previewStore', () => {
-  it('starts paused', () => {
-    expect(usePreviewStore.getState().isRunning).toBe(false)
+  it('starts running', () => {
+    expect(usePreviewStore.getState().isRunning).toBe(true)
   })
 
   it('toggle flips running state', () => {
     usePreviewStore.getState().toggle()
-    expect(usePreviewStore.getState().isRunning).toBe(true)
-    usePreviewStore.getState().toggle()
     expect(usePreviewStore.getState().isRunning).toBe(false)
+    usePreviewStore.getState().toggle()
+    expect(usePreviewStore.getState().isRunning).toBe(true)
   })
 
   it('has default speed of 1', () => {
