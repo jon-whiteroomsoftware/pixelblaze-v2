@@ -141,7 +141,28 @@ export function createShim(config: ShimConfig): ShimContext {
     move: noop,
 
     // ── Array ──────────────────────────────────────────────────────────────
-    array: (n: number) => new Array(n).fill(0),
+    // Pixelblaze hardware implicitly truncates float indices to integers.
+    // Wrap in a Proxy so patterns that index arrays with float values (a
+    // common pattern: `buf[x * width]`) work the same as on hardware.
+    array: (n: number) => {
+      const raw = new Array(Math.floor(n)).fill(0)
+      return new Proxy(raw, {
+        get(target, prop, receiver) {
+          if (typeof prop === 'string') {
+            const i = Number(prop)
+            if (!isNaN(i) && i >= 0) return target[Math.floor(i)]
+          }
+          return Reflect.get(target, prop, receiver)
+        },
+        set(target, prop, value, receiver) {
+          if (typeof prop === 'string') {
+            const i = Number(prop)
+            if (!isNaN(i) && i >= 0) { target[Math.floor(i)] = value; return true }
+          }
+          return Reflect.set(target, prop, value, receiver)
+        },
+      })
+    },
   }
 
   return { builtins, capturedPixel }

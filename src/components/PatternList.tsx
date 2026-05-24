@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { DEMOS } from '@/pixelblaze/demos'
-import { NEW_PATTERN_SRC } from '@/pixelblaze/newPattern'
-import { uniquePatternName, nameConflicts } from '@/engine/patternName'
+import { nameConflicts } from '@/engine/patternName'
 import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
@@ -10,11 +9,6 @@ import { LibraryHoverCard } from '@/components/LibraryHoverCard'
 
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
-
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
 
 function SectionHeader({ label }: { label: string }) {
   return (
@@ -174,7 +168,6 @@ export function PatternList() {
   const setActiveDemo = usePatternStore((s) => s.setActiveDemo)
   const setActivePattern = usePatternStore((s) => s.setActivePattern)
   const loadPatterns = usePatternStore((s) => s.loadPatterns)
-  const addPattern = usePatternStore((s) => s.addPattern)
   const renamePattern = usePatternStore((s) => s.renamePattern)
   const removePattern = usePatternStore((s) => s.removePattern)
 
@@ -283,35 +276,9 @@ export function PatternList() {
     setIsReadOnly(false)
   }
 
-  async function handleCreate() {
-    const id = generateId()
-    const existingNames = userPatterns.map((p) => p.name)
-    const name = uniquePatternName('Untitled Pattern', existingNames)
-    const record: PatternRecord = {
-      id,
-      name,
-      src: NEW_PATTERN_SRC,
-      controls: {},
-      updatedAt: Date.now(),
-    }
-    await addPattern(record)
-    setActivePattern(id)
-    setSource(record.src)
-    setIsReadOnly(false)
-  }
-
   return (
     <div className="flex flex-col h-full text-sm">
-      <div className="flex items-center justify-between pr-2">
-        <SectionHeader label="Your Patterns" />
-        <button
-          onClick={handleCreate}
-          className="text-zinc-500 hover:text-zinc-200 text-lg leading-none px-1"
-          title="New pattern"
-        >
-          +
-        </button>
-      </div>
+      <SectionHeader label="Your Patterns" />
 
       <ul>
         {userPatterns.map((pattern) => (

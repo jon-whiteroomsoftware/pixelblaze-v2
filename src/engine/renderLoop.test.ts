@@ -229,6 +229,56 @@ describe('renderPreviewFrame', () => {
   })
 })
 
+// ── error handling ────────────────────────────────────────────────────────────
+
+describe('error handling', () => {
+  it('tick propagates errors from beforeRender', () => {
+    const handle = makeMockHandle()
+    ;(handle.beforeRender as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('bad pattern')
+    })
+    const loop = createRenderLoop({
+      handle, shim: makeMockShim(), clock: makeMockClock(),
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
+      paint: vi.fn(),
+    })
+    expect(() => loop.tick(16)).toThrow('bad pattern')
+  })
+
+  it('renderPreviewFrame calls onError instead of throwing', () => {
+    const handle = makeMockHandle()
+    ;(handle.beforeRender as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('render fail')
+    })
+    const onError = vi.fn()
+    const loop = createRenderLoop({
+      handle, shim: makeMockShim(), clock: makeMockClock(),
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
+      paint: vi.fn(),
+      onError,
+    })
+    expect(() => loop.renderPreviewFrame()).not.toThrow()
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'render fail' }))
+  })
+
+  it('renderPreviewFrame wraps non-Error throws into an Error', () => {
+    const handle = makeMockHandle()
+    ;(handle.beforeRender as ReturnType<typeof vi.fn>).mockImplementation(() => { throw 'oops' })
+    const onError = vi.fn()
+    const loop = createRenderLoop({
+      handle, shim: makeMockShim(), clock: makeMockClock(),
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
+      paint: vi.fn(),
+      onError,
+    })
+    loop.renderPreviewFrame()
+    expect(onError).toHaveBeenCalledWith(expect.any(Error))
+  })
+})
+
 // ── virtual clock advancement ─────────────────────────────────────────────────
 
 describe('virtual clock', () => {

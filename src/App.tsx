@@ -7,10 +7,17 @@ import { Preview } from '@/components/Preview'
 import { PreviewSettings } from '@/components/PreviewSettings'
 import { PaneHeader } from '@/components/PaneHeader'
 import { usePreviewStore } from '@/store/previewStore'
-import { usePatternStore } from '@/store/patternStore'
+import { usePatternStore, PatternRecord } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
 import { bundle } from '@/engine/bundle'
 import { LIBRARIES } from '@/pixelblaze/libs'
+import { NEW_PATTERN_SRC } from '@/pixelblaze/newPattern'
+import { uniquePatternName } from '@/engine/patternName'
+import { parseEpe } from '@/engine/epeImport'
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
 
 function Splitter({ onDrag }: { onDrag: (dx: number) => void }) {
   const lastX = useRef(0)
@@ -49,9 +56,77 @@ export default function App() {
   const activeLibraryName = usePatternStore((s) => s.activeLibraryName)
   const activeDemoName = usePatternStore((s) => s.activeDemoName)
   const userPatterns = usePatternStore((s) => s.userPatterns)
+  const addPattern = usePatternStore((s) => s.addPattern)
+  const setActivePattern = usePatternStore((s) => s.setActivePattern)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
   const source = useEditorStore((s) => s.source)
   const compileStatus = useEditorStore((s) => s.compileStatus)
+  const setSource = useEditorStore((s) => s.setSource)
+  const setIsReadOnly = useEditorStore((s) => s.setIsReadOnly)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const importErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (importErrorTimerRef.current) clearTimeout(importErrorTimerRef.current) }, [])
+
+  const showImportError = useCallback((msg: string) => {
+    setImportError(msg)
+    if (importErrorTimerRef.current) clearTimeout(importErrorTimerRef.current)
+    importErrorTimerRef.current = setTimeout(() => setImportError(null), 4000)
+  }, [])
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const text = ev.target?.result
+      if (typeof text !== 'string') return
+      let parsed
+      try {
+        parsed = parseEpe(text)
+      } catch (err) {
+        showImportError(err instanceof Error ? err.message : 'Failed to import EPE file')
+        return
+      }
+      const { userPatterns, addPattern, setActivePattern } = usePatternStore.getState()
+      const { setSource, setIsReadOnly } = useEditorStore.getState()
+      const id = generateId()
+      const existingNames = userPatterns.map((p) => p.name)
+      const name = uniquePatternName(parsed.name, existingNames)
+      const record: PatternRecord = {
+        id,
+        name,
+        src: parsed.src,
+        controls: {},
+        updatedAt: Date.now(),
+      }
+      await addPattern(record)
+      setActivePattern(id)
+      setSource(record.src)
+      setIsReadOnly(false)
+    }
+    reader.readAsText(file)
+  }, [showImportError])
+
+  const handleCreate = useCallback(async () => {
+    const id = generateId()
+    const existingNames = userPatterns.map((p) => p.name)
+    const name = uniquePatternName('Untitled Pattern', existingNames)
+    const record: PatternRecord = {
+      id,
+      name,
+      src: NEW_PATTERN_SRC,
+      controls: {},
+      updatedAt: Date.now(),
+    }
+    await addPattern(record)
+    setActivePattern(id)
+    setSource(record.src)
+    setIsReadOnly(false)
+  }, [userPatterns, addPattern, setActivePattern, setSource, setIsReadOnly])
 
   const [copied, setCopied] = useState(false)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,7 +162,21 @@ export default function App() {
       </header>
       <div className="flex flex-1 min-h-0">
         <aside data-testid="left-pane" className="shrink-0 flex flex-col" style={{ width: leftWidth }}>
-          <PaneHeader>Patterns</PaneHeader>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".epe"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <PaneHeader>
+            {importError
+              ? <span className="flex-1 min-w-0 truncate text-red-400 text-xs">{importError}</span>
+              : <span className="flex-1">Patterns</span>
+            }
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>Open</Button>
+            <Button size="sm" variant="outline" onClick={handleCreate}>New</Button>
+          </PaneHeader>
           <div className="flex-1 overflow-y-auto">
             <PatternList />
           </div>

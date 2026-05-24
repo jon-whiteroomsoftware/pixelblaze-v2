@@ -137,11 +137,40 @@ describe('pixelCount', () => {
 // ── array ────────────────────────────────────────────────────────────────────
 
 describe('array', () => {
-  it('returns a native JS array of n zeros', () => {
+  it('returns an array of n zeros', () => {
     const { builtins } = makeShim()
     const result = (builtins.array as (n: number) => number[])(5)
     expect(result).toHaveLength(5)
     expect(result).toEqual([0, 0, 0, 0, 0])
+  })
+
+  it('floors a float size argument', () => {
+    const { builtins } = makeShim()
+    const result = (builtins.array as (n: number) => number[])(3.9)
+    expect(result).toHaveLength(3)
+  })
+
+  it('reads with a float index by flooring it', () => {
+    const { builtins } = makeShim()
+    const arr = (builtins.array as (n: number) => number[])(5)
+    arr[2] = 99
+    expect(arr[2.7]).toBe(99)
+  })
+
+  it('writes with a float index by flooring it', () => {
+    const { builtins } = makeShim()
+    const arr = (builtins.array as (n: number) => number[])(5)
+    arr[2.9] = 42
+    expect(arr[2]).toBe(42)
+  })
+
+  it('stores sub-arrays created by array() and accesses them with float indices', () => {
+    const { builtins } = makeShim()
+    const arrayFn = builtins.array as (n: number) => unknown[]
+    const outer = arrayFn(3)
+    outer[0] = arrayFn(4)
+    ;(outer[0] as number[])[1] = 7
+    expect((outer[0.4] as number[])[1.8]).toBe(7)
   })
 })
 

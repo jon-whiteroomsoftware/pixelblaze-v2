@@ -11,6 +11,7 @@ export interface RenderLoopConfig {
   getBrightness: () => number
   isDimmed: () => boolean
   paint: (pixels: [number, number, number][], brightness: number, dimmed: boolean) => void
+  onError?: (err: Error) => void
 }
 
 export interface RenderLoop {
@@ -49,10 +50,21 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
     doTick(realDelta, isDimmed())
   }
 
+  function reportError(err: unknown): void {
+    const error = err instanceof Error ? err : new Error(String(err))
+    config.onError?.(error)
+  }
+
   function loop(ts: number): void {
     const delta = lastTs === null ? 0 : ts - lastTs
     lastTs = ts
-    tick(delta)
+    try {
+      tick(delta)
+    } catch (err) {
+      reportError(err)
+      rafId = null
+      return
+    }
     rafId = requestAnimationFrame(loop)
   }
 
@@ -69,6 +81,12 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
       }
     },
     tick,
-    renderPreviewFrame() { doTick(0, false) },
+    renderPreviewFrame() {
+      try {
+        doTick(0, false)
+      } catch (err) {
+        reportError(err)
+      }
+    },
   }
 }

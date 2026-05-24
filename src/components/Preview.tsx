@@ -19,6 +19,7 @@ export function Preview() {
   const grid = usePreviewStore((s) => s.grid)
   const previewSource = useEditorStore((s) => s.previewSource)
   const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
   // Derive spacing from container width so cols always fill the available width
   useEffect(() => {
@@ -37,6 +38,7 @@ export function Preview() {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !previewSource || !canvasDims) return
+    setRuntimeError(null)
 
     const gridWithDims = { ...usePreviewStore.getState().grid, ...canvasDims }
 
@@ -66,6 +68,7 @@ export function Preview() {
       getBrightness: () => usePreviewStore.getState().brightness,
       isDimmed: () => !usePreviewStore.getState().isRunning,
       paint,
+      onError: (err) => setRuntimeError(err.message),
     })
 
     loopRef.current = loop
@@ -94,6 +97,13 @@ export function Preview() {
     <div className="h-full bg-zinc-950 pt-3 pl-3">
       <div ref={containerRef} className="relative w-full h-full">
         <canvas ref={canvasRef} className="rounded-sm" />
+        {runtimeError && (
+          <div className="absolute inset-0 flex items-end justify-start p-2 pointer-events-none">
+            <span className="text-red-400 text-xs bg-zinc-900/80 px-2 py-1 rounded max-w-full truncate">
+              {runtimeError}
+            </span>
+          </div>
+        )}
         {grid.glowAmount > 0 && (
           <canvas
             ref={glowCanvasRef}
