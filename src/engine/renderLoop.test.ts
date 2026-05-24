@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createRenderLoop } from './renderLoop'
 import type { PatternHandle } from './loadPattern'
 import type { ShimContext } from './shim'
+import type { VirtualClock } from './virtualClock'
+
+function makeMockClock(): VirtualClock {
+  return { advance: vi.fn(), getTime: vi.fn(() => 0), reset: vi.fn() }
+}
 
 function makeMockHandle(): PatternHandle {
   return {
@@ -27,7 +32,7 @@ describe('tick sequencing', () => {
   it('calls beforeRender once per tick', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 2, cols: 2 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
@@ -39,7 +44,7 @@ describe('tick sequencing', () => {
   it('calls render2D once per pixel per tick', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 3, cols: 4 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
@@ -54,7 +59,7 @@ describe('tick sequencing', () => {
     ;(handle.beforeRender as ReturnType<typeof vi.fn>).mockImplementation(() => callOrder.push('br'))
     ;(handle.render2D as ReturnType<typeof vi.fn>).mockImplementation(() => callOrder.push('r2d'))
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 1, cols: 2 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
@@ -70,7 +75,7 @@ describe('pixel coordinates', () => {
   it('first pixel receives index=0, x=0, y=0', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 3, cols: 3 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
@@ -82,7 +87,7 @@ describe('pixel coordinates', () => {
   it('last pixel in a 3x3 grid receives index=8, x=1, y=1', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 3, cols: 3 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
@@ -94,13 +99,12 @@ describe('pixel coordinates', () => {
   it('single-column grid uses x=0 for all pixels', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 3, cols: 1 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
     })
     loop.tick(16)
-    // all three pixels: x should be 0
     const calls = (handle.render2D as ReturnType<typeof vi.fn>).mock.calls
     expect(calls.map((c: unknown[]) => c[1])).toEqual([0, 0, 0])
   })
@@ -108,7 +112,7 @@ describe('pixel coordinates', () => {
   it('single-row grid uses y=0 for all pixels', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 1, cols: 3 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
@@ -121,14 +125,14 @@ describe('pixel coordinates', () => {
   it('middle pixel in a 3-col row has x=0.5', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 1, cols: 3 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
     })
     loop.tick(16)
     const calls = (handle.render2D as ReturnType<typeof vi.fn>).mock.calls
-    expect(calls[1][1]).toBeCloseTo(0.5) // second pixel, x
+    expect(calls[1][1]).toBeCloseTo(0.5)
   })
 })
 
@@ -138,7 +142,7 @@ describe('pixel array', () => {
   it('passes a pixel for every grid position to paint', () => {
     const paint = vi.fn()
     const loop = createRenderLoop({
-      handle: makeMockHandle(), shim: makeMockShim(),
+      handle: makeMockHandle(), shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 4, cols: 5 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint,
@@ -156,7 +160,7 @@ describe('pixel array', () => {
     )
     const paint = vi.fn()
     const loop = createRenderLoop({
-      handle: makeMockHandle(), shim,
+      handle: makeMockHandle(), shim, clock: makeMockClock(),
       grid: { rows: 1, cols: 3 },
       getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
       paint,
@@ -171,7 +175,7 @@ describe('pixel array', () => {
   it('passes brightness and dimmed flag to paint', () => {
     const paint = vi.fn()
     const loop = createRenderLoop({
-      handle: makeMockHandle(), shim: makeMockShim(),
+      handle: makeMockHandle(), shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 1, cols: 1 },
       getSpeed: () => 1, getBrightness: () => 0.6, isDimmed: () => true,
       paint,
@@ -187,12 +191,42 @@ describe('delta scaling', () => {
   it('passes delta scaled by speed to beforeRender', () => {
     const handle = makeMockHandle()
     const loop = createRenderLoop({
-      handle, shim: makeMockShim(),
+      handle, shim: makeMockShim(), clock: makeMockClock(),
       grid: { rows: 1, cols: 1 },
       getSpeed: () => 2, getBrightness: () => 1, isDimmed: () => false,
       paint: vi.fn(),
     })
     loop.tick(16)
     expect(handle.beforeRender).toHaveBeenCalledWith(32)
+  })
+})
+
+// ── virtual clock advancement ─────────────────────────────────────────────────
+
+describe('virtual clock', () => {
+  it('advances the clock by the scaled delta each tick', () => {
+    const clock = makeMockClock()
+    const loop = createRenderLoop({
+      handle: makeMockHandle(), shim: makeMockShim(), clock,
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 2, getBrightness: () => 1, isDimmed: () => false,
+      paint: vi.fn(),
+    })
+    loop.tick(16)
+    expect(clock.advance).toHaveBeenCalledWith(32)
+  })
+
+  it('advances the clock once per tick', () => {
+    const clock = makeMockClock()
+    const loop = createRenderLoop({
+      handle: makeMockHandle(), shim: makeMockShim(), clock,
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 1, getBrightness: () => 1, isDimmed: () => false,
+      paint: vi.fn(),
+    })
+    loop.tick(16)
+    loop.tick(16)
+    loop.tick(16)
+    expect(clock.advance).toHaveBeenCalledTimes(3)
   })
 })

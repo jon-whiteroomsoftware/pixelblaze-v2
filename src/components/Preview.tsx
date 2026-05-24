@@ -6,6 +6,7 @@ import { loadPattern } from '@/engine/loadPattern'
 import { bundle } from '@/engine/bundle'
 import { createRenderer } from '@/engine/renderer'
 import { createRenderLoop, type RenderLoop } from '@/engine/renderLoop'
+import { createVirtualClock } from '@/engine/virtualClock'
 import { LIBRARIES } from '@/pixelblaze/libs'
 
 export function Preview() {
@@ -20,7 +21,8 @@ export function Preview() {
 
     const grid = usePreviewStore.getState().grid
 
-    const shim = createShim({ grid, getVirtualTime: () => Date.now() })
+    const clock = createVirtualClock()
+    const shim = createShim({ grid, getVirtualTime: () => clock.getTime() })
     const src = useEditorStore.getState().source
     const { code, metadata } = bundle(src, LIBRARIES)
     const handle = loadPattern(code, metadata, shim.builtins)
@@ -29,6 +31,7 @@ export function Preview() {
     const loop = createRenderLoop({
       handle,
       shim,
+      clock,
       grid,
       getSpeed: () => usePreviewStore.getState().speed,
       getBrightness: () => usePreviewStore.getState().brightness,

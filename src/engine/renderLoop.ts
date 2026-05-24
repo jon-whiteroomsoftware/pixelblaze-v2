@@ -1,9 +1,11 @@
 import type { PatternHandle } from './loadPattern'
 import type { ShimContext } from './shim'
+import type { VirtualClock } from './virtualClock'
 
 export interface RenderLoopConfig {
   handle: PatternHandle
   shim: ShimContext
+  clock: VirtualClock
   grid: { rows: number; cols: number }
   getSpeed: () => number
   getBrightness: () => number
@@ -18,12 +20,13 @@ export interface RenderLoop {
 }
 
 export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
-  const { handle, shim, grid, getSpeed, getBrightness, isDimmed, paint } = config
+  const { handle, shim, clock, grid, getSpeed, getBrightness, isDimmed, paint } = config
   let rafId: number | null = null
   let lastTs: number | null = null
 
   function tick(realDelta: number): void {
     const scaledDelta = realDelta * getSpeed()
+    clock.advance(scaledDelta)
     handle.beforeRender(scaledDelta)
 
     const { rows, cols } = grid
