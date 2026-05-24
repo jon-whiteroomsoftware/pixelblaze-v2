@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Editor } from '@/components/Editor'
 
 export default function App() {
   return (
@@ -9,7 +10,9 @@ export default function App() {
       </header>
       <div className="flex flex-1 min-h-0">
         <aside data-testid="left-pane" className="w-56 border-r border-zinc-800 shrink-0" />
-        <main data-testid="editor-pane" className="flex-1 min-w-0" />
+        <main data-testid="editor-pane" className="flex-1 min-w-0 overflow-hidden">
+          <Editor />
+        </main>
         <aside data-testid="preview-pane" className="w-80 border-l border-zinc-800 shrink-0" />
       </div>
     </div>
