@@ -5,9 +5,17 @@ import {
   listPatterns,
   updatePattern,
   deletePattern,
+  setSetting,
 } from '@/engine/storage'
 
 export type { PatternRecord }
+
+export const LAST_ACTIVE_KEY = 'lastActive'
+
+export type LastActive =
+  | { type: 'pattern'; id: string }
+  | { type: 'library'; name: string }
+  | { type: 'demo'; name: string }
 
 interface PatternState {
   activePatternId: string | null
@@ -34,9 +42,18 @@ export const patternInitialState = {
 export const usePatternStore = create<PatternState>()((set, get) => ({
   ...patternInitialState,
 
-  setActivePattern: (id) => set({ activePatternId: id, activeLibraryName: null, activeDemoName: null }),
-  setActiveLibrary: (name) => set({ activeLibraryName: name, activePatternId: null, activeDemoName: null }),
-  setActiveDemo: (name) => set({ activeDemoName: name, activeLibraryName: null, activePatternId: null }),
+  setActivePattern: (id) => {
+    set({ activePatternId: id, activeLibraryName: null, activeDemoName: null })
+    if (id !== null) setSetting<LastActive>(LAST_ACTIVE_KEY, { type: 'pattern', id }).catch(() => {})
+  },
+  setActiveLibrary: (name) => {
+    set({ activeLibraryName: name, activePatternId: null, activeDemoName: null })
+    if (name !== null) setSetting<LastActive>(LAST_ACTIVE_KEY, { type: 'library', name }).catch(() => {})
+  },
+  setActiveDemo: (name) => {
+    set({ activeDemoName: name, activeLibraryName: null, activePatternId: null })
+    if (name !== null) setSetting<LastActive>(LAST_ACTIVE_KEY, { type: 'demo', name }).catch(() => {})
+  },
 
   loadPatterns: async () => {
     const patterns = await listPatterns()

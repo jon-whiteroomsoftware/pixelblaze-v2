@@ -3,8 +3,9 @@ import { LIBRARIES } from '@/pixelblaze/libs'
 import { DEMOS } from '@/pixelblaze/demos'
 import { NEW_PATTERN_SRC } from '@/pixelblaze/newPattern'
 import { uniquePatternName, nameConflicts } from '@/engine/patternName'
+import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
-import { usePatternStore, PatternRecord } from '@/store/patternStore'
+import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
 
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
@@ -171,7 +172,46 @@ export function PatternList() {
   const removePattern = usePatternStore((s) => s.removePattern)
 
   useEffect(() => {
-    loadPatterns()
+    loadPatterns().then(async () => {
+      const last = await getSetting<LastActive>(LAST_ACTIVE_KEY).catch(() => undefined)
+      const { userPatterns, setActivePattern, setActiveLibrary, setActiveDemo } = usePatternStore.getState()
+      const { setSource, setIsReadOnly, setPreviewSource, setPreviewPatternName } = useEditorStore.getState()
+      if (!last) {
+        const p = userPatterns[0]
+        if (p) {
+          setActivePattern(p.id)
+          setSource(p.src)
+          setPreviewSource(p.src)
+          setPreviewPatternName(p.name)
+          setIsReadOnly(false)
+        }
+        return
+      }
+      if (last.type === 'pattern') {
+        const p = userPatterns.find((p) => p.id === last.id)
+        if (p) {
+          setActivePattern(p.id)
+          setSource(p.src)
+          setPreviewSource(p.src)
+          setPreviewPatternName(p.name)
+          setIsReadOnly(false)
+        }
+      } else if (last.type === 'demo') {
+        if (DEMOS[last.name]) {
+          setActiveDemo(last.name)
+          setSource(DEMOS[last.name])
+          setPreviewSource(DEMOS[last.name])
+          setPreviewPatternName(last.name)
+          setIsReadOnly(true)
+        }
+      } else if (last.type === 'library') {
+        if (LIBRARIES[last.name]) {
+          setActiveLibrary(last.name)
+          setSource(LIBRARIES[last.name])
+          setIsReadOnly(true)
+        }
+      }
+    })
   }, [loadPatterns])
 
   function openLibrary(name: string) {
