@@ -45,7 +45,7 @@ export function LibraryHoverCard({ name, anchorRect, onMouseEnter, onMouseLeave 
   const data = CHEATSHEETS[name]
   if (!data) return null
 
-  const top = Math.max(8, Math.min(anchorRect.top, window.innerHeight - MAX_HEIGHT - 8))
+  const top = Math.max(50, Math.min(anchorRect.top, window.innerHeight - MAX_HEIGHT - 8))
   const midpoint = Math.ceil(data.sections.length / 2)
   const col1 = data.sections.slice(0, midpoint)
   const col2 = data.sections.slice(midpoint)
@@ -56,13 +56,13 @@ export function LibraryHoverCard({ name, anchorRect, onMouseEnter, onMouseLeave 
       onMouseLeave={onMouseLeave}
       style={{
         position: 'fixed',
-        left: SIDEBAR_W + 1,
+        left: 0,
         top,
-        width: `calc(100vw - ${SIDEBAR_W + 1}px - ${PREVIEW_W}px)`,
+        width: `calc(100vw - ${PREVIEW_W}px)`,
         maxHeight: MAX_HEIGHT,
         zIndex: 50,
       }}
-      className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-y-auto p-4"
+      className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden p-4"
     >
       <div className="flex gap-6">
         <div className="flex-1 min-w-0">
