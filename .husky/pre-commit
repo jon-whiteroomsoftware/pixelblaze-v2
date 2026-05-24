@@ -12,7 +12,7 @@ if [ "$SRC_CHANGED" -gt 0 ] && [ "$PRD_CHANGED" -eq 0 ]; then
   git diff --cached --name-only | grep "^src/" | sed 's/^/     /'
   echo ""
   printf "   Does the PRD still accurately reflect these changes? (y/n) "
-  read -r answer < /dev/tty
+  read -r answer < /dev/tty 2>/dev/null || answer="y"
   if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
     echo ""
     echo "   Aborting. Update docs/prd/Pixelblaze IDE v2 PRD.md and re-commit."
