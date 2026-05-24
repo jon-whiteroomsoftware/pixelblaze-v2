@@ -30,4 +30,13 @@ describe('editorStore', () => {
     useEditorStore.getState().setPreviewSource(src)
     expect(useEditorStore.getState().previewSource).toBe(src)
   })
+
+  it('starts with empty previewPatternName', () => {
+    expect(useEditorStore.getState().previewPatternName).toBe('')
+  })
+
+  it('setPreviewPatternName updates previewPatternName', () => {
+    useEditorStore.getState().setPreviewPatternName('Rainbow Waves')
+    expect(useEditorStore.getState().previewPatternName).toBe('Rainbow Waves')
+  })
 })

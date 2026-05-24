@@ -7,10 +7,12 @@ interface EditorState {
   source: string
   isReadOnly: boolean
   previewSource: string
+  previewPatternName: string
   setCompileStatus: (status: CompileStatus) => void
   setSource: (source: string) => void
   setIsReadOnly: (value: boolean) => void
   setPreviewSource: (src: string) => void
+  setPreviewPatternName: (name: string) => void
 }
 
 export const editorInitialState = {
@@ -18,6 +20,7 @@ export const editorInitialState = {
   source: '',
   isReadOnly: true,
   previewSource: '',
+  previewPatternName: '',
 }
 
 export const useEditorStore = create<EditorState>()((set) => ({
@@ -26,4 +29,5 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setSource: (source) => set({ source }),
   setIsReadOnly: (isReadOnly) => set({ isReadOnly }),
   setPreviewSource: (previewSource) => set({ previewSource }),
+  setPreviewPatternName: (previewPatternName) => set({ previewPatternName }),
 }))
