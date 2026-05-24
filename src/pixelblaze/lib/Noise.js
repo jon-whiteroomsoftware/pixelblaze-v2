@@ -24,6 +24,7 @@ function _hash1(n) {
 
 // ─── Value noise ─────────────────────────────────────────────────────────────
 
+// Smooth 1D value noise; range 0..1
 function noise1D(x) {
   var ix = floor(x);
   var fx = x - ix;
@@ -70,17 +71,20 @@ function gradNoise2D(x, y) {
 // ─── Fractal Brownian Motion ──────────────────────────────────────────────────
 // Layered octaves for organic, cloud-like detail. 2–4 octaves is practical.
 
+// 2-octave fBm; practical balance of detail vs. speed
 function fbm2D_2(x, y) {
   return noise2D(x, y) * 0.5333
        + noise2D(x * 2.01, y * 2.01) * 0.2666;
 }
 
+// 3-octave fBm; more detail
 function fbm2D_3(x, y) {
   return noise2D(x, y) * 0.4444
        + noise2D(x * 2.01, y * 2.01) * 0.2222
        + noise2D(x * 4.03, y * 4.03) * 0.1111;
 }
 
+// 4-octave fBm; maximum detail
 function fbm2D_4(x, y) {
   return noise2D(x, y) * 0.3810
        + noise2D(x * 2.01, y * 2.01) * 0.1905
@@ -92,9 +96,11 @@ function fbm2D_4(x, y) {
 // Distort coordinates with noise before sampling — creates fluid, swirling shapes.
 // strength: displacement amount (try 0.2–0.5)
 
+// Displace x with noise; try strength 0.2–0.5
 function warpX(x, y, t, strength) {
   return x + noise2D(x + t * 0.3, y + 0.5) * strength - strength * 0.5;
 }
+// Displace y with noise; try strength 0.2–0.5
 function warpY(x, y, t, strength) {
   return y + noise2D(x + 0.5, y + t * 0.3) * strength - strength * 0.5;
 }

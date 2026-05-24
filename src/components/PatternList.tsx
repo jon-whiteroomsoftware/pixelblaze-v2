@@ -6,6 +6,7 @@ import { uniquePatternName, nameConflicts } from '@/engine/patternName'
 import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
+import { LibraryHoverCard } from '@/components/LibraryHoverCard'
 
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
@@ -28,15 +29,21 @@ function ListItem({
   active,
   dim,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   label: string
   active: boolean
   dim?: string
   onClick: () => void
+  onMouseEnter?: (e: React.MouseEvent<HTMLLIElement>) => void
+  onMouseLeave?: () => void
 }) {
   return (
     <li
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className={[
         'px-3 py-1.5 cursor-pointer truncate select-none flex items-center gap-1.5',
         'hover:text-zinc-100 hover:bg-zinc-800',
@@ -171,6 +178,46 @@ export function PatternList() {
   const renamePattern = usePatternStore((s) => s.renamePattern)
   const removePattern = usePatternStore((s) => s.removePattern)
 
+  const [hoveredLib, setHoveredLib] = useState<string | null>(null)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const hoveredLibRef = useRef<string | null>(null)
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current)
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    }
+  }, [])
+
+  function startShow(name: string, el: HTMLElement) {
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null }
+    if (hoveredLibRef.current !== null) {
+      setAnchorRect(el.getBoundingClientRect())
+      setHoveredLib(name)
+      hoveredLibRef.current = name
+      return
+    }
+    showTimerRef.current = setTimeout(() => {
+      setAnchorRect(el.getBoundingClientRect())
+      setHoveredLib(name)
+      hoveredLibRef.current = name
+    }, 250)
+  }
+
+  function startHide() {
+    if (showTimerRef.current) { clearTimeout(showTimerRef.current); showTimerRef.current = null }
+    hideTimerRef.current = setTimeout(() => {
+      setHoveredLib(null)
+      hoveredLibRef.current = null
+    }, 100)
+  }
+
+  function cancelHide() {
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null }
+  }
+
   useEffect(() => {
     loadPatterns().then(async () => {
       const last = await getSetting<LastActive>(LAST_ACTIVE_KEY).catch(() => undefined)
@@ -295,6 +342,13 @@ export function PatternList() {
 
       <SectionHeader label="Libraries" />
       <ul>
+        <li
+          onMouseEnter={(e) => startShow('PixelBlaze', e.currentTarget)}
+          onMouseLeave={startHide}
+          className="px-3 py-1.5 select-none flex items-center gap-1.5 cursor-default hover:text-zinc-100 hover:bg-zinc-800 text-zinc-400"
+        >
+          PixelBlaze
+        </li>
         {LIBRARY_NAMES.map((name) => (
           <ListItem
             key={name}
@@ -302,9 +356,20 @@ export function PatternList() {
             active={activeLibraryName === name}
             dim="read-only"
             onClick={() => openLibrary(name)}
+            onMouseEnter={(e) => startShow(name, e.currentTarget)}
+            onMouseLeave={startHide}
           />
         ))}
       </ul>
+
+      {hoveredLib && anchorRect && (
+        <LibraryHoverCard
+          name={hoveredLib}
+          anchorRect={anchorRect}
+          onMouseEnter={cancelHide}
+          onMouseLeave={startHide}
+        />
+      )}
     </div>
   )
 }

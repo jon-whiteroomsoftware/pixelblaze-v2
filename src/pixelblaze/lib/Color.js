@@ -15,6 +15,7 @@ function lerpHue(h0, h1, t) {
   return ((h0 + d * t) % 1 + 1) % 1;
 }
 
+// Hue directly opposite on the colour wheel
 function complementHue(h) { return (h + 0.5) % 1; }
 
 // Analogous hue offset by fraction f (try ±0.083 for ±30°)
@@ -35,6 +36,7 @@ function lerpHSV(h0, s0, v0, h1, s1, v1, t) {
 
 // ─── Palettes ─────────────────────────────────────────────────────────────────
 
+// Interpolate hue from hStart to hEnd
 function paletteLinear(t, hStart, hEnd) {
   return lerpHue(hStart, hEnd, t);
 }
@@ -44,38 +46,53 @@ function fireHue(t)   { return clamp(t, 0, 0.17); }
 function fireValue(t) { return clamp(t * 1.5, 0, 1); }
 function fireSat(t)   { return clamp(1.5 - t, 0, 1); }
 
-// Ice
+// Ice colour components
 function iceHue(t)   { return 0.58 + t * 0.08; }
 function iceSat(t)   { return clamp(1.5 - t, 0, 1); }
 function iceValue(t) { return clamp(t * 1.2, 0, 1); }
 
+// Full-spectrum hue cycling
 function rainbowHue(t) { return t % 1; }
 
+// Bright neon colour components
 function neonHue(t)   { return t % 1; }
 function neonSat()    { return 1; }
 function neonValue(t) { return 0.7 + wave(t * 3) * 0.3; }
 
 // ─── Blend modes ─────────────────────────────────────────────────────────────
 
+// Additive blend; clamped to 1
 function blendAdd(a, b)        { return min(a + b, 1); }
+// Multiply blend
 function blendMul(a, b)        { return a * b; }
+// Screen blend; brighter than multiply
 function blendScreen(a, b)     { return 1 - (1 - a) * (1 - b); }
+// Overlay blend; boosts contrast
 function blendOverlay(a, b)    { return a < 0.5 ? 2 * a * b : 1 - 2 * (1-a) * (1-b); }
+// Absolute difference
 function blendDifference(a, b) { return abs(a - b); }
+// Hard light; b controls contrast
 function blendHardLight(a, b)  { return b < 0.5 ? 2*a*b : 1 - 2*(1-a)*(1-b); }
+// Soft light; gentler contrast than hard light
 function blendSoftLight(a, b) {
   return b < 0.5
     ? a - (1 - 2*b) * a * (1 - a)
     : a + (2*b - 1) * ((a < 0.25 ? ((16*a - 12)*a + 4)*a : sqrt(a)) - a);
 }
+// Lighter of the two values
 function blendMax(a, b)        { return max(a, b); }
+// Darker of the two values
 function blendMin(a, b)        { return min(a, b); }
+// Linear mix; t is weight 0..1
 function blendMix(a, b, t)     { return a + (b - a) * t; }
 
 // ─── Brightness adjustments ──────────────────────────────────────────────────
 
+// Apply gamma correction; g>1 darkens midtones
 function gamma(v, g)      { return pow(clamp(v, 0, 1), g); }
+// Push brightness toward 1
 function boost(v, amount) { return clamp(v + amount * (1 - v), 0, 1); }
+// Increase or decrease contrast around 0.5
 function contrast(v, amount) { return clamp((v - 0.5) * amount + 0.5, 0, 1); }
 
 // Sets outH, outS, outV to a warm (orange→yellow-white) colour for brightness t

@@ -7,6 +7,7 @@
 
 // ─── Primitive shapes ────────────────────────────────────────────────────────
 
+// Circle at (cx, cy) with radius r
 function circle(px, py, cx, cy, r) {
   var dx = px - cx, dy = py - cy;
   return sqrt(dx * dx + dy * dy) - r;
@@ -20,6 +21,7 @@ function rect(px, py, cx, cy, hw, hh) {
   return sqrt(ox * ox + oy * oy) + min(max(dx, dy), 0);
 }
 
+// Square; half is half-side length
 function square(px, py, cx, cy, half) {
   return rect(px, py, cx, cy, half, half);
 }
@@ -34,6 +36,7 @@ function polygon(px, py, cx, cy, r, n) {
   return dist * cos(angle - nearest) - r * cos(PI / n);
 }
 
+// Equilateral triangle; r is circumradius
 function triangle(px, py, cx, cy, r) {
   return polygon(px, py, cx, cy, r, 3);
 }
@@ -108,8 +111,11 @@ function cross(px, py, cx, cy, size, thickness) {
 
 // ─── Boolean operations ──────────────────────────────────────────────────────
 
+// Minimum of two SDFs (OR)
 function union(a, b)    { return min(a, b); }
+// Maximum of two SDFs (AND)
 function intersect(a, b) { return max(a, b); }
+// Cut shape b from shape a
 function subtract(a, b) { return max(a, -b); }
 
 // Smooth union: blends boundary between shapes (k = blend radius)
@@ -118,6 +124,7 @@ function smoothUnion(a, b, k) {
   return min(a, b) - h * h * k * 0.25;
 }
 
+// Blended subtraction
 function smoothSubtract(a, b, k) {
   var h = max(k - abs(-a - b), 0) / k;
   return max(a, -b) + h * h * k * 0.25;

@@ -5,16 +5,25 @@
 
 // ─── Easing ──────────────────────────────────────────────────────────────────
 
+// Quadratic ease-in: slow start, fast end
 function easeIn2(t)    { return t * t; }
+// Quadratic ease-out: fast start, slow end
 function easeOut2(t)   { return t * (2 - t); }
+// Quadratic ease-in-out: slow at both ends
 function easeInOut2(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
 
+// Cubic ease-in
 function easeIn3(t)    { return t * t * t; }
+// Cubic ease-out
 function easeOut3(t)   { var u = 1 - t; return 1 - u * u * u; }
+// Cubic ease-in-out
 function easeInOut3(t) { return t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2; }
 
+// Quartic ease-in
 function easeIn4(t)    { return t * t * t * t; }
+// Quartic ease-out
 function easeOut4(t)   { var u = 1 - t; return 1 - u * u * u * u; }
+// Quartic ease-in-out
 function easeInOut4(t) { return t < 0.5 ? 8 * t * t * t * t : 1 - pow(-2 * t + 2, 4) / 2; }
 
 // Elastic: overshoots and oscillates at the end
@@ -48,18 +57,22 @@ function easeOutBack(t) {
 
 // ─── Interpolation ───────────────────────────────────────────────────────────
 
+// Linear interpolation from a to b
 function lerp(a, b, t) { return a + (b - a) * t; }
 
+// Smooth Hermite interpolation; output 0..1
 function smoothstep(lo, hi, t) {
   t = clamp((t - lo) / (hi - lo), 0, 1);
   return t * t * (3 - 2 * t);
 }
 
+// Ken Perlin's improved smoothstep; output 0..1
 function smootherstep(lo, hi, t) {
   t = clamp((t - lo) / (hi - lo), 0, 1);
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
+// Remap v from [inLo, inHi] to [outLo, outHi]
 function mapRange(v, inLo, inHi, outLo, outHi) {
   return outLo + (v - inLo) / (inHi - inLo) * (outHi - outLo);
 }

@@ -29,11 +29,13 @@ function radiusFrom(x, y, cx, cy) {
 
 // ─── Rotation ────────────────────────────────────────────────────────────────
 
+// Rotated x coordinate around (cx, cy) by angle a (radians)
 function rotateX(x, y, cx, cy, a) {
   var dx = x - cx, dy = y - cy;
   return cx + dx * cos(a) - dy * sin(a);
 }
 
+// Rotated y coordinate around (cx, cy) by angle a (radians)
 function rotateY(x, y, cx, cy, a) {
   var dx = x - cx, dy = y - cy;
   return cy + dx * sin(a) + dy * cos(a);
@@ -41,13 +43,18 @@ function rotateY(x, y, cx, cy, a) {
 
 // ─── Scale ───────────────────────────────────────────────────────────────────
 
+// Scale x around centre cx by factor s
 function scaleX(x, cx, s) { return cx + (x - cx) * s; }
+// Scale y around centre cy by factor s
 function scaleY(y, cy, s) { return cy + (y - cy) * s; }
 
 // ─── Mirror / fold ───────────────────────────────────────────────────────────
 
+// Fold x at 0.5; left half mirrors right
 function mirrorX(x) { return x < 0.5 ? x : 1 - x; }
+// Fold y at 0.5; top half mirrors bottom
 function mirrorY(y) { return y < 0.5 ? y : 1 - y; }
+// Fold v at an arbitrary axis point
 function mirrorAround(v, axis) { return v < axis ? v : 2 * axis - v; }
 
 // ─── Tiling ──────────────────────────────────────────────────────────────────
@@ -55,7 +62,7 @@ function mirrorAround(v, axis) { return v < axis ? v : 2 * axis - v; }
 // Position within one cell of n equal tiles
 function tile(v, n) { return (v * n) % 1; }
 
-// Which cell (0-indexed)
+// Which tile cell (0-indexed)
 function tileCell(v, n) { return floor(v * n); }
 
 // Tile with every other cell mirrored for seamless tiling
@@ -69,6 +76,7 @@ function tileMirror(v, n) {
 
 // Repeat space every size units; returns position within [-size/2, size/2]
 function repeatX(x, size) { return x - size * floor(x / size + 0.5); }
+// Same as repeatX for the y axis
 function repeatY(y, size) { return y - size * floor(y / size + 0.5); }
 
 // ─── Rotational symmetry ─────────────────────────────────────────────────────
@@ -88,11 +96,14 @@ function foldAngle(angle, n) {
 
 // ─── Coordinate remapping ─────────────────────────────────────────────────────
 
+// Map v from one range to another
 function remap(v, inLo, inHi, outLo, outHi) {
   return outLo + (v - inLo) / (inHi - inLo) * (outHi - outLo);
 }
 
 // ─── Skew ────────────────────────────────────────────────────────────────────
 
+// Shear x by y×amount
 function skewX(x, y, amount) { return x + y * amount; }
+// Shear y by x×amount
 function skewY(x, y, amount) { return y + x * amount; }
