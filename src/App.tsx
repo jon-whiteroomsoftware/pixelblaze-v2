@@ -14,11 +14,12 @@ export default function App() {
 
   const activePatternId = usePatternStore((s) => s.activePatternId)
   const activeLibraryName = usePatternStore((s) => s.activeLibraryName)
+  const activeDemoName = usePatternStore((s) => s.activeDemoName)
   const userPatterns = usePatternStore((s) => s.userPatterns)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
 
   const activeFileName =
-    activeLibraryName ?? userPatterns.find((p) => p.id === activePatternId)?.name ?? '—'
+    activeLibraryName ?? activeDemoName ?? userPatterns.find((p) => p.id === activePatternId)?.name ?? '—'
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100">
@@ -35,7 +36,7 @@ export default function App() {
         <main data-testid="editor-pane" className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <PaneHeader>
             <span className="flex-1 truncate">{activeFileName}</span>
-            <CompileStatusBadge />
+            {activePatternId !== null && <CompileStatusBadge />}
           </PaneHeader>
           <div className="flex-1 overflow-hidden">
             <Editor />

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { LIBRARIES } from '@/pixelblaze/libs'
+import { DEMOS } from '@/pixelblaze/demos'
 import { uniquePatternName, nameConflicts } from '@/engine/patternName'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord } from '@/store/patternStore'
 
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
+const DEMO_NAMES = Object.keys(DEMOS).sort()
 
 const NEW_PATTERN_SRC = `export function beforeRender(delta) {
 }
@@ -163,9 +165,11 @@ export function PatternList() {
   const setPreviewSource = useEditorStore((s) => s.setPreviewSource)
   const setPreviewPatternName = useEditorStore((s) => s.setPreviewPatternName)
   const activeLibraryName = usePatternStore((s) => s.activeLibraryName)
+  const activeDemoName = usePatternStore((s) => s.activeDemoName)
   const activePatternId = usePatternStore((s) => s.activePatternId)
   const userPatterns = usePatternStore((s) => s.userPatterns)
   const setActiveLibrary = usePatternStore((s) => s.setActiveLibrary)
+  const setActiveDemo = usePatternStore((s) => s.setActiveDemo)
   const setActivePattern = usePatternStore((s) => s.setActivePattern)
   const loadPatterns = usePatternStore((s) => s.loadPatterns)
   const addPattern = usePatternStore((s) => s.addPattern)
@@ -179,6 +183,12 @@ export function PatternList() {
   function openLibrary(name: string) {
     setActiveLibrary(name)
     setSource(LIBRARIES[name])
+    setIsReadOnly(true)
+  }
+
+  function openDemo(name: string) {
+    setActiveDemo(name)
+    setSource(DEMOS[name])
     setIsReadOnly(true)
   }
 
@@ -230,6 +240,19 @@ export function PatternList() {
             onSelect={() => openUserPattern(pattern)}
             onRename={(name) => renamePattern(pattern.id, name)}
             onDelete={() => removePattern(pattern.id)}
+          />
+        ))}
+      </ul>
+
+      <SectionHeader label="Demos" />
+      <ul>
+        {DEMO_NAMES.map((name) => (
+          <ListItem
+            key={name}
+            label={name}
+            active={activeDemoName === name}
+            dim="read-only"
+            onClick={() => openDemo(name)}
           />
         ))}
       </ul>

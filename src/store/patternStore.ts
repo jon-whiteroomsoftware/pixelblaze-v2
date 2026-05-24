@@ -12,9 +12,11 @@ export type { PatternRecord }
 interface PatternState {
   activePatternId: string | null
   activeLibraryName: string | null
+  activeDemoName: string | null
   userPatterns: PatternRecord[]
   setActivePattern: (id: string | null) => void
   setActiveLibrary: (name: string | null) => void
+  setActiveDemo: (name: string | null) => void
   loadPatterns: () => Promise<void>
   addPattern: (record: PatternRecord) => Promise<void>
   renamePattern: (id: string, name: string) => Promise<void>
@@ -25,14 +27,16 @@ interface PatternState {
 export const patternInitialState = {
   activePatternId: null as string | null,
   activeLibraryName: null as string | null,
+  activeDemoName: null as string | null,
   userPatterns: [] as PatternRecord[],
 }
 
 export const usePatternStore = create<PatternState>()((set, get) => ({
   ...patternInitialState,
 
-  setActivePattern: (id) => set({ activePatternId: id, activeLibraryName: null }),
-  setActiveLibrary: (name) => set({ activeLibraryName: name, activePatternId: null }),
+  setActivePattern: (id) => set({ activePatternId: id, activeLibraryName: null, activeDemoName: null }),
+  setActiveLibrary: (name) => set({ activeLibraryName: name, activePatternId: null, activeDemoName: null }),
+  setActiveDemo: (name) => set({ activeDemoName: name, activeLibraryName: null, activePatternId: null }),
 
   loadPatterns: async () => {
     const patterns = await listPatterns()
