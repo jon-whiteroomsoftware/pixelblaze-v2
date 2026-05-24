@@ -1,0 +1,12 @@
+COMMIT_MSG=$(cat "$1")
+
+# Skip merge, fixup, and squash commits
+echo "$COMMIT_MSG" | grep -qE "^(Merge |fixup!|squash!)" && exit 0
+
+if ! echo "$COMMIT_MSG" | grep -qE '#[0-9]+'; then
+  echo ""
+  echo "❌ Commit message must reference at least one GitHub issue (#N)."
+  echo "   Example: \"Add login page (closes #42)\""
+  echo ""
+  exit 1
+fi
