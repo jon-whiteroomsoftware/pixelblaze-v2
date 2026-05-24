@@ -183,6 +183,8 @@ export function PatternList() {
   function openDemo(name: string) {
     setActiveDemo(name)
     setSource(DEMOS[name])
+    setPreviewSource(DEMOS[name])
+    setPreviewPatternName(name)
     setIsReadOnly(true)
   }
 
