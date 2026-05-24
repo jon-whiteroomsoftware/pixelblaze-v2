@@ -40,7 +40,7 @@ export function Preview() {
     })
 
     loopRef.current = loop
-    loop.tick(0) // render one frozen frame immediately
+    loop.renderPreviewFrame()
 
     // Preserve running state across pattern switches and sync-tick reloads
     if (usePreviewStore.getState().isRunning) {

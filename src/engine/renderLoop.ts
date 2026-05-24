@@ -17,6 +17,7 @@ export interface RenderLoop {
   start(): void
   stop(): void
   tick(realDelta: number): void
+  renderPreviewFrame(): void
 }
 
 export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
@@ -24,7 +25,7 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
   let rafId: number | null = null
   let lastTs: number | null = null
 
-  function tick(realDelta: number): void {
+  function doTick(realDelta: number, dimmed: boolean): void {
     const scaledDelta = realDelta * getSpeed()
     clock.advance(scaledDelta)
     handle.beforeRender(scaledDelta)
@@ -41,7 +42,11 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
       }
     }
 
-    paint(pixels, getBrightness(), isDimmed())
+    paint(pixels, getBrightness(), dimmed)
+  }
+
+  function tick(realDelta: number): void {
+    doTick(realDelta, isDimmed())
   }
 
   function loop(ts: number): void {
@@ -64,5 +69,6 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
       }
     },
     tick,
+    renderPreviewFrame() { doTick(0, false) },
   }
 }

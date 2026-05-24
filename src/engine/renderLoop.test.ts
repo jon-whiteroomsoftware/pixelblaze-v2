@@ -201,6 +201,34 @@ describe('delta scaling', () => {
   })
 })
 
+// ── renderPreviewFrame ────────────────────────────────────────────────────────
+
+describe('renderPreviewFrame', () => {
+  it('paints with dimmed=false even when isDimmed returns true', () => {
+    const paint = vi.fn()
+    const loop = createRenderLoop({
+      handle: makeMockHandle(), shim: makeMockShim(), clock: makeMockClock(),
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 1, getBrightness: () => 0.8, isDimmed: () => true,
+      paint,
+    })
+    loop.renderPreviewFrame()
+    expect(paint).toHaveBeenCalledWith(expect.anything(), 0.8, false)
+  })
+
+  it('calls beforeRender with delta=0 regardless of speed', () => {
+    const handle = makeMockHandle()
+    const loop = createRenderLoop({
+      handle, shim: makeMockShim(), clock: makeMockClock(),
+      grid: { rows: 1, cols: 1 },
+      getSpeed: () => 5, getBrightness: () => 1, isDimmed: () => false,
+      paint: vi.fn(),
+    })
+    loop.renderPreviewFrame()
+    expect(handle.beforeRender).toHaveBeenCalledWith(0)
+  })
+})
+
 // ── virtual clock advancement ─────────────────────────────────────────────────
 
 describe('virtual clock', () => {
