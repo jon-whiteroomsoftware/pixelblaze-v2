@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePreviewStore } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
 import { createShim } from '@/engine/shim'
@@ -11,16 +11,31 @@ import { LIBRARIES } from '@/pixelblaze/libs'
 
 export function Preview() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const loopRef = useRef<RenderLoop | null>(null)
   const isRunning = usePreviewStore((s) => s.isRunning)
   const previewSource = useEditorStore((s) => s.previewSource)
+  const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
 
-  // Rebuild the loop whenever a new clean source is pushed (pattern switch or sync tick)
+  // Derive spacing from container width so cols always fill the available width
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      const { width } = entry.contentRect
+      const { cols } = usePreviewStore.getState().grid
+      setCanvasDims({ spacing: Math.max(1, Math.floor(width / cols)) })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Rebuild the loop whenever source or spacing changes
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !previewSource) return
+    if (!canvas || !previewSource || !canvasDims) return
 
-    const grid = usePreviewStore.getState().grid
+    const grid = { ...usePreviewStore.getState().grid, ...canvasDims }
 
     const clock = createVirtualClock()
     const shim = createShim({ grid, getVirtualTime: () => clock.getTime() })
@@ -42,13 +57,13 @@ export function Preview() {
     loopRef.current = loop
     loop.renderPreviewFrame()
 
-    // Preserve running state across pattern switches and sync-tick reloads
+    // Preserve running state across pattern switches and resizes
     if (usePreviewStore.getState().isRunning) {
       loop.start()
     }
 
     return () => loop.stop()
-  }, [previewSource])
+  }, [previewSource, canvasDims])
 
   // Start / stop when isRunning changes
   useEffect(() => {
@@ -60,7 +75,9 @@ export function Preview() {
 
   return (
     <div className="h-full bg-zinc-950 pt-3 pl-3">
-      <canvas ref={canvasRef} className="rounded-sm" />
+      <div ref={containerRef} className="w-full h-full">
+        <canvas ref={canvasRef} className="rounded-sm" />
+      </div>
     </div>
   )
 }

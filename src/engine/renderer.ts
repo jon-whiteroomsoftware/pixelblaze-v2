@@ -36,7 +36,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function paint(pixels: [number, number, number][], brightness: number, dimmed: boolean): void {
     const { rows, cols, spacing, glow, glowAmount } = grid
-    const radius = spacing / 2 - 2
+    const radius = spacing / 2 - 3
     const dimScale = dimmed ? DIM_FACTOR : 1
 
     ctx2d.clearRect(0, 0, canvas.width, canvas.height)
