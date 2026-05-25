@@ -133,7 +133,7 @@ The app starts **paused**. Running state is preserved across pattern switches.
 
 ### User pattern storage
 
-User patterns are stored in **IndexedDB** under a dedicated object store. Each record: `{ id: string, name: string, src: string, controls: Record<string, number | number[]>, updatedAt: number }`. The `controls` map holds persisted control values keyed by export name — a single `number` for `slider`/`toggle`, a 3-element array for `hsvPicker`/`rgbPicker` (matching the shape the hardware websocket API uses for `getControls`/`setControls`, which eases the deferred hardware-upload feature). Control values are therefore per-pattern, saved/loaded/deleted atomically with the pattern.
+User patterns are stored in **IndexedDB** under a dedicated object store. Each record: `{ id: string, name: string, src: string, updatedAt: number }`. Control values are **not** persisted — they are transient session state held in Zustand and reset to defaults on every page load.
 
 A separate key-value store holds **global** app settings (grid config, speed, brightness) — these are not per-pattern.
 
@@ -214,7 +214,7 @@ A pattern can export specially-named functions that cause the IDE to render inte
 
 v1 supports only these four **input** control types. The remaining Pixelblaze control prefixes — `trigger`, `inputNumber`, `showNumber`, `gauge` — are deferred (see Deferred section); the last two are *output* controls that the IDE would poll for a return value, a separate path. Any exported function whose prefix is not one of the four supported kinds is **ignored** by the controls renderer — no widget, no error, no squiggle. It remains an ordinary exported function (callable internally by the pattern), so patterns authored on hardware that use a `gauge` or `trigger` still load and run, just without that widget.
 
-When a pattern is loaded, each supported control function is called immediately with its saved value so pattern state is consistent before the first frame renders. Control values are persisted per-pattern across reloads and app restarts.
+When a pattern is loaded, each supported control function is called immediately with its current value so pattern state is consistent before the first frame renders. Control values are transient session state — they reset to defaults when the page is reloaded.
 
 ### Var Watcher
 

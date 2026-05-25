@@ -48,4 +48,17 @@ describe('editorStore', () => {
     useEditorStore.getState().setPatternVars(['t', 'width', 'height'])
     expect(useEditorStore.getState().patternVars).toEqual(['t', 'width', 'height'])
   })
+
+  it('starts with empty controls', () => {
+    expect(useEditorStore.getState().controls).toEqual([])
+  })
+
+  it('setControls updates controls', () => {
+    const controls = [
+      { exportName: 'sliderSpeed', kind: 'slider', label: 'Speed' },
+      { exportName: 'toggleInvert', kind: 'toggle', label: 'Invert' },
+    ]
+    useEditorStore.getState().setControls(controls)
+    expect(useEditorStore.getState().controls).toEqual(controls)
+  })
 })

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePreviewStore } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
+import { useControlStore } from '@/store/controlStore'
 import { WatchPanel } from '@/components/WatchPanel'
+import { ControlsPanel } from '@/components/ControlsPanel'
 import { createShim } from '@/engine/shim'
 import { loadPattern } from '@/engine/loadPattern'
 import { bundle } from '@/engine/bundle'
@@ -19,6 +21,8 @@ export function Preview() {
   const isRunning = usePreviewStore((s) => s.isRunning)
   const grid = usePreviewStore((s) => s.grid)
   const previewSource = useEditorStore((s) => s.previewSource)
+  const controlValues = useControlStore((s) => s.controlValues)
+  const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
@@ -58,7 +62,22 @@ export function Preview() {
     try {
       const { code, metadata } = bundle(previewSource, LIBRARIES)
       handle = loadPattern(code, metadata, shim.builtins)
+      handleRef.current = handle
       useEditorStore.getState().setPatternVars(metadata.patternVars)
+      useEditorStore.getState().setControls(metadata.controls)
+      // Seed controlStore with defaults and invoke each control callback once
+      const defaults: Record<string, number | [number, number, number]> = {}
+      for (const c of metadata.controls) {
+        if (c.kind === 'slider') defaults[c.exportName] = 0.5
+        else if (c.kind === 'toggle') defaults[c.exportName] = 0
+        else if (c.kind === 'hsvPicker') defaults[c.exportName] = [0, 1, 1]
+        else if (c.kind === 'rgbPicker') defaults[c.exportName] = [1, 1, 1]
+      }
+      useControlStore.getState().resetControls(defaults)
+      for (const [name, value] of Object.entries(defaults)) {
+        if (Array.isArray(value)) handle.controls[name]?.(...(value as number[]))
+        else handle.controls[name]?.(value)
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       queueMicrotask(() => setRuntimeError(msg))
@@ -112,6 +131,19 @@ export function Preview() {
     return () => loop.stop()
   }, [previewSource, canvasDims])
 
+  // Forward control value changes to the live pattern handle
+  useEffect(() => {
+    const handle = handleRef.current
+    if (!handle) return
+    for (const [name, value] of Object.entries(controlValues)) {
+      if (Array.isArray(value)) handle.controls[name]?.(...(value as number[]))
+      else handle.controls[name]?.(value)
+    }
+    if (!usePreviewStore.getState().isRunning) {
+      loopRef.current?.renderPreviewFrame()
+    }
+  }, [controlValues])
+
   // Push grid changes to the renderer without rebuilding the loop
   useEffect(() => {
     if (!canvasDims) return
@@ -162,6 +194,7 @@ export function Preview() {
           </div>
           <div className="mt-2">
             <WatchPanel />
+            <ControlsPanel />
           </div>
         </div>
       </div>

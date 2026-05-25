@@ -8,7 +8,7 @@ export interface PatternHandle {
   beforeRender: (delta: number) => void
   render2D: (index: number, x: number, y: number) => void
   getExports: () => Record<string, unknown>
-  controls: Record<string, (value: number | number[]) => void>
+  controls: Record<string, (...args: number[]) => void>
 }
 
 export function loadPattern(
