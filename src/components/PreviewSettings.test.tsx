@@ -64,13 +64,13 @@ describe('PreviewSettings', () => {
     expect(usePreviewStore.getState().brightness).toBe(0.5)
   })
 
-  it('glow slider updates the store', async () => {
+  it('diffusion slider updates the store', async () => {
     const user = userEvent.setup()
     render(<PreviewSettings />)
     await user.click(screen.getByRole('button', { name: /preview settings/i }))
-    const slider = screen.getByRole('slider', { name: /glow/i })
-    fireEvent.change(slider, { target: { value: '12' } })
-    expect(usePreviewStore.getState().grid.glowAmount).toBe(12)
+    const slider = screen.getByRole('slider', { name: /diffusion/i })
+    fireEvent.change(slider, { target: { value: '0.5' } })
+    expect(usePreviewStore.getState().grid.diffusion).toBe(0.5)
   })
 
   it('grid size inputs show current rows and cols', async () => {

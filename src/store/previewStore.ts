@@ -5,7 +5,7 @@ export interface GridConfig {
   rows: number
   cols: number
   spacing: number
-  glowAmount: number
+  diffusion: number
 }
 
 interface PreviewState {
@@ -33,7 +33,7 @@ export const previewInitialState = {
     rows: 16,
     cols: 16,
     spacing: 20,
-    glowAmount: 8,
+    diffusion: 0,
   },
   watchedBuiltins: ['delta', 'pixelCount'] as string[],
   watchedPatternVars: [] as string[],

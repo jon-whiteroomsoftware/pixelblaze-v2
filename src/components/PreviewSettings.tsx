@@ -43,7 +43,7 @@ export function PreviewSettings() {
 
   const brightness = usePreviewStore((s) => s.brightness)
   const setBrightness = usePreviewStore((s) => s.setBrightness)
-  const glowAmount = usePreviewStore((s) => s.grid.glowAmount)
+  const diffusion = usePreviewStore((s) => s.grid.diffusion)
   const gridRows = usePreviewStore((s) => s.grid.rows)
   const gridCols = usePreviewStore((s) => s.grid.cols)
   const setGrid = usePreviewStore((s) => s.setGrid)
@@ -126,14 +126,14 @@ export function PreviewSettings() {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-zinc-500">Glow</span>
+                <span className="text-xs text-zinc-500">Diffusion</span>
                 <input
                   type="range"
                   min={0}
-                  max={30}
-                  step={1}
-                  value={glowAmount}
-                  onChange={(e) => setGrid({ glowAmount: Number(e.target.value) })}
+                  max={1}
+                  step={0.01}
+                  value={diffusion}
+                  onChange={(e) => setGrid({ diffusion: Number(e.target.value) })}
                   className="w-full accent-amber-500"
                 />
               </label>

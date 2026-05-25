@@ -14,7 +14,6 @@ import { LIBRARIES } from '@/pixelblaze/libs'
 
 export function Preview() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const glowCanvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const loopRef = useRef<RenderLoop | null>(null)
   const rendererRef = useRef<ReturnType<typeof createRenderer> | null>(null)
@@ -87,16 +86,8 @@ export function Preview() {
     const renderer = createRenderer(canvas, gridWithDims)
     rendererRef.current = renderer
 
-    // After each paint, copy the sharp frame to the glow canvas so the
-    // screen-blend overlay stays in sync without rebuilding the loop
     const paint = (pixels: [number, number, number][], brightness: number, dimmed: boolean) => {
       renderer.paint(pixels, brightness, dimmed)
-      const gc = glowCanvasRef.current
-      if (gc) {
-        if (gc.width !== canvas.width) gc.width = canvas.width
-        if (gc.height !== canvas.height) gc.height = canvas.height
-        gc.getContext('2d')?.drawImage(canvas, 0, 0)
-      }
     }
 
     const loop = createRenderLoop({
@@ -166,7 +157,9 @@ export function Preview() {
             <canvas
               ref={canvasRef}
               className="rounded-sm"
-              style={{ opacity: (1 - Math.pow(grid.glowAmount / 30, 2) * 0.65).toFixed(2) }}
+              style={grid.diffusion > 0 ? {
+                filter: `blur(${(grid.diffusion * (canvasDims?.spacing ?? grid.spacing)).toFixed(1)}px)`,
+              } : undefined}
             />
             {runtimeError && (
               <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
@@ -176,20 +169,6 @@ export function Preview() {
                   </span>
                 </div>
               </div>
-            )}
-            {grid.glowAmount > 0 && (
-              <canvas
-                ref={glowCanvasRef}
-                className="rounded-sm"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  filter: `blur(${Math.min(grid.glowAmount, 25)}px) brightness(${(1 + Math.pow(grid.glowAmount / 30, 2) * 5).toFixed(2)})`,
-                  mixBlendMode: 'screen',
-                  pointerEvents: 'none',
-                }}
-              />
             )}
           </div>
           <div className="mt-2">

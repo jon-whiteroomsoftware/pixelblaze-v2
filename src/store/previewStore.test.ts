@@ -40,7 +40,7 @@ describe('previewStore', () => {
     expect(grid.rows).toBe(16)
     expect(grid.cols).toBe(16)
     expect(grid.spacing).toBe(20)
-    expect(grid.glowAmount).toBe(8)
+    expect(grid.diffusion).toBe(0)
   })
 
   it('setGrid merges partial grid updates', () => {
