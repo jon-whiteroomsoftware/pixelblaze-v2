@@ -6,6 +6,16 @@ import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
 import { LibraryHoverCard } from '@/components/LibraryHoverCard'
+import {
+  AlertDialogRoot,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
 
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
@@ -101,57 +111,66 @@ function UserPatternItem({
     if (conflict) setConflict(false)
   }
 
-  function handleDelete(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (confirm(`Delete "${pattern.name}"?`)) onDelete()
-  }
-
   return (
-    <li
-      onClick={onSelect}
-      className={[
-        'px-3 py-1.5 cursor-pointer select-none flex items-center gap-1',
-        'hover:text-zinc-100 hover:bg-zinc-800 group',
-        active ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400',
-      ].join(' ')}
-    >
-      {editing ? (
-        <input
-          ref={inputRef}
-          autoFocus
-          value={draft}
-          onChange={handleDraftChange}
-          onBlur={commitRename}
-          onKeyDown={onKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          className={[
-            'flex-1 min-w-0 text-sm px-1 rounded outline-none',
-            conflict
-              ? 'bg-red-900/60 text-red-200 ring-1 ring-red-500'
-              : 'bg-zinc-700 text-zinc-100',
-          ].join(' ')}
-          title={conflict ? 'A pattern with that name already exists' : undefined}
-        />
-      ) : (
-        <>
-          <span className="flex-1 min-w-0 truncate">{pattern.name}</span>
-          <button
-            onClick={startEdit}
-            className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 text-xs px-1 shrink-0"
-            title="Rename"
-          >
-            ✎
-          </button>
-          <button
-            onClick={handleDelete}
-            className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
-            title="Delete"
-          >
-            ✕
-          </button>
-        </>
-      )}
-    </li>
+    <AlertDialogRoot>
+      <li
+        onClick={onSelect}
+        className={[
+          'px-3 py-1.5 cursor-pointer select-none flex items-center gap-1',
+          'hover:text-zinc-100 hover:bg-zinc-800 group',
+          active ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400',
+        ].join(' ')}
+      >
+        {editing ? (
+          <input
+            ref={inputRef}
+            autoFocus
+            value={draft}
+            onChange={handleDraftChange}
+            onBlur={commitRename}
+            onKeyDown={onKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className={[
+              'flex-1 min-w-0 text-sm px-1 rounded outline-none',
+              conflict
+                ? 'bg-red-900/60 text-red-200 ring-1 ring-red-500'
+                : 'bg-zinc-700 text-zinc-100',
+            ].join(' ')}
+            title={conflict ? 'A pattern with that name already exists' : undefined}
+          />
+        ) : (
+          <>
+            <span className="flex-1 min-w-0 truncate">{pattern.name}</span>
+            <button
+              onClick={startEdit}
+              className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 text-xs px-1 shrink-0"
+              title="Rename"
+            >
+              ✎
+            </button>
+            <AlertDialogTrigger asChild>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
+                title="Delete"
+              >
+                ✕
+              </button>
+            </AlertDialogTrigger>
+          </>
+        )}
+      </li>
+      <AlertDialogContent>
+        <AlertDialogTitle>Delete pattern?</AlertDialogTitle>
+        <AlertDialogDescription>
+          "{pattern.name}" will be permanently deleted and cannot be recovered.
+        </AlertDialogDescription>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialogRoot>
   )
 }
 
