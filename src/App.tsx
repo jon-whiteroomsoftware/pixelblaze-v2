@@ -176,7 +176,10 @@ export default function App() {
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100">
       <header data-testid="top-bar" className="h-10 flex items-center px-4 border-b border-zinc-800 shrink-0 bg-zinc-900">
         <span className="text-sm font-mono uppercase tracking-widest text-amber-500/70">
-          Pixelbl<span className="relative select-none" style={{ top: '-0.1em', position: 'relative', fontSize: '1.25em', marginLeft: '-0.15em', marginRight: '-0.15em' }}>🔥</span>ze IDE
+          Pixelbl<span className="relative inline-block" style={{ marginLeft: '-0.05em', marginRight: '-0.05em' }}>
+            <span className="absolute select-none" style={{ fontSize: '1.26em', top: '-0.35em', left: '50%', transform: 'translateX(calc(-50% - 1px))', opacity: 0.58, zIndex: 0 }}>🔥</span>
+            <span className="relative" style={{ zIndex: 1 }}>a</span>
+          </span>ze IDE
         </span>
       </header>
       <div className="flex flex-1 min-h-0">
