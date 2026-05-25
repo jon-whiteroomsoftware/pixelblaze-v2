@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export interface GridConfig {
   rows: number
@@ -39,13 +40,21 @@ export const previewInitialState = {
   watchValues: {} as Record<string, unknown>,
 }
 
-export const usePreviewStore = create<PreviewState>()((set) => ({
-  ...previewInitialState,
-  toggle: () => set((s) => ({ isRunning: !s.isRunning })),
-  setSpeed: (speed) => set({ speed }),
-  setBrightness: (brightness) => set({ brightness }),
-  setGrid: (partial) => set((s) => ({ grid: { ...s.grid, ...partial } })),
-  setWatchedBuiltins: (watchedBuiltins) => set({ watchedBuiltins }),
-  setWatchedPatternVars: (watchedPatternVars) => set({ watchedPatternVars }),
-  setWatchValues: (watchValues) => set({ watchValues }),
-}))
+export const usePreviewStore = create<PreviewState>()(
+  persist(
+    (set) => ({
+      ...previewInitialState,
+      toggle: () => set((s) => ({ isRunning: !s.isRunning })),
+      setSpeed: (speed) => set({ speed }),
+      setBrightness: (brightness) => set({ brightness }),
+      setGrid: (partial) => set((s) => ({ grid: { ...s.grid, ...partial } })),
+      setWatchedBuiltins: (watchedBuiltins) => set({ watchedBuiltins }),
+      setWatchedPatternVars: (watchedPatternVars) => set({ watchedPatternVars }),
+      setWatchValues: (watchValues) => set({ watchValues }),
+    }),
+    {
+      name: 'pixelblaze-preview',
+      partialize: (s) => ({ brightness: s.brightness, speed: s.speed, grid: s.grid }),
+    }
+  )
+)
