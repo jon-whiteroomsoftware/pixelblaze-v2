@@ -34,6 +34,14 @@ export function Preview() {
     return () => ro.disconnect()
   }, [])
 
+  // Recompute spacing when cols changes without a container resize
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const { width } = el.getBoundingClientRect()
+    setCanvasDims({ spacing: Math.max(1, Math.floor(width / grid.cols)) })
+  }, [grid.cols])
+
   // Rebuild the loop whenever source or spacing changes
   useEffect(() => {
     const canvas = canvasRef.current

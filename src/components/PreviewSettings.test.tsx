@@ -72,4 +72,35 @@ describe('PreviewSettings', () => {
     fireEvent.change(slider, { target: { value: '12' } })
     expect(usePreviewStore.getState().grid.glowAmount).toBe(12)
   })
+
+  it('grid size inputs show current rows and cols', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    expect(screen.getByRole('spinbutton', { name: /grid columns/i })).toHaveValue(16)
+    expect(screen.getByRole('spinbutton', { name: /grid rows/i })).toHaveValue(16)
+  })
+
+  it('clicking OK commits grid size to the store', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    await user.clear(screen.getByRole('spinbutton', { name: /grid columns/i }))
+    await user.type(screen.getByRole('spinbutton', { name: /grid columns/i }), '8')
+    await user.clear(screen.getByRole('spinbutton', { name: /grid rows/i }))
+    await user.type(screen.getByRole('spinbutton', { name: /grid rows/i }), '4')
+    await user.click(screen.getByRole('button', { name: /ok/i }))
+    const { rows, cols } = usePreviewStore.getState().grid
+    expect(cols).toBe(8)
+    expect(rows).toBe(4)
+  })
+
+  it('pressing Enter in a grid input commits the size', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    await user.clear(screen.getByRole('spinbutton', { name: /grid columns/i }))
+    await user.type(screen.getByRole('spinbutton', { name: /grid columns/i }), '10{Enter}')
+    expect(usePreviewStore.getState().grid.cols).toBe(10)
+  })
 })

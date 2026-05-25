@@ -9,7 +9,20 @@ export function PreviewSettings() {
   const brightness = usePreviewStore((s) => s.brightness)
   const setBrightness = usePreviewStore((s) => s.setBrightness)
   const glowAmount = usePreviewStore((s) => s.grid.glowAmount)
+  const gridRows = usePreviewStore((s) => s.grid.rows)
+  const gridCols = usePreviewStore((s) => s.grid.cols)
   const setGrid = usePreviewStore((s) => s.setGrid)
+
+  const [draftRows, setDraftRows] = useState(String(gridRows))
+  const [draftCols, setDraftCols] = useState(String(gridCols))
+
+  function commitGridSize() {
+    const rows = Math.max(1, parseInt(draftRows, 10) || gridRows)
+    const cols = Math.max(1, parseInt(draftCols, 10) || gridCols)
+    setDraftRows(String(rows))
+    setDraftCols(String(cols))
+    setGrid({ rows, cols })
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -67,6 +80,39 @@ export function PreviewSettings() {
                   className="w-full accent-amber-500"
                 />
               </label>
+            </div>
+          </section>
+
+          <section className="mt-4">
+            <h3 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-3">
+              Grid Size
+            </h3>
+            <div className="flex items-center gap-2">
+              <input
+                aria-label="Grid columns"
+                type="number"
+                min={1}
+                value={draftCols}
+                onChange={(e) => setDraftCols(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && commitGridSize()}
+                className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 text-center focus:outline-none focus:border-amber-500"
+              />
+              <span className="text-xs text-zinc-500">×</span>
+              <input
+                aria-label="Grid rows"
+                type="number"
+                min={1}
+                value={draftRows}
+                onChange={(e) => setDraftRows(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && commitGridSize()}
+                className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 text-center focus:outline-none focus:border-amber-500"
+              />
+              <button
+                onClick={commitGridSize}
+                className="px-2 py-1 text-xs rounded border border-amber-500 text-amber-500 hover:bg-amber-500/10 transition-colors"
+              >
+                OK
+              </button>
             </div>
           </section>
         </div>
