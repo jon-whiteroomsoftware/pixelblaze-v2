@@ -76,6 +76,7 @@ function UserPatternItem({
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const [draft, setDraft] = useState(pattern.name)
   const [conflict, setConflict] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -115,9 +116,11 @@ function UserPatternItem({
     <AlertDialogRoot>
       <li
         onClick={onSelect}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         className={[
           'pl-6 pr-3 py-1.5 cursor-pointer select-none flex items-center gap-1',
-          'hover:text-zinc-300 hover:bg-zinc-800/60 group',
+          'hover:text-zinc-300 hover:bg-zinc-800/60',
           active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-500',
         ].join(' ')}
       >
@@ -138,12 +141,12 @@ function UserPatternItem({
             ].join(' ')}
             title={conflict ? 'A pattern with that name already exists' : undefined}
           />
-        ) : (
+        ) : hovered ? (
           <>
             <span className="flex-1 min-w-0 truncate">{pattern.name}</span>
             <button
               onClick={startEdit}
-              className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 text-xs px-1 shrink-0"
+              className="text-zinc-500 hover:text-zinc-300 text-xs px-1 shrink-0"
               title="Rename"
             >
               ✎
@@ -151,13 +154,15 @@ function UserPatternItem({
             <AlertDialogTrigger asChild>
               <button
                 onClick={(e) => e.stopPropagation()}
-                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
+                className="text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
                 title="Delete"
               >
                 ✕
               </button>
             </AlertDialogTrigger>
           </>
+        ) : (
+          <span>{pattern.name}</span>
         )}
       </li>
       <AlertDialogContent>
@@ -320,7 +325,6 @@ export function PatternList() {
             key={name}
             label={name}
             active={activeDemoName === name}
-            dim="read-only"
             onClick={() => openDemo(name)}
           />
         ))}
@@ -340,7 +344,6 @@ export function PatternList() {
             key={name}
             label={name}
             active={activeLibraryName === name}
-            dim="read-only"
             onClick={() => openLibrary(name)}
             onMouseEnter={(e) => startShow(name, e.currentTarget)}
             onMouseLeave={startHide}
