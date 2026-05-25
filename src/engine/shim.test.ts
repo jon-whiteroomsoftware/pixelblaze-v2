@@ -190,14 +190,39 @@ describe('hardware stubs', () => {
   it('sensor globals are defined as zero defaults', () => {
     const { builtins } = makeShim()
     expect(builtins.energyAverage).toBe(0)
-    expect(builtins.nodeId).toBe(0)
     expect(Array.isArray(builtins.frequencyData)).toBe(true)
+  })
+
+  it('nodeId is a function returning 0', () => {
+    const { builtins } = makeShim()
+    expect((builtins.nodeId as () => number)()).toBe(0)
   })
 
   it('coordinate transform stubs are callable without throwing', () => {
     const { builtins } = makeShim()
     expect(() => (builtins.resetTransform as () => void)()).not.toThrow()
     expect(() => (builtins.translate as (x: number, y: number) => void)(1, 2)).not.toThrow()
+  })
+})
+
+// ── pixel map queries ─────────────────────────────────────────────────────────
+
+describe('pixel map queries', () => {
+  it('has2DMap, has3DMap and pixelMapDimensions are callable functions', () => {
+    const { builtins } = makeShim()
+    expect((builtins.has2DMap as () => boolean)()).toBe(true)
+    expect((builtins.has3DMap as () => boolean)()).toBe(false)
+    expect((builtins.pixelMapDimensions as () => number)()).toBe(2)
+  })
+})
+
+// ── hsv24 ─────────────────────────────────────────────────────────────────────
+
+describe('hsv24', () => {
+  it('captures the same color as hsv for matching h, s, v', () => {
+    const { builtins, capturedPixel } = makeShim()
+    ;(builtins.hsv24 as (h: number, s: number, v: number) => void)(0, 1, 1)
+    expect(capturedPixel()).toEqual([1, 0, 0])
   })
 })
 
@@ -216,5 +241,221 @@ describe('setPalette / paint', () => {
   it('paint without palette does not throw', () => {
     const { builtins } = makeShim()
     expect(() => (builtins.paint as (pos: number) => void)(0.5)).not.toThrow()
+  })
+})
+
+// ── math additions ────────────────────────────────────────────────────────────
+
+describe('frac', () => {
+  it('returns the fractional part of a positive number', () => {
+    const { builtins } = makeShim()
+    expect((builtins.frac as (v: number) => number)(5.5)).toBeCloseTo(0.5)
+  })
+  it('returns negative fractional part for negative numbers (truncation-based)', () => {
+    const { builtins } = makeShim()
+    expect((builtins.frac as (v: number) => number)(-5.5)).toBeCloseTo(-0.5)
+  })
+})
+
+describe('mod', () => {
+  it('matches JS % for positive operands', () => {
+    const { builtins } = makeShim()
+    expect((builtins.mod as (x: number, y: number) => number)(7, 3)).toBeCloseTo(1)
+  })
+  it('uses floored division so result has sign of y (mod(-3.5, 3) == 2.5)', () => {
+    const { builtins } = makeShim()
+    expect((builtins.mod as (x: number, y: number) => number)(-3.5, 3)).toBeCloseTo(2.5)
+  })
+})
+
+describe('smoothstep', () => {
+  it('returns 0 below lo', () => {
+    const { builtins } = makeShim()
+    expect((builtins.smoothstep as (lo: number, hi: number, v: number) => number)(0.2, 0.8, 0)).toBe(0)
+  })
+  it('returns 1 above hi', () => {
+    const { builtins } = makeShim()
+    expect((builtins.smoothstep as (lo: number, hi: number, v: number) => number)(0.2, 0.8, 1)).toBe(1)
+  })
+  it('returns 0.5 at midpoint', () => {
+    const { builtins } = makeShim()
+    expect((builtins.smoothstep as (lo: number, hi: number, v: number) => number)(0, 1, 0.5)).toBeCloseTo(0.5)
+  })
+})
+
+describe('mix', () => {
+  it('interpolates linearly', () => {
+    const { builtins } = makeShim()
+    expect((builtins.mix as (lo: number, hi: number, w: number) => number)(0, 10, 0.3)).toBeCloseTo(3)
+  })
+})
+
+describe('bezierQuadratic', () => {
+  it('returns p0 at t=0 and p2 at t=1', () => {
+    const { builtins } = makeShim()
+    const bq = builtins.bezierQuadratic as (t: number, p0: number, p1: number, p2: number) => number
+    expect(bq(0, 1, 5, 3)).toBeCloseTo(1)
+    expect(bq(1, 1, 5, 3)).toBeCloseTo(3)
+  })
+})
+
+describe('bezierCubic', () => {
+  it('returns p0 at t=0 and p3 at t=1', () => {
+    const { builtins } = makeShim()
+    const bc = builtins.bezierCubic as (t: number, p0: number, p1: number, p2: number, p3: number) => number
+    expect(bc(0, 1, 5, 7, 4)).toBeCloseTo(1)
+    expect(bc(1, 1, 5, 7, 4)).toBeCloseTo(4)
+  })
+})
+
+describe('prng / prngSeed', () => {
+  it('produces the same sequence for the same seed', () => {
+    const { builtins } = makeShim()
+    const prng = builtins.prng as (max: number) => number
+    const seed = builtins.prngSeed as (s: number) => number
+    seed(42)
+    const a = [prng(1), prng(1), prng(1)]
+    seed(42)
+    const b = [prng(1), prng(1), prng(1)]
+    expect(a).toEqual(b)
+  })
+  it('returns values in [0, max)', () => {
+    const { builtins } = makeShim()
+    const prng = builtins.prng as (max: number) => number
+    for (let i = 0; i < 20; i++) {
+      const v = prng(5)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThan(5)
+    }
+  })
+})
+
+interface PbArray extends Array<number> {
+  sum(): number
+  mutate(fn: (v: number, i: number, a: number[]) => number): PbArray
+  sort(): PbArray
+}
+
+function pbArr(builtins: Record<string, unknown>, n: number): PbArray {
+  return (builtins.array as (n: number) => PbArray)(n)
+}
+
+describe('array methods', () => {
+  it('sum() returns the sum of all elements', () => {
+    const { builtins } = makeShim()
+    const a = pbArr(builtins, 3)
+    a[0] = 1; a[1] = 2; a[2] = 3
+    expect(a.sum()).toBe(6)
+  })
+  it('mutate() applies fn in place', () => {
+    const { builtins } = makeShim()
+    const a = pbArr(builtins, 3)
+    a[0] = 1; a[1] = 2; a[2] = 3
+    a.mutate((v: number) => v * 2)
+    expect([a[0], a[1], a[2]]).toEqual([2, 4, 6])
+  })
+  it('sort() sorts numerically (not lexicographically)', () => {
+    const { builtins } = makeShim()
+    const a = pbArr(builtins, 3)
+    a[0] = 10; a[1] = 9; a[2] = 2
+    a.sort()
+    expect([a[0], a[1], a[2]]).toEqual([2, 9, 10])
+  })
+})
+
+describe('arraySum (standalone)', () => {
+  it('returns the sum', () => {
+    const { builtins } = makeShim()
+    const a = (builtins.array as (n: number) => number[])(3)
+    a[0] = 4; a[1] = 5; a[2] = 6
+    expect((builtins.arraySum as (a: number[]) => number)(a)).toBe(15)
+  })
+})
+
+// ── Perlin noise ─────────────────────────────────────────────────────────────
+
+describe('perlin', () => {
+  it('returns a value in [0, 1]', () => {
+    const { builtins } = makeShim()
+    const p = builtins.perlin as (x: number, y: number, z: number, seed: number) => number
+    for (let i = 0; i < 20; i++) {
+      const v = p(Math.random() * 100, Math.random() * 100, Math.random() * 100, 0)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('is deterministic', () => {
+    const { builtins } = makeShim()
+    const p = builtins.perlin as (x: number, y: number, z: number, seed: number) => number
+    expect(p(1.5, 2.3, 0.7, 0)).toBe(p(1.5, 2.3, 0.7, 0))
+  })
+
+  it('different seeds produce different values', () => {
+    const { builtins } = makeShim()
+    const p = builtins.perlin as (x: number, y: number, z: number, seed: number) => number
+    expect(p(1.5, 2.3, 0.7, 0)).not.toBe(p(1.5, 2.3, 0.7, 7))
+  })
+
+  it('nearby points are similar (continuity)', () => {
+    const { builtins } = makeShim()
+    const p = builtins.perlin as (x: number, y: number, z: number, seed: number) => number
+    const a = p(1.0, 1.0, 1.0, 0)
+    const b = p(1.001, 1.0, 1.0, 0)
+    expect(Math.abs(a - b)).toBeLessThan(0.01)
+  })
+
+  it('wraps seamlessly at the period set by setPerlinWrap', () => {
+    const { builtins } = makeShim()
+    const p = builtins.perlin as (x: number, y: number, z: number, seed: number) => number
+    const wrap = builtins.setPerlinWrap as (x: number, y: number, z: number) => void
+    wrap(4, 4, 4)
+    // x=0 and x=4 should be the same sample
+    expect(p(0, 0.5, 0.5, 0)).toBeCloseTo(p(4, 0.5, 0.5, 0), 10)
+  })
+})
+
+describe('perlinFbm', () => {
+  it('returns a value in [0, 1]', () => {
+    const { builtins } = makeShim()
+    const f = builtins.perlinFbm as (x: number, y: number, z: number, lac: number, gain: number, oct: number) => number
+    for (let i = 0; i < 20; i++) {
+      const v = f(Math.random() * 10, Math.random() * 10, Math.random() * 10, 2, 0.5, 4)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('perlinTurbulence', () => {
+  it('returns a value in [0, 1]', () => {
+    const { builtins } = makeShim()
+    const t = builtins.perlinTurbulence as (x: number, y: number, z: number, lac: number, gain: number, oct: number) => number
+    for (let i = 0; i < 20; i++) {
+      const v = t(Math.random() * 10, Math.random() * 10, Math.random() * 10, 2, 0.5, 4)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('perlinRidge', () => {
+  it('returns a value in [0, 1]', () => {
+    const { builtins } = makeShim()
+    const r = builtins.perlinRidge as (x: number, y: number, z: number, lac: number, gain: number, offset: number, oct: number) => number
+    for (let i = 0; i < 20; i++) {
+      const v = r(Math.random() * 10, Math.random() * 10, Math.random() * 10, 2, 0.5, 1, 4)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+// ── hypot ─────────────────────────────────────────────────────────────────────
+
+describe('hypot', () => {
+  it('returns the Euclidean distance for a 3-4-5 triangle', () => {
+    const { builtins } = makeShim()
+    expect((builtins.hypot as (x: number, y: number) => number)(3, 4)).toBeCloseTo(5)
   })
 })
