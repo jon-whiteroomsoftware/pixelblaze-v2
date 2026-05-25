@@ -96,7 +96,11 @@ export function Preview() {
   return (
     <div className="h-full bg-zinc-950 pt-3 pl-3">
       <div ref={containerRef} className="relative w-full h-full">
-        <canvas ref={canvasRef} className="rounded-sm" />
+        <canvas
+          ref={canvasRef}
+          className="rounded-sm"
+          style={{ opacity: (1 - Math.pow(grid.glowAmount / 30, 2) * 0.65).toFixed(2) }}
+        />
         {runtimeError && (
           <div className="absolute inset-0 flex items-end justify-start p-2 pointer-events-none">
             <span className="text-red-400 text-xs bg-zinc-900/80 px-2 py-1 rounded max-w-full truncate">
@@ -112,7 +116,7 @@ export function Preview() {
               position: 'absolute',
               top: 0,
               left: 0,
-              filter: `blur(${grid.glowAmount}px) brightness(1.5)`,
+              filter: `blur(${Math.min(grid.glowAmount, 25)}px) brightness(${(1 + Math.pow(grid.glowAmount / 30, 2) * 5).toFixed(2)})`,
               mixBlendMode: 'screen',
               pointerEvents: 'none',
             }}
