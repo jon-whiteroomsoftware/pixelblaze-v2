@@ -158,7 +158,7 @@ export function Preview() {
               ref={canvasRef}
               className="rounded-sm"
               style={grid.diffusion > 0 ? {
-                filter: `blur(${(grid.diffusion * (canvasDims?.spacing ?? grid.spacing)).toFixed(1)}px)`,
+                filter: `blur(${(grid.diffusion * (canvasDims?.spacing ?? grid.spacing)).toFixed(1)}px) brightness(${(1 + grid.diffusion * 2).toFixed(2)})`,
               } : undefined}
             />
             {runtimeError && (
