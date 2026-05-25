@@ -2,9 +2,11 @@ import { usePreviewStore } from '@/store/previewStore'
 
 function formatValue(v: unknown): string {
   if (v === undefined || v === null) return '—'
-  if (typeof v === 'number') return v.toFixed(4)
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2)
   if (Array.isArray(v)) {
-    const items = (v as number[]).slice(0, 8).map((n) => (typeof n === 'number' ? n.toFixed(3) : '?'))
+    const items = (v as number[]).slice(0, 8).map((n) =>
+      typeof n === 'number' ? (Number.isInteger(n) ? String(n) : n.toFixed(2)) : '?'
+    )
     return items.join(', ') + (v.length > 8 ? ', …' : '')
   }
   return String(v)
