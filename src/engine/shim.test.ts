@@ -428,7 +428,6 @@ describe('prng / prngSeed', () => {
 interface PbArray extends Array<number> {
   sum(): number
   mutate(fn: (v: number, i: number, a: number[]) => number): PbArray
-  sort(): PbArray
 }
 
 function pbArr(builtins: Record<string, unknown>, n: number): PbArray {
