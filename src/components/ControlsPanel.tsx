@@ -55,71 +55,82 @@ export function ControlsPanel() {
   const controlValues = useControlStore((s) => s.controlValues)
   const setControlValue = useControlStore((s) => s.setControlValue)
 
-  const SUPPORTED = ['slider', 'toggle', 'hsvPicker', 'rgbPicker']
-  const visible = controls.filter((c) => SUPPORTED.includes(c.kind))
-  if (visible.length === 0) return null
+  const sliders = controls.filter((c) => c.kind === 'slider')
+  const toggles = controls.filter((c) => c.kind === 'toggle')
+  const pickers = controls.filter((c) => c.kind === 'hsvPicker' || c.kind === 'rgbPicker')
+  if (sliders.length + toggles.length + pickers.length === 0) return null
+
+  const renderSlider = (c: (typeof controls)[number]) => {
+    const raw = controlValues[c.exportName]
+    const value = typeof raw === 'number' ? raw : 0.5
+    return (
+      <label key={c.exportName} className="flex flex-col gap-1">
+        <span className="text-zinc-500">{c.label}</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={value}
+          onChange={(e) => setControlValue(c.exportName, Number(e.target.value))}
+          className="w-full accent-amber-500"
+        />
+      </label>
+    )
+  }
+
+  const renderToggle = (c: (typeof controls)[number]) => {
+    const raw = controlValues[c.exportName]
+    const value = typeof raw === 'number' ? raw : 0
+    return (
+      <label key={c.exportName} className="flex items-center gap-1.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={value === 1}
+          onChange={(e) => setControlValue(c.exportName, e.target.checked ? 1 : 0)}
+          className="accent-amber-500 shrink-0"
+        />
+        <span className="text-zinc-500">{c.label}</span>
+      </label>
+    )
+  }
+
+  const renderPicker = (c: (typeof controls)[number]) => {
+    const raw = controlValues[c.exportName]
+    const hex = tripletToHex(c.kind, raw ?? [1, 1, 1])
+    return (
+      <label key={c.exportName} className="flex items-center gap-2">
+        <span className="text-zinc-500 flex-1">{c.label}</span>
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => {
+            const [r, g, b] = hexToRgb(e.target.value)
+            const triplet: [number, number, number] =
+              c.kind === 'hsvPicker' ? rgbToHsv(r, g, b) : [r, g, b]
+            setControlValue(c.exportName, triplet)
+          }}
+          className="w-8 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+        />
+      </label>
+    )
+  }
 
   return (
     <div className="font-mono text-xs border-t border-zinc-800 mt-2 pt-2 pb-3 pr-3">
       <h4 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
         Controls
       </h4>
-      <div className="flex flex-col gap-2">
-        {visible.map((c) => {
-          const raw = controlValues[c.exportName]
-
-          if (c.kind === 'slider') {
-            const value = typeof raw === 'number' ? raw : 0.5
-            return (
-              <label key={c.exportName} className="flex flex-col gap-1">
-                <span className="text-zinc-500">{c.label}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={value}
-                  onChange={(e) => setControlValue(c.exportName, Number(e.target.value))}
-                  className="w-full accent-amber-500"
-                />
-              </label>
-            )
-          }
-
-          if (c.kind === 'toggle') {
-            const value = typeof raw === 'number' ? raw : 0
-            return (
-              <label key={c.exportName} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={value === 1}
-                  onChange={(e) => setControlValue(c.exportName, e.target.checked ? 1 : 0)}
-                  className="accent-amber-500 shrink-0"
-                />
-                <span className="text-zinc-300">{c.label}</span>
-              </label>
-            )
-          }
-
-          // hsvPicker or rgbPicker — render as a color well
-          const hex = tripletToHex(c.kind, raw ?? [1, 1, 1])
-          return (
-            <label key={c.exportName} className="flex items-center gap-2">
-              <span className="text-zinc-500 flex-1">{c.label}</span>
-              <input
-                type="color"
-                value={hex}
-                onChange={(e) => {
-                  const [r, g, b] = hexToRgb(e.target.value)
-                  const triplet: [number, number, number] =
-                    c.kind === 'hsvPicker' ? rgbToHsv(r, g, b) : [r, g, b]
-                  setControlValue(c.exportName, triplet)
-                }}
-                className="w-8 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
-              />
-            </label>
-          )
-        })}
+      <div className="flex flex-col gap-5">
+        {sliders.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">{sliders.map(renderSlider)}</div>
+        )}
+        {toggles.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">{toggles.map(renderToggle)}</div>
+        )}
+        {pickers.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">{pickers.map(renderPicker)}</div>
+        )}
       </div>
     </div>
   )
