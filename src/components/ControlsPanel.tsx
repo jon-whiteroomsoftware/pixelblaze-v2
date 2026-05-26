@@ -66,15 +66,18 @@ export function ControlsPanel() {
     return (
       <label key={c.exportName} className="flex flex-col gap-1">
         <span className="text-zinc-500">{c.label}</span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={value}
-          onChange={(e) => setControlValue(c.exportName, Number(e.target.value))}
-          className="w-full accent-amber-500"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={value}
+            onChange={(e) => setControlValue(c.exportName, Number(e.target.value))}
+            className="w-2/3 accent-amber-500"
+          />
+          <span className="flex-1 text-right text-amber-400 tabular-nums">{value.toFixed(2)}</span>
+        </div>
       </label>
     )
   }
