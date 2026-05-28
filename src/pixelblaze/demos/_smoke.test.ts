@@ -15,12 +15,19 @@ function runDemo(file: string) {
   const shim = createShim({ grid: { rows: 16, cols: 16 }, getVirtualTime: () => vt })
   const handle = loadPattern(code, metadata, shim.builtins)
 
-  // Exercise every detected slider control across its range.
+  // Exercise every detected control across its range. Pickers take (r,g,b),
+  // toggles a bool, the rest a single 0..1 value.
   for (const c of metadata.controls) {
     const fn = handle.controls[c.exportName]
-    fn?.(0)
-    fn?.(1)
-    fn?.(0.5)
+    if (c.kind === 'rgbPicker' || c.kind === 'hsvPicker') {
+      fn?.(0, 0, 0)
+      fn?.(1, 1, 1)
+      fn?.(0.5, 0.5, 0.5)
+    } else {
+      fn?.(0)
+      fn?.(1)
+      fn?.(0.5)
+    }
   }
 
   let anyLit = false
@@ -42,7 +49,7 @@ function runDemo(file: string) {
 }
 
 describe('demo smoke tests', () => {
-  for (const file of ['PlasmaNebula.js', 'Caustics.js', 'KaleidoBloom.js']) {
+  for (const file of ['PlasmaNebula.js', 'Caustics.js', 'KaleidoBloom.js', 'Kishimisu.js']) {
     it(`${file} bundles, runs, lights pixels, and exposes sliders`, () => {
       let result!: ReturnType<typeof runDemo>
       expect(() => { result = runDemo(file) }).not.toThrow()
