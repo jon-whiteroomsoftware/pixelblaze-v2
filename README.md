@@ -10,63 +10,23 @@ A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED co
 
 The built-in Pixelblaze editor works, but it has three rough edges this IDE smooths out:
 
-- **No hardware needed.** Write and preview patterns entirely offline. The IDE runs in your browser with no controller connected.
-- **A real code editor.** Monaco (the editor inside VS Code) with syntax highlighting, inline error squiggles, autocomplete for every built-in function, and signature hints when you type `(` after a function name.
-- **Reusable libraries.** Five bundled libraries — `SDF`, `Anim`, `Color`, `Coord`, `Noise` — let you call well-tested functions with `LibName.fnName()` syntax. The transpiler inlines only the functions you actually use before bundling for the hardware.
+- **No hardware needed.** Write and preview patterns entirely offline. The IDE runs in your browser with no controller connected
+- **A modern code editor** with autocomplete and inline errors
+- **Reusable libraries.** Build your own patterns leveraging existing library code
 
 ---
-
-## Layout
-
-```
-┌──────────────┬────────────────────────┬──────────────────────┐
-│  Patterns    │                        │  LED Preview         │
-│              │   Code Editor          │  ──────────────────  │
-│  Libraries   │   (Monaco)             │  Pattern Controls    │
-│  Demos       │                        │  Var Watcher         │
-│  Your work   │                        │                      │
-└──────────────┴────────────────────────┴──────────────────────┘
-```
-
-Drag the vertical dividers to resize panes.
-
----
-
-## Writing patterns
-
-Patterns are written exactly as they are for the hardware — `export function beforeRender(delta)`, `export function render2D(index, x, y)`, `hsv()`, `rgb()`, built-ins, all of it. The IDE runs your code in the browser so the preview is live.
-
-**One thing to know about the sync tick:** the IDE doesn't push every keystroke to the preview. Instead a background tick fires every few seconds. If your code compiles cleanly at that moment, it auto-saves and reloads the preview. While you're editing, the last clean version keeps running. The compile status badge at the top of the editor pane shows **Good** or **Broken** in real time — you can always tell whether your current code would sync.
-
-**New patterns** start with a simple hue-gradient skeleton that immediately produces visible output, so you can tell the pipeline is working before you've written anything.
-
----
-
-## Using libraries
-
-Libraries are groups of functions you can call from any pattern. Reference them with dot notation:
-
-```js
-export function render2D(index, x, y) {
-  var d = SDF.circle(x, y, 0.5, 0.5, 0.3)
-  var brightness = SDF.fillGlow(d, 0.05)
-  hsv(Anim.easeInOut2(time(0.1)), 1, brightness)
-}
-```
-
-The transpiler resolves `SDF.circle`, `SDF.fillGlow`, and `Anim.easeInOut2`, inlines only those functions into the artifact, and rewrites the calls — the output file is self-contained and ready for the hardware.
 
 ### Available libraries
 
-| Library | What it provides |
-|---------|-----------------|
-| `SDF` | 2D signed distance fields: circles, rects, rings, stars, polygons, smooth boolean ops, glow fills |
-| `Anim` | Easing curves, oscillators, phase timing, looping animation primitives |
-| `Color` | HSV/RGB blend modes, palette interpolation, colour math |
-| `Coord` | Polar coordinates, rectangular↔polar conversion, spatial transforms |
-| `Noise` | Value noise, Voronoi distance, organic variation |
-
 Hover over any library name in the left pane to see a quick summary of its functions. Click to open the full source in the editor.
+
+| Library | What it provides                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------- |
+| `SDF`   | 2D signed distance fields: circles, rects, rings, stars, polygons, smooth boolean ops, glow fills |
+| `Anim`  | Easing curves, oscillators, phase timing, looping animation primitives                            |
+| `Color` | HSV/RGB blend modes, palette interpolation, colour math                                           |
+| `Coord` | Polar coordinates, rectangular↔polar conversion, spatial transforms                               |
+| `Noise` | Value noise, Voronoi distance, organic variation                                                  |
 
 ---
 
@@ -109,16 +69,3 @@ A few things that aren't there yet:
 - **1D strip patterns** — `render(index)` without a 2D map isn't supported in the preview yet. The pattern will save and copy correctly, but you won't see output in the grid.
 - **Coordinate transforms** — `translate`, `scale`, `rotate`, and friends are recognised syntax but are no-ops in the preview. Patterns that animate by transforming the coordinate space will appear static here.
 - **Float64 vs. hardware arithmetic** — the preview runs your code as native JavaScript float64. The hardware uses a fixed-point format. Patterns that use bitwise tricks or rely on integer overflow may look different in the preview than on the device.
-
----
-
-## Running locally
-
-```bash
-npm install
-npm run dev       # dev server at http://localhost:5174
-npm test          # run the test suite
-npm run build     # production build → dist/
-```
-
-Requires Node 18+.
