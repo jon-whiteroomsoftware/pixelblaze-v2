@@ -17,8 +17,8 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   const ctx = canvas.getContext('2d')
 
   function applySize(): void {
-    canvas.width = grid.cols * grid.spacing
-    canvas.height = grid.rows * grid.spacing
+    canvas.width = Math.round(grid.cols * grid.spacing)
+    canvas.height = Math.round(grid.rows * grid.spacing)
   }
 
   applySize()
@@ -35,16 +35,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function paint(pixels: [number, number, number][], brightness: number, dimmed: boolean): void {
     const { rows, cols, spacing } = grid
-    // Grow the dot radius with diffusion so the lit area closes its gaps:
-    // at diffusion 0 we draw distinct dots, at 1 the dots overlap and fully
-    // cover the grid, leaving no black for the blur to average toward (which
-    // is what otherwise causes brightness to fall off as diffusion rises).
-    const diffusion = grid.diffusion ?? 0
-    // Floor baseRadius so dense grids (small spacing) don't go negative —
-    // arc() rejects negative radii. 0.5 keeps a 1px dot visible at any density.
-    const baseRadius = Math.max(0.5, spacing / 2 - 3)
-    const fullRadius = spacing * 0.62
-    const radius = baseRadius + diffusion * (fullRadius - baseRadius)
+    // Constant radius — dots just touch their neighbours. Diffusion blur is
+    // handled by a CSS filter in the UI layer (blur conserves total luminance,
+    // so brightness stays constant across all diffusion settings).
+    const radius = Math.max(0.5, spacing / 2)
     const dimScale = dimmed ? DIM_FACTOR : 1
 
     ctx2d.clearRect(0, 0, canvas.width, canvas.height)

@@ -25,14 +25,22 @@ export function Preview() {
   const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
-  // Derive spacing from container width so cols always fill the available width
+  // Derive spacing from container width so cols always fill the available width.
+  // Also directly updates the renderer on each observation to avoid waiting for
+  // the React re-render cycle, which would lag the canvas behind the container
+  // during splitter drags.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver(([entry]) => {
       const { width } = entry.contentRect
       const { cols } = usePreviewStore.getState().grid
-      setCanvasDims({ spacing: Math.max(1, Math.floor(width / cols)) })
+      const spacing = Math.max(1, width / cols)
+      setCanvasDims({ spacing })
+      if (rendererRef.current) {
+        rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing })
+        if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
+      }
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -43,7 +51,7 @@ export function Preview() {
     const el = containerRef.current
     if (!el) return
     const { width } = el.getBoundingClientRect()
-    setCanvasDims({ spacing: Math.max(1, Math.floor(width / grid.cols)) })
+    setCanvasDims({ spacing: Math.max(1, width / grid.cols) })
   }, [grid.cols])
 
   // Rebuild the loop whenever source or spacing changes
