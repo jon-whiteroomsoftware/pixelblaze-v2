@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { DEMOS } from '@/pixelblaze/demos'
-import { nameConflicts } from '@/engine/patternName'
+import { nameConflicts, uniquePatternName } from '@/engine/patternName'
+import { NEW_PATTERN_SRC } from '@/pixelblaze/newPattern'
 import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
@@ -247,6 +248,17 @@ export function PatternList() {
           setSource(p.src)
           setPreviewSource(p.src)
           setPreviewPatternName(p.name)
+          setIsReadOnly(false)
+        } else {
+          const { addPattern } = usePatternStore.getState()
+          const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          const name = uniquePatternName('Untitled Pattern', [])
+          const record = { id, name, src: NEW_PATTERN_SRC, controls: {}, updatedAt: Date.now() }
+          await addPattern(record)
+          setActivePattern(id)
+          setSource(record.src)
+          setPreviewSource(record.src)
+          setPreviewPatternName(record.name)
           setIsReadOnly(false)
         }
         return
