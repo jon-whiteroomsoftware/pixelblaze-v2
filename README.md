@@ -16,6 +16,12 @@ The built-in Pixelblaze editor works, but it has three rough edges this IDE smoo
 
 ---
 
+## IDE interface
+
+![Pixelblaze IDE screenshot](IDE_screenshot.png)
+
+---
+
 ### Available libraries
 
 Hover over any library name in the left pane to see a quick summary of its functions. Click to open the full source in the editor.
