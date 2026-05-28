@@ -40,7 +40,9 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     // cover the grid, leaving no black for the blur to average toward (which
     // is what otherwise causes brightness to fall off as diffusion rises).
     const diffusion = grid.diffusion ?? 0
-    const baseRadius = spacing / 2 - 3
+    // Floor baseRadius so dense grids (small spacing) don't go negative —
+    // arc() rejects negative radii. 0.5 keeps a 1px dot visible at any density.
+    const baseRadius = Math.max(0.5, spacing / 2 - 3)
     const fullRadius = spacing * 0.62
     const radius = baseRadius + diffusion * (fullRadius - baseRadius)
     const dimScale = dimmed ? DIM_FACTOR : 1
