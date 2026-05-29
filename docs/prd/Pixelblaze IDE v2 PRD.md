@@ -165,7 +165,7 @@ The IDE operates entirely without a network connection or hardware controller. P
 - Library files can be opened in the editor for reading but are not editable.
 - v1 libraries: `anim` (easing, oscillators, timing), `sdf` (2D signed distance fields and boolean ops), `color` (palette, blend modes), `coord` (polar, coordinate transforms), `noise` (value noise, Perlin helpers).
 - Planned library content: scalar math helpers, polar coordinates, SDFs (circle, rect, polygon, segment), blend modes, value noise, palette interpolation, animation primitives.
-- Planned: a `shader` library of GLSL gap-fillers (`fract`, `step`, `dot2/3`, `normalize2/3`, `reflect`, `mat2` rotate, `toUV`, IQ palette, hardware-safe hash) supporting ShaderToy porting — see `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md`.
+- Shipped: a `shader` library of GLSL gap-fillers (`fract`, `step`, `dot2/3`, `normalize2/3`, `reflect`, `mat2` rotate, `toUV`, IQ palette, hardware-safe hash) supporting ShaderToy porting — see `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md` (#94).
 
 ### Code Editor (Monaco)
 

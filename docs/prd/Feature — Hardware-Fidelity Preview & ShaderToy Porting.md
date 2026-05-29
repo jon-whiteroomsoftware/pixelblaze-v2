@@ -1,6 +1,6 @@
 # Feature PRD — Hardware-Fidelity Preview & ShaderToy Porting
 
-**Status:** proposed
+**Status:** in progress — Phases 1–3 shipped; Phase 4 in progress (demo hardening + `Shader.*` refactor done, #96; porting guide #95 and cold port #97 outstanding)
 **Type:** Feature PRD (companion to `Pixelblaze IDE v2 PRD.md`)
 **Supersedes:** ADR-0001 (via ADR-0003)
 **Related:** ADR-0002 (main-thread execution), ADR-0003 (fixed-point fidelity default)
@@ -80,7 +80,7 @@ The fixed-point emit wraps each operator node from the Acorn AST in an `fx` help
 | `<` `>` `<=` `>=` `==` `!=` | compare raw ints directly (order-preserving; no wrap needed) |
 
 - **Multiply is the only expensive op.** float64 loses bits past 2⁵³ (product reaches 2⁶²), so a correct multiply needs a `Math.imul`-based 32×32→64 decomposition (~6–10 ops). BigInt is correct but too slow for the hot path.
-- **Overflow = int32 wrap** is the working assumption (consistent with the "bitwise over 32 bits" firmware behaviour) — flagged for hardware validation (see Open Items).
+- **Overflow = int32 wrap** — **confirmed** against a real device (divergence harness, fw 3.67, 2026-05-29): overflow wraps, not saturates. Multiply, `frac`, and `%` all **truncate** (sign of the dividend), and bitwise ops integer-coerce their operands first. See ADR-0003 Consequences for the full confirmed table.
 
 ### Transcendentals and built-ins (the `fx.*` seam)
 
@@ -121,11 +121,14 @@ A development/test tool, not a shipped UI feature:
 - Integration: a known-overflowing hash (`sin(p)*43758.5453`) produces *different* output under fidelity vs fast preview, proving the engine exposes the bug.
 - The divergence harness runs against a real device out-of-band; its report is committed.
 
-### Open validation items (Phase 1)
+### Validation items (Phase 1) — confirmed
 
-- Confirm overflow is **wrap** (assumed) vs **saturate** against hardware.
-- Confirm the multiply **rounding mode** (round vs truncate after `>>16`).
-- Confirm `frac`/`mod`/`~` edge behaviours match firmware on negatives.
+All resolved via the committed divergence harness against a real device (fw 3.67, 2026-05-29):
+
+- ✅ Overflow **wraps** (int32), not saturates (#110).
+- ✅ Multiply **truncates** after `>>16` (sign of the dividend); `frac` and `%` likewise truncate (#109, #114). Division also truncates on the device — a sub-ULP divergence vs the shim's rounding `fx.div`, for non-power-of-two divisors only.
+- ✅ Bitwise ops integer-coerce their operands first; `~` zeros the low 16 bits (#110).
+- ⚠️ Residual: hardware multiply drops low operand bits on fractional operands (#114), and the `× 1/65536` reinterpret literal flushes to raw 0 in the firmware parser (#111) — both documented and designed around (the integer hashes demote with `/ 256 / 256`, validated bit-identical, #113).
 
 ---
 
@@ -137,7 +140,7 @@ The fidelity engine turns latent hardware bugs into visible preview bugs. Target
   - Fidelity-critical, stable per-cell hashing (e.g. `voronoiID`, used by `Caustics`) → a **pure-integer hash** with representable constants relying on faithful int32 wrap, or `prngSeed(cellIndex)` + `prng()` where algorithmic divergence is acceptable.
   - Quality is constrained by 16.16; lower-entropy hashes are expected and acceptable for LED-scale visuals.
 - **`PlasmaNebula` star hash.** Replace the inline `frac(sin(...)·43758.5453)` twinkle hash. Twinkle is cosmetic, so `prng`-based (accepting algorithmic divergence) is acceptable here.
-- **Square-grid assumptions.** `Kishimisu` and `NeonSquircles` use `x*2-1` directly. Route through `Shader.toUV(x, y, aspect)` (Phase 3) so non-square grids are correct (honors the `2d-uv-convention`).
+- **Square-grid assumptions.** `Kishimisu` and `NeonSquircles` use `x*2-1` directly. Both now route through `Shader.toUV(x, y, aspect)` (#96). True non-square correctness (threading a real `aspect`) is **deferred to #116**: the preview normalises coords per-axis and exposes no `cols`/`rows` built-in, so `aspect` is hardcoded to `1` for now — an accepted square-grid limitation (honors the `2d-uv-convention` once #116 lands).
 - **Sweep the other libraries.** `SDF.js`, `Coord.js`, `Color.js`, `Anim.js` operate in 0–1 ranges with small products and look hardware-safe; confirm under the fidelity engine and fix any surprises.
 
 ---
@@ -190,7 +193,7 @@ Shader.hash21(ix, iy)
 Shader.hash11(n)
 ```
 
-> The exact hash constants are **validation-pending** on the overflow-wrap confirmation (Phase 1 open item). The library lands with a candidate and the harness verifies preview↔hardware identity before the hash is declared "bit-faithful."
+> The hash constants are **validated bit-identical preview↔hardware** via the divergence harness (fw 3.67, #103/#113). The final recipe demotes the wrapped int with `/ 256 / 256` (power-of-two, bit-exact) rather than a `× 1/65536` literal, which flushed to raw 0 on the device (#111).
 
 #### What `Shader` deliberately omits
 
@@ -247,7 +250,7 @@ test/
 
 ## Risks & open questions
 
-- **Overflow semantics unconfirmed** — the entire fidelity contract assumes int32 wrap. If hardware saturates, `fx` ops and the hash design change. Mitigation: validate early with the harness before Phase 2/3 hash work.
+- ~~**Overflow semantics unconfirmed**~~ — **resolved**: hardware wraps (int32), confirmed via the harness (fw 3.67); multiply/`frac`/`%` truncate, bitwise ops integer-coerce. The fidelity contract and hash design held (#103/#110/#113).
 - **Multiply performance** — the imul 64-bit path is the hot loop; if it's too slow even on small grids, fidelity-default may need reconsidering. Mitigation: benchmark in Phase 1 spike before committing.
 - **Hash quality at 16.16** — pure-integer hashes constrained to representable constants may mix poorly; LED-scale visuals are forgiving, but some shaders may look grainier than on a GPU. Accepted.
 - **Algorithmic divergence surprises** — patterns leaning on `perlin`/`prng` look right in preview but differ on hardware. Mitigation: the guide flags built-in noise as preview-approximate.
