@@ -45,8 +45,11 @@ export function render2D(index, x, y) {
   var sharpnessM   = 0.5   + sharpness * 2.5
   var octavesM     = clamp(floor(octaves * 6) + 1, 1, 6)
 
-  // Centred uv (short axis = unit). Engine normalises (x,y) to [0,1]², so a
-  // square aspect (1) reproduces the original's direct 2x-1 / 2y-1.
+  // Centred uv via Shader.toUV (short axis = unit). The engine normalises
+  // (x,y) to [0,1]² per-axis, so aspect is hardcoded to 1: a square grid
+  // reproduces the original's direct 2x-1 / 2y-1. Non-square grids stretch —
+  // an accepted limitation (#96): the preview exposes no cols/rows built-in to
+  // derive a true aspect from.
   Shader.toUV(x, y, 1)
   var px = ux, py = uy          // Shader.toUV writes the ux/uy out-vars
   var len0 = hypot(px, py)

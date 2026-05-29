@@ -16,7 +16,9 @@ export function beforeRender(delta) {
 }
 
 export function render2D(index, x, y) {
-  // Centred uv (short axis = unit); square aspect matches the original 2x-1.
+  // Centred uv via Shader.toUV (short axis = unit). aspect is hardcoded to 1:
+  // a square grid matches the original's direct 2x-1; non-square grids stretch,
+  // an accepted limitation (#96) as the preview exposes no cols/rows built-in.
   Shader.toUV(x, y, 1)
   var px = ux, py = uy          // Shader.toUV writes the ux/uy out-vars
 
