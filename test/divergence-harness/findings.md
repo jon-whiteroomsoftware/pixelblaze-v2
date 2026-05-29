@@ -84,6 +84,26 @@ comments updated to cite the power-of-two divide instead of the `1/65536`
 literal. The `hash11_div` / `div-rounding` probes are kept as regression
 evidence.
 
+## #100 CLOSED — Noise.js hashes confirmed bit-identical
+
+The final validation-pending item carried over from #92 (validate `Noise.js`
+`_hash1`/`_hash2` and dependents bit-identical preview↔hardware) is **resolved
+by this report**. The harness's `hash11`/`hash21` probes (`report.md`,
+"Candidate integer hashes") are **byte-for-byte the same recipe** as `Noise.js`
+`_hash1`/`_hash2` — `× 1619 + 1013`, `× (h+197)`, `× 769`, `/ 256 / 256` — so
+the device readings characterise the Noise hashes directly:
+
+- `hash11` max |Δ| = 5.2e-7, `hash21` max |Δ| = 5.3e-7 — both **sub-ULP, i.e.
+  bit-identical**, on fw 3.67.
+- The dependents (`noise2D`, `gradNoise2D`, `voronoiDist`, `voronoiID`) are pure
+  compositions of these hashes with already-validated fixed-point ops, so they
+  inherit the bit-identity.
+
+No constant adjustment was needed beyond the `/256/256` fold already landed in
+#113. The device readings are pinned in `Noise.fidelity.test.ts`
+("Noise hash bit-identity vs hardware (#100)") as a committed in-repo
+regression guard.
+
 ## Transport note (not a contradiction)
 
 - **`setVars` saturates out-of-range inputs** to ±32767 before storing them as

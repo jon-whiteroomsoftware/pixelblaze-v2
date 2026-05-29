@@ -73,3 +73,38 @@ describe('Noise hash fidelity (#92)', () => {
     }
   })
 })
+
+// 1 ULP of 16.16 fixed point.
+const ULP = 1 / 65536
+
+// Hardware bit-identity regression (#100). The divergence harness (#107) drove
+// the byte-identical `hash11`/`hash21` recipe on a real Pixelblaze (fw 3.67) and
+// recorded these device readings in test/divergence-harness/report.md. Pinning
+// the fidelity engine to those device values guards the bit-identity claim in
+// ADR-0003: if a future edit to the `_hash1`/`_hash2` fold (e.g. reverting the
+// #113 `/256/256` demotion back to a `× 1/65536` literal, which flushes to 0 on
+// hardware — #111) regresses preview↔hardware fidelity, these assertions fail.
+describe('Noise hash bit-identity vs hardware (#100)', () => {
+  // Device readings copied from report.md (firmware 3.67, 2026-05-29).
+  const HASH1_DEVICE: Array<[number, number]> = [
+    [0, 0.726593], [2, 0.89502], [4, 0.873138], [6, 0.66095], [8, 0.258453], [10, 0.665649],
+  ]
+  const HASH2_DEVICE: Array<[number, number, number]> = [
+    [0, 0, 0.726593], [0, 9, 0.446808], [0, 18, 0.34967],
+    [0, 27, 0.435181], [0, 36, 0.703339], [0, 45, 0.154144],
+  ]
+
+  it('_hash1 matches the device readings to within 1 ULP', () => {
+    const probe = makeProbe('Noise._hash1(x)', 'fidelity')
+    for (const [n, device] of HASH1_DEVICE) {
+      expect(Math.abs(probe(n, 0) - device)).toBeLessThan(ULP)
+    }
+  })
+
+  it('_hash2 matches the device readings to within 1 ULP', () => {
+    const probe = makeProbe('Noise._hash2(x, y)', 'fidelity')
+    for (const [ix, iy, device] of HASH2_DEVICE) {
+      expect(Math.abs(probe(ix, iy) - device)).toBeLessThan(ULP)
+    }
+  })
+})
