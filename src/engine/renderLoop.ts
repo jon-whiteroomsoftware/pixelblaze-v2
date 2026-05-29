@@ -13,7 +13,17 @@ export interface RenderLoopConfig {
   paint: (pixels: [number, number, number][], brightness: number, dimmed: boolean) => void
   onError?: (err: Error) => void
   onFrame?: (delta: number, builtins: Record<string, unknown>, elapsedMs: number) => void
+  /**
+   * Reports a smoothed frames-per-second figure, averaged over a ~500ms window
+   * so the readout it feeds doesn't flicker. Only fires while the rAF loop runs
+   * (not for one-off preview frames).
+   */
+  onFps?: (fps: number) => void
 }
+
+// Minimum real-time span to average FPS over before reporting. Doubles as the
+// max update cadence for the readout (~2 updates/sec), which keeps it legible.
+const FPS_WINDOW_MS = 500
 
 export interface RenderLoop {
   start(): void
@@ -26,6 +36,8 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
   const { handle, shim, clock, grid, getSpeed, getBrightness, isDimmed, paint } = config
   let rafId: number | null = null
   let lastTs: number | null = null
+  let fpsWindowStart: number | null = null
+  let fpsFrames = 0
 
   function doTick(realDelta: number, dimmed: boolean): void {
     const scaledDelta = realDelta * getSpeed()
@@ -72,6 +84,20 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
       rafId = null
       return
     }
+    // Windowed FPS: count the frames elapsed since the window opened and report
+    // the average once it fills, smoothing per-frame jitter and capping updates
+    // at ~2/sec. The opening frame marks t0 and isn't itself counted.
+    if (fpsWindowStart === null) {
+      fpsWindowStart = ts
+    } else {
+      fpsFrames++
+      const windowMs = ts - fpsWindowStart
+      if (windowMs >= FPS_WINDOW_MS) {
+        config.onFps?.(Math.round((fpsFrames * 1000) / windowMs))
+        fpsWindowStart = ts
+        fpsFrames = 0
+      }
+    }
     rafId = requestAnimationFrame(loop)
   }
 
@@ -79,6 +105,8 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
     start() {
       if (rafId !== null) return
       lastTs = null
+      fpsWindowStart = null
+      fpsFrames = 0
       rafId = requestAnimationFrame(loop)
     },
     stop() {

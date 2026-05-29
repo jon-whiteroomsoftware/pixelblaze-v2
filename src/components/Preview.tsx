@@ -120,6 +120,7 @@ export function Preview() {
       isDimmed: () => !usePreviewStore.getState().isRunning,
       paint,
       onError: (err) => setRuntimeError(err.message),
+      onFps: (fps) => usePreviewStore.getState().setFps(fps),
       onFrame: (_delta, builtins, elapsedMs) => {
         const { watchedBuiltins, watchedPatternVars } = usePreviewStore.getState()
         if (watchedBuiltins.length === 0 && watchedPatternVars.length === 0) return
@@ -187,7 +188,10 @@ export function Preview() {
     const loop = loopRef.current
     if (!loop) return
     if (isRunning) loop.start()
-    else loop.stop()
+    else {
+      loop.stop()
+      usePreviewStore.getState().setFps(null)
+    }
   }, [isRunning])
 
   return (

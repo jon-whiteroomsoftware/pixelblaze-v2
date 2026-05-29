@@ -19,7 +19,9 @@ interface PreviewState {
   watchedBuiltins: string[]
   watchedPatternVars: string[]
   watchValues: Record<string, unknown>
+  fps: number | null
   toggle: () => void
+  setFps: (fps: number | null) => void
   setFidelity: (fidelity: FidelityMode) => void
   setSpeed: (speed: number) => void
   setBrightness: (brightness: number) => void
@@ -45,6 +47,9 @@ export const previewInitialState = {
   watchedBuiltins: ['elapsed', 'pixelCount'] as string[],
   watchedPatternVars: [] as string[],
   watchValues: {} as Record<string, unknown>,
+  // Smoothed frames-per-second readout; null while paused/not yet measured.
+  // Transient session state — never persisted.
+  fps: null as number | null,
 }
 
 // Deep-merge persisted state over the live state so a persisted `grid` that
@@ -65,6 +70,7 @@ export const usePreviewStore = create<PreviewState>()(
     (set) => ({
       ...previewInitialState,
       toggle: () => set((s) => ({ isRunning: !s.isRunning })),
+      setFps: (fps) => set({ fps }),
       setFidelity: (fidelity) => set({ fidelity }),
       setSpeed: (speed) => set({ speed }),
       setBrightness: (brightness) => set({ brightness }),
