@@ -53,8 +53,13 @@ Respond with JSON only (no markdown fences):
     continue
   fi
 
-  # Strip any markdown fences Claude may add
-  TEXT=$(echo "$TEXT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//' | xargs)
+  # Strip any markdown fences and trim surrounding whitespace. Avoid `xargs`:
+  # it parses shell-style quoting and chokes ("unterminated quote") on any
+  # apostrophe in Claude's text (e.g. "Pixelblaze's"). jq tolerates leftover
+  # whitespace, so a plain sed trim is enough.
+  TEXT=$(printf '%s' "$TEXT" \
+    | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//' \
+          -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
   ACTION=$(echo "$TEXT" | jq -r '.action // "nothing"' 2>/dev/null || echo "nothing")
   MESSAGE=$(echo "$TEXT" | jq -r '.message // ""' 2>/dev/null || echo "")
