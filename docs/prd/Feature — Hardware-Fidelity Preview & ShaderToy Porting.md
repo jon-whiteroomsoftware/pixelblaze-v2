@@ -141,7 +141,7 @@ The fidelity engine turns latent hardware bugs into visible preview bugs. Target
   - Quality is constrained by 16.16; lower-entropy hashes are expected and acceptable for LED-scale visuals.
 - **`PlasmaNebula` star hash.** Replace the inline `frac(sin(...)·43758.5453)` twinkle hash. Twinkle is cosmetic, so `prng`-based (accepting algorithmic divergence) is acceptable here.
 - **Square-grid assumptions.** `Kishimisu` and `NeonSquircles` use `x*2-1` directly. Both now route through `Shader.toUV(x, y, aspect)` (#96). True non-square correctness (threading a real `aspect`) is **deferred to #116**: the preview normalises coords per-axis and exposes no `cols`/`rows` built-in, so `aspect` is hardcoded to `1` for now — an accepted square-grid limitation (honors the `2d-uv-convention` once #116 lands).
-- **Sweep the other libraries.** `SDF.js`, `Coord.js`, `Color.js`, `Anim.js` operate in 0–1 ranges with small products and look hardware-safe; confirm under the fidelity engine and fix any surprises.
+- **Sweep the other libraries.** `SDF.js`, `Coord.js`, `Color.js`, `Anim.js` operate in 0–1 ranges with small products and look hardware-safe; confirm under the fidelity engine and fix any surprises. **Done (#93):** all four swept — every function exercised in both fast and fidelity mode and asserted to agree (`{SDF,Coord,Color,Anim}.fidelity.test.ts`). No divergences found and no source changes needed: no `fx`-shadowing identifiers, no bit-shift/`|0` traps, no constants beyond ±32767. Confirmed hardware-safe.
 
 ---
 
