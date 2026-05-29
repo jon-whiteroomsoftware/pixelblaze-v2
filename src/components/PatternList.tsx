@@ -21,9 +21,43 @@ import {
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
 
+const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase']
+const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom']
+const GROUPED_DEMOS = new Set([...OPENGL_DEMOS, ...BRAND_NEW_DEMOS])
+
+// "Old Favorites" is the rest — anything not explicitly grouped, so new demos
+// land there by default until reassigned.
+const DEMO_SECTIONS: { label: string; names: string[] }[] = [
+  { label: 'OpenGL', names: OPENGL_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
+  { label: 'Old Favorites', names: DEMO_NAMES.filter((n) => !GROUPED_DEMOS.has(n)) },
+  { label: 'Brand New', names: BRAND_NEW_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
+]
+
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="mt-1 px-3 py-1.5 text-[10px] font-mono font-semibold text-amber-500/60 uppercase tracking-wider border-t border-zinc-800 bg-zinc-950/60">
+      {label}
+    </div>
+  )
+}
+
+function SubsectionHeader({
+  label,
+  collapsed,
+  onToggle,
+}: {
+  label: string
+  collapsed: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div
+      onClick={onToggle}
+      className="pl-2 pr-3 py-1 flex items-center gap-1 cursor-pointer select-none text-[10px] font-mono text-amber-500/60 uppercase tracking-wider hover:text-amber-500/90"
+    >
+      <span className={`w-3 text-center text-[8px] transition-transform ${collapsed ? '-rotate-90' : ''}`}>
+        ▾
+      </span>
       {label}
     </div>
   )
@@ -196,6 +230,7 @@ export function PatternList() {
   const renamePattern = usePatternStore((s) => s.renamePattern)
   const removePattern = usePatternStore((s) => s.removePattern)
 
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
   const [hoveredLib, setHoveredLib] = useState<string | null>(null)
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
   const hoveredLibRef = useRef<string | null>(null)
@@ -330,18 +365,6 @@ export function PatternList() {
         ))}
       </ul>
 
-      <SectionHeader label="Demos" />
-      <ul>
-        {DEMO_NAMES.map((name) => (
-          <ListItem
-            key={name}
-            label={name}
-            active={activeDemoName === name}
-            onClick={() => openDemo(name)}
-          />
-        ))}
-      </ul>
-
       <SectionHeader label="Libraries" />
       <ul>
         <li
@@ -362,6 +385,34 @@ export function PatternList() {
           />
         ))}
       </ul>
+
+      <SectionHeader label="Demos" />
+      {DEMO_SECTIONS.map((section) => {
+        const collapsed = !!collapsedSections[section.label]
+        return (
+          <div key={section.label}>
+            <SubsectionHeader
+              label={section.label}
+              collapsed={collapsed}
+              onToggle={() =>
+                setCollapsedSections((c) => ({ ...c, [section.label]: !c[section.label] }))
+              }
+            />
+            {!collapsed && (
+              <ul>
+                {section.names.map((name) => (
+                  <ListItem
+                    key={name}
+                    label={name}
+                    active={activeDemoName === name}
+                    onClick={() => openDemo(name)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })}
 
       {hoveredLib && anchorRect && (
         <LibraryHoverCard
