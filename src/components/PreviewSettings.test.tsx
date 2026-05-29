@@ -73,6 +73,27 @@ describe('PreviewSettings', () => {
     expect(usePreviewStore.getState().grid.diffusion).toBe(0.5)
   })
 
+  it('renderer toggle shows both Fidelity and Precision options', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    const group = screen.getByRole('radiogroup', { name: /renderer/i })
+    expect(group).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Fidelity' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Precision' })).toBeInTheDocument()
+  })
+
+  it('renderer toggle reflects and updates the store fidelity mode', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    // Default is fidelity
+    expect(screen.getByRole('radio', { name: 'Fidelity' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('radio', { name: 'Precision' }))
+    expect(usePreviewStore.getState().fidelity).toBe('fast')
+    expect(screen.getByRole('radio', { name: 'Precision' })).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('grid size inputs show current rows and cols', async () => {
     const user = userEvent.setup()
     render(<PreviewSettings />)

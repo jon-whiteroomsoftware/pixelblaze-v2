@@ -45,6 +45,8 @@ export function PreviewSettings() {
   const brightness = usePreviewStore((s) => s.brightness)
   const setBrightness = usePreviewStore((s) => s.setBrightness)
   const diffusion = usePreviewStore((s) => s.grid.diffusion)
+  const fidelity = usePreviewStore((s) => s.fidelity)
+  const setFidelity = usePreviewStore((s) => s.setFidelity)
   const gridRows = usePreviewStore((s) => s.grid.rows)
   const gridCols = usePreviewStore((s) => s.grid.cols)
   const setGrid = usePreviewStore((s) => s.setGrid)
@@ -138,6 +140,34 @@ export function PreviewSettings() {
                   className="w-full accent-amber-500"
                 />
               </label>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-zinc-500">Renderer</span>
+                <div
+                  role="radiogroup"
+                  aria-label="Renderer mode"
+                  className="flex rounded border border-zinc-700 overflow-hidden"
+                >
+                  {([
+                    ['fidelity', 'Fidelity', 'Fidelity (16.16 fixed-point, hardware-accurate)'],
+                    ['fast', 'Precision', 'Precision (float64, fast preview)'],
+                  ] as const).map(([value, label, title]) => (
+                    <button
+                      key={value}
+                      role="radio"
+                      aria-checked={fidelity === value}
+                      title={title}
+                      onClick={() => setFidelity(value)}
+                      className={`flex-1 px-2 py-1 text-xs transition-colors ${
+                        fidelity === value
+                          ? 'bg-amber-500/20 text-amber-400 font-semibold'
+                          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
