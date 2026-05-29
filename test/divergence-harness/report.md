@@ -25,6 +25,9 @@ Produced by `npm run harness` (test/divergence-harness). The probe pattern is ha
 |---|---|---|---|
 | `hash11` | 128 | 0.99713135 | ❌ NO |
 | `hash21` | 256 | 0.99896240 | ❌ NO |
+| `reint` | 64 | 0.0038909912 | ❌ NO |
+| `hash11_s1` | 64 | 0.91970825 | ❌ NO |
+| `hash11_s2` | 64 | 0.97302246 | ❌ NO |
 
 <details><summary>hash11 — sample values (device vs fixed-point reference)</summary>
 
@@ -49,6 +52,45 @@ Produced by `npm run harness` (test/divergence-harness). The probe pattern is ha
 | a=0, b=27 | 0.0000000 | 0.43518066 | 0.43518066 |
 | a=0, b=36 | 0.0000000 | 0.70333862 | 0.70333862 |
 | a=0, b=45 | 0.0000000 | 0.15414429 | 0.15414429 |
+
+</details>
+
+<details><summary>reint — sample values (device vs fixed-point reference)</summary>
+
+| input | device | reference | Δ |
+|---|---|---|---|
+| a=0 | 0.0000000 | 0.0000000 | 0.0000000 |
+| a=4 | 0.0000000 | 0.000061035156 | 0.000061035156 |
+| a=8 | 0.0000000 | 0.00012207031 | 0.00012207031 |
+| a=12 | 0.0000000 | 0.00018310547 | 0.00018310547 |
+| a=16 | 0.0000000 | 0.00024414063 | 0.00024414063 |
+| a=20 | 0.0000000 | 0.00030517578 | 0.00030517578 |
+
+</details>
+
+<details><summary>hash11_s1 — sample values (device vs fixed-point reference)</summary>
+
+| input | device | reference | Δ |
+|---|---|---|---|
+| a=0 | 0.0000000 | 0.015457153 | 0.015457153 |
+| a=4 | 0.0000000 | 0.11427307 | 0.11427307 |
+| a=8 | 0.0000000 | 0.21308899 | 0.21308899 |
+| a=12 | 0.0000000 | 0.31190491 | 0.31190491 |
+| a=16 | 0.0000000 | 0.41072083 | 0.41072083 |
+| a=20 | 0.0000000 | 0.50953674 | 0.50953674 |
+
+</details>
+
+<details><summary>hash11_s2 — sample values (device vs fixed-point reference)</summary>
+
+| input | device | reference | Δ |
+|---|---|---|---|
+| a=0 | 0.0000000 | 0.70315552 | 0.70315552 |
+| a=4 | 0.0000000 | 0.30282593 | 0.30282593 |
+| a=8 | 0.0000000 | 0.76626587 | 0.76626587 |
+| a=12 | 0.0000000 | 0.093475342 | 0.093475342 |
+| a=16 | 0.0000000 | 0.28445435 | 0.28445435 |
+| a=20 | 0.0000000 | 0.33920288 | 0.33920288 |
 
 </details>
 
