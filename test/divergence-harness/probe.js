@@ -38,6 +38,31 @@ function hash21(ix, iy) {
   return f - floor(f)
 }
 
+// ── #111 discriminators: localise WHERE hash11 collapses to 0 on hardware ─────
+// Each stage ends with the same reinterpret-and-fract tail as hash11, so its
+// output lands in [0,1) and survives getVars readback (which saturates values
+// outside ±32767). Comparing each stage device-vs-fx narrows the root cause:
+//   - reint     : does the tiny ×1/65536 constant survive a multiply at all?
+//   - hash11_s1 : stage 1 only (no overflow yet) — isolates the reinterpret/floor
+//   - hash11_s2 : through the first overflowing multiply h*(h+197)
+// If reint is 0 → constant underflowed to 0. If s1 is 0 but reint isn't →
+// floor/reinterpret on a wrapped value. If s1 matches but s2/full is 0 → the
+// overflow multiply, not the tail, is the culprit.
+function reint(n) {
+  return n * 0.0000152587890625
+}
+function hash11_s1(n) {
+  var h = n * 1619 + 1013
+  var f = h * 0.0000152587890625
+  return f - floor(f)
+}
+function hash11_s2(n) {
+  var h = n * 1619 + 1013
+  h = h * (h + 197)
+  var f = h * 0.0000152587890625
+  return f - floor(f)
+}
+
 function compute() {
   if (fn == 0)  return sin(a)
   if (fn == 1)  return cos(a)
@@ -56,6 +81,9 @@ function compute() {
   if (fn == 14) return exp(a)
   if (fn == 15) return log(a)
   if (fn == 16) return pow(a, b)
+  if (fn == 17) return reint(a)        // #111: does ×1/65536 survive a multiply?
+  if (fn == 18) return hash11_s1(a)    // #111: hash11 stage 1 (pre-overflow)
+  if (fn == 19) return hash11_s2(a)    // #111: hash11 through first overflow mul
   return 0
 }
 

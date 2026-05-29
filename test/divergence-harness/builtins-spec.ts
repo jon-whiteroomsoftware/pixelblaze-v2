@@ -22,6 +22,8 @@ export const FN = {
   sin: 0, cos: 1, tan: 2, abs: 3, sqrt: 4, floor: 5, ceil: 6, frac: 7,
   mod: 8, mul: 9, not: 10, add: 11, hash11: 12, hash21: 13,
   exp: 14, log: 15, pow: 16,
+  // #111 discriminators (localise where hash11 collapses to 0 on hardware)
+  reint: 17, hash11_s1: 18, hash11_s2: 19,
 } as const
 
 /** One 16.16 ULP — the finest distinction the device can express in vars JSON. */
@@ -51,6 +53,28 @@ function fxHash21(ixFloat: number, iyFloat: number): number {
   let h = fx.add(fx.add(fx.mul(ix, C(1619)), fx.mul(iy, C(31337))), C(1013))
   h = fx.mul(h, fx.add(h, C(197)))
   h = fx.mul(h, C(769))
+  const f = fx.mul(h, C(0.0000152587890625))
+  return fx.toFloat(fx.sub(f, fxFloor(f)))
+}
+
+// #111 discriminator references — each mirrors the matching probe.js stage with
+// `fx`, ending in the reinterpret-and-fract tail so the result is in [0,1).
+function fxReint(nFloat: number): number {
+  const C = (v: number) => fx.fromFloat(v)
+  return fx.toFloat(fx.mul(C(nFloat), C(0.0000152587890625)))
+}
+
+function fxHash11Stage1(nFloat: number): number {
+  const C = (v: number) => fx.fromFloat(v)
+  const h = fx.add(fx.mul(C(nFloat), C(1619)), C(1013))
+  const f = fx.mul(h, C(0.0000152587890625))
+  return fx.toFloat(fx.sub(f, fxFloor(f)))
+}
+
+function fxHash11Stage2(nFloat: number): number {
+  const C = (v: number) => fx.fromFloat(v)
+  let h = fx.add(fx.mul(C(nFloat), C(1619)), C(1013))
+  h = fx.mul(h, fx.add(h, C(197)))
   const f = fx.mul(h, C(0.0000152587890625))
   return fx.toFloat(fx.sub(f, fxFloor(f)))
 }
@@ -149,6 +173,23 @@ export const PROBES: Probe[] = [
       sweep(0, 63, 8).map((b) => ({ a: Math.round(a), b: Math.round(b) })),
     ),
     reference: (a, b) => fxHash21(a, b),
+  },
+
+  // ── #111 hash-collapse discriminators (bit-identical fixed-point ref) ───────
+  {
+    kind: 'hash', name: 'reint', fn: FN.reint,
+    samples: sweep(0, 255, 64).map((a) => ({ a: Math.round(a) })),
+    reference: (a) => fxReint(a),
+  },
+  {
+    kind: 'hash', name: 'hash11_s1', fn: FN.hash11_s1,
+    samples: sweep(0, 255, 64).map((a) => ({ a: Math.round(a) })),
+    reference: (a) => fxHash11Stage1(a),
+  },
+  {
+    kind: 'hash', name: 'hash11_s2', fn: FN.hash11_s2,
+    samples: sweep(0, 255, 64).map((a) => ({ a: Math.round(a) })),
+    reference: (a) => fxHash11Stage2(a),
   },
 
   // ── behaviour discriminators ───────────────────────────────────────────────
