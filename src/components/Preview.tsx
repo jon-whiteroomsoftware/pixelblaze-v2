@@ -123,16 +123,27 @@ export function Preview() {
       onFrame: (_delta, builtins, elapsedMs) => {
         const { watchedBuiltins, watchedPatternVars } = usePreviewStore.getState()
         if (watchedBuiltins.length === 0 && watchedPatternVars.length === 0) return
+        // Watched values live in the pattern's numeric domain (raw int32 in
+        // fidelity mode); decode scalars and array elements to the float UI
+        // domain so the panel reads the same in fast and fidelity modes.
+        // decodeScalar is identity in fast mode.
+        const dec = shim.decodeScalar
+        const decode = (v: unknown): unknown =>
+          typeof v === 'number'
+            ? dec(v)
+            : Array.isArray(v)
+              ? (v as unknown[]).map((n) => (typeof n === 'number' ? dec(n) : n))
+              : v
         const values: Record<string, unknown> = {}
         if (watchedBuiltins.includes('elapsed')) {
           values['elapsed'] = `${(elapsedMs / 1000).toFixed(1)}s`
         }
         for (const name of watchedBuiltins) {
-          if (name !== 'elapsed') values[name] = builtins[name]
+          if (name !== 'elapsed') values[name] = decode(builtins[name])
         }
         const exports = handle.getExports()
         for (const name of watchedPatternVars) {
-          values[name] = exports[name]
+          values[name] = decode(exports[name])
         }
         usePreviewStore.getState().setWatchValues(values)
       },
