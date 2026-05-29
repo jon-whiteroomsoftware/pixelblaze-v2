@@ -28,6 +28,7 @@ Produced by `npm run harness` (test/divergence-harness). The probe pattern is ha
 | `reint` | 64 | 0.0038909912 | ❌ NO |
 | `hash11_s1` | 64 | 0.91970825 | ❌ NO |
 | `hash11_s2` | 64 | 0.97302246 | ❌ NO |
+| `mul-precision` | 64 | 0.000015723633 | ✅ yes |
 
 <details><summary>hash11 — sample values (device vs fixed-point reference)</summary>
 
@@ -94,7 +95,31 @@ Produced by `npm run harness` (test/divergence-harness). The probe pattern is ha
 
 </details>
 
+<details><summary>mul-precision — sample values (device vs fixed-point reference)</summary>
+
+| input | device | reference | Δ |
+|---|---|---|---|
+| a=0, b=0.3333333333333333 | 0.0000000 | 0.0000000 | 0.0000000 |
+| a=0.015873015873015872, b=0.3333333333333333 | 0.0052800000 | 0.0052795410 | 4.5898437e-7 |
+| a=0.031746031746031744, b=0.3333333333333333 | 0.010574000 | 0.010574341 | 3.4082031e-7 |
+| a=0.047619047619047616, b=0.3333333333333333 | 0.015854000 | 0.015869141 | 0.000015140625 |
+| a=0.06349206349206349, b=0.3333333333333333 | 0.021149000 | 0.021148682 | 3.1835938e-7 |
+| a=0.07936507936507936, b=0.3333333333333333 | 0.026443000 | 0.026443481 | 4.8144531e-7 |
+
+</details>
+
 ## Firmware behaviour — confirmed answers
+
+### small-const
+
+**Q:** Does the literal 1/65536 (0.0000152587890625) compile to raw 1 or flush to 0?  
+**Device returned:** `0.0000000`  
+**→ flushes to 0**
+
+| candidate | predicted | \|Δ\| |
+|---|---|---|
+| raw 1 (smallest 16.16 ULP) | 0.000015258789 | 0.000015258789 |
+| flushes to 0 | 0.0000000 | 0.0000000 |
 
 ### add-overflow
 

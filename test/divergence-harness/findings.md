@@ -28,39 +28,37 @@ firmware 3.67, 2026-05-29.
 
 ## Anomaly for the fidelity work — ROOT CAUSE FOUND (#111)
 
-- **`hash11` / `hash21` return exactly 0 on hardware.** The `fn` 17–19
-  discriminators (live run 2026-05-29, fw 3.67) pin it precisely:
+- **`hash11` / `hash21` return exactly 0 on hardware.** Pinned over two live
+  runs (2026-05-29, fw 3.67) with the `fn` 17–20 discriminators:
 
   - **`reint` (`a * 1/65536`) = 0 for every input** (a=4 → device `0`, ref
-    `0.000061`). This is the smoking gun.
-  - `hash11_s1` and `hash11_s2` are *also* 0 — because both end in the same
-    `* (1/65536)` reinterpret step. The overflow multiplies are **not** the
-    culprit.
+    `0.000061`).
+  - `hash11_s1` / `hash11_s2` are *also* 0 — both end in the same
+    `* (1/65536)` reinterpret step.
+  - `mul-precision` (multiply with a *non-tiny* fractional operand, b=1/3):
+    device matches exact `fx.mul` to **~1 ULP**. So the device multiply is
+    full-precision truncate — it does **not** drop operand bits.
+  - **`small-const` → `flushes to 0`**: the literal `0.0000152587890625`
+    (= 1/65536, the smallest 16.16 ULP) compiles to raw **0** on the device.
 
-  **Root cause: the device's 16.16 multiply truncates the low bits of each
-  operand before multiplying** (classic embedded `(a>>8)*(b>>8)`-style mul, not
-  an exact 64-bit product). Multiplying by the reinterpret constant — raw int
-  `1` (= 1/65536) — zeroes that operand, so the product is 0. The whole
-  `× 1/65536` "reinterpret the wrapped int's bits as a fraction" trick is
-  therefore **unsound on hardware**.
+  **Root cause: the `1/65536` literal flushes to 0 in the firmware's literal
+  parser.** `h * 0` is 0 for all `h`, so every hash that ends in the
+  `× 1/65536` reinterpret returns 0. The multiply is innocent; the constant is
+  the problem.
 
-  This also resolves two earlier loose ends:
-  - It explains the "mul → truncate" behaviour answer (low operand bits are
-    dropped, not rounded).
-  - It explains why "multiply matches `fx`" looked true before: that was only
-    ever checked on **integer-valued** operands (raw low bits = 0) — the one
-    case where the device's lossy mul and `fx`'s exact mul agree. `fx.mul` is
-    NOT bit-identical to hardware for operands carrying fractional precision.
+  > Correction: an earlier draft of this note blamed a "lossy `(a>>8)*(b>>8)`
+  > multiply." The `mul-precision` probe **disproved** that (~1 ULP agreement).
+  > The "mul → truncate" answer is ordinary result truncation, not operand-bit
+  > loss, and `fx.mul` is fine.
 
   **Consequences / follow-ups:**
-  - The bit-identity claim in **ADR-0003** cannot hold for the reinterpret-based
-    hash recipe. `Noise.js` `_hash1`/`_hash2` and `Shader.js` `hash11`/`hash21`
-    need a redesign that never relies on multiplying by a sub-256-raw constant
-    (e.g. read the integer part via `floor`/division rather than the multiply
-    reinterpret), then re-probe.
-  - `fx.mul` fidelity itself is now in question for fractional operands — worth a
-    dedicated probe sweep to characterise exactly how many low bits the device
-    drops, so `fx.mul` can match (or the divergence be documented).
+  - The bit-identity claim in **ADR-0003** can't hold for the reinterpret-based
+    hash recipe while it depends on a sub-ULP literal. `Noise.js` `_hash1`/
+    `_hash2` and `Shader.js` `hash11`/`hash21` need a redesign that never relies
+    on a `1/65536`-scale literal (e.g. use `floor`/division or a larger-constant
+    fold), then re-probe. → **#113**
+  - `fx.mul` fidelity is **not** a concern after all (device ~1 ULP on
+    fractional operands). → **#114 closed: not reproduced.**
 
 ## Transport note (not a contradiction)
 

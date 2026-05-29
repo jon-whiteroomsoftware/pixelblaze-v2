@@ -23,7 +23,7 @@ export const FN = {
   mod: 8, mul: 9, not: 10, add: 11, hash11: 12, hash21: 13,
   exp: 14, log: 15, pow: 16,
   // #111 discriminators (localise where hash11 collapses to 0 on hardware)
-  reint: 17, hash11_s1: 18, hash11_s2: 19,
+  reint: 17, hash11_s1: 18, hash11_s2: 19, smallconst: 20,
 } as const
 
 /** One 16.16 ULP — the finest distinction the device can express in vars JSON. */
@@ -203,6 +203,15 @@ export const PROBES: Probe[] = [
   },
 
   // ── behaviour discriminators ───────────────────────────────────────────────
+  {
+    kind: 'behaviour', name: 'small-const', fn: FN.smallconst,
+    question: 'Does the literal 1/65536 (0.0000152587890625) compile to raw 1 or flush to 0?',
+    a: 0,
+    candidates: [
+      { label: 'raw 1 (smallest 16.16 ULP)', value: 0.0000152587890625 },
+      { label: 'flushes to 0', value: 0 },
+    ],
+  },
   {
     kind: 'behaviour', name: 'add-overflow', fn: FN.add,
     question: 'On 16.16 overflow, does the device WRAP or SATURATE?',

@@ -84,6 +84,7 @@ function compute() {
   if (fn == 17) return reint(a)        // #111: does ×1/65536 survive a multiply?
   if (fn == 18) return hash11_s1(a)    // #111: hash11 stage 1 (pre-overflow)
   if (fn == 19) return hash11_s2(a)    // #111: hash11 through first overflow mul
+  if (fn == 20) return 0.0000152587890625  // #111: does the 1/65536 literal compile to raw 1 or flush to 0?
   return 0
 }
 
