@@ -11,6 +11,11 @@ export interface ShimContext {
   builtins: Record<string, unknown>
   capturedPixel: () => [number, number, number]
   getBuiltin: (name: string) => unknown
+  // Encode/decode a scalar at the engine↔pattern boundary. The float64 shim is
+  // the identity; the fixed-point shim converts float ↔ raw int32 so the render
+  // loop, controls, and watchers can stay mode-agnostic.
+  encodeScalar: (n: number) => number
+  decodeScalar: (n: number) => number
   // Applies the current transform matrix to a map coordinate. The render loop
   // calls this before render2D/render3D so transform()/translate()/etc. behave
   // as they do on hardware (the transformed coords are handed to the pattern).
@@ -306,7 +311,14 @@ export function createShim(config: ShimConfig): ShimContext {
     arrayReplaceAt: (a: number[], offset: number, ...args: number[]) => { args.forEach((v, i) => { a[offset + i] = v }); return a },
   }
 
-  return { builtins, capturedPixel, getBuiltin: (name: string) => builtins[name], transformPoint }
+  return {
+    builtins,
+    capturedPixel,
+    getBuiltin: (name: string) => builtins[name],
+    encodeScalar: (n: number) => n,
+    decodeScalar: (n: number) => n,
+    transformPoint,
+  }
 }
 
 // ── Fixed-point shim ─────────────────────────────────────────────────────────
@@ -332,7 +344,9 @@ export function createFxShim(config: ShimConfig): ShimContext {
     }
   }
 
-  const fxBuiltins: Record<string, unknown> = {}
+  // The fixed-point emit references the fx.* helpers directly, so expose the
+  // engine to the evaluated pattern as a built-in.
+  const fxBuiltins: Record<string, unknown> = { fx }
 
   for (const [key, val] of Object.entries(floatBuiltins)) {
     if (typeof val === 'function') {
@@ -364,6 +378,8 @@ export function createFxShim(config: ShimConfig): ShimContext {
     builtins: fxBuiltins,
     capturedPixel,
     getBuiltin: (name: string) => fxBuiltins[name],
+    encodeScalar: fx.fromFloat,
+    decodeScalar: fx.toFloat,
     transformPoint,
   }
 }

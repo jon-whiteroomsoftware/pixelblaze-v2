@@ -30,7 +30,9 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
   function doTick(realDelta: number, dimmed: boolean): void {
     const scaledDelta = realDelta * getSpeed()
     clock.advance(scaledDelta)
-    handle.beforeRender(scaledDelta)
+    // delta and index cross the engine→pattern boundary as scalars, so they
+    // must be encoded to the active numeric domain (raw int32 in fidelity mode).
+    handle.beforeRender(shim.encodeScalar(scaledDelta))
 
     const { rows, cols } = grid
     const pixels: [number, number, number][] = []
@@ -42,7 +44,7 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
         // Apply the pattern's coordinate transform stack before render2D, so
         // translate/rotate/scale behave as on hardware.
         const [tx, ty] = shim.transformPoint(x, y, 0)
-        handle.render2D(row * cols + col, tx, ty)
+        handle.render2D(shim.encodeScalar(row * cols + col), tx, ty)
         pixels.push(shim.capturedPixel())
       }
     }

@@ -8,15 +8,19 @@ export interface GridConfig {
   diffusion: number
 }
 
+export type FidelityMode = 'fidelity' | 'fast'
+
 interface PreviewState {
   isRunning: boolean
   speed: number
   brightness: number
   grid: GridConfig
+  fidelity: FidelityMode
   watchedBuiltins: string[]
   watchedPatternVars: string[]
   watchValues: Record<string, unknown>
   toggle: () => void
+  setFidelity: (fidelity: FidelityMode) => void
   setSpeed: (speed: number) => void
   setBrightness: (brightness: number) => void
   setGrid: (partial: Partial<GridConfig>) => void
@@ -35,6 +39,9 @@ export const previewInitialState = {
     spacing: 20,
     diffusion: 0.5,
   },
+  // Fidelity (16.16 fixed-point) is the default; Fast preview is the float64
+  // escape hatch. Transient session state for now — persistence is #90.
+  fidelity: 'fidelity' as FidelityMode,
   watchedBuiltins: ['elapsed', 'pixelCount'] as string[],
   watchedPatternVars: [] as string[],
   watchValues: {} as Record<string, unknown>,
@@ -58,6 +65,7 @@ export const usePreviewStore = create<PreviewState>()(
     (set) => ({
       ...previewInitialState,
       toggle: () => set((s) => ({ isRunning: !s.isRunning })),
+      setFidelity: (fidelity) => set({ fidelity }),
       setSpeed: (speed) => set({ speed }),
       setBrightness: (brightness) => set({ brightness }),
       setGrid: (partial) => set((s) => ({ grid: { ...s.grid, ...partial } })),

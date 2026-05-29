@@ -53,6 +53,8 @@ function Splitter({ onDrag }: { onDrag: (dx: number) => void }) {
 export default function App() {
   const isRunning = usePreviewStore((s) => s.isRunning)
   const toggle = usePreviewStore((s) => s.toggle)
+  const fidelity = usePreviewStore((s) => s.fidelity)
+  const setFidelity = usePreviewStore((s) => s.setFidelity)
 
   const activePatternId = usePatternStore((s) => s.activePatternId)
   const activeLibraryName = usePatternStore((s) => s.activeLibraryName)
@@ -267,6 +269,18 @@ export default function App() {
         <aside data-testid="preview-pane" className="shrink-0 flex flex-col" style={{ width: rightWidth }}>
           <PaneHeader>
             <span className="flex-1 truncate">{previewPatternName || '—'}</span>
+            <button
+              aria-label={fidelity === 'fidelity' ? 'Fidelity (16.16 fixed-point) — click for Fast preview' : 'Fast preview (float64) — click for Fidelity'}
+              title={fidelity === 'fidelity' ? 'Fidelity (hardware-accurate fixed-point)' : 'Fast preview (float64)'}
+              onClick={() => setFidelity(fidelity === 'fidelity' ? 'fast' : 'fidelity')}
+              className={`px-1.5 h-6 rounded text-[10px] font-mono font-semibold tracking-wide transition-colors ${
+                fidelity === 'fidelity'
+                  ? 'text-amber-400 hover:bg-zinc-700'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
+              }`}
+            >
+              {fidelity === 'fidelity' ? 'FIDELITY' : 'FAST'}
+            </button>
             <PreviewSettings />
             <SpeedSelector />
             <button

@@ -4,7 +4,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { useControlStore } from '@/store/controlStore'
 import { WatchPanel } from '@/components/WatchPanel'
 import { ControlsPanel } from '@/components/ControlsPanel'
-import { createShim } from '@/engine/shim'
+import { createShim, createFxShim, type ShimContext } from '@/engine/shim'
 import { loadPattern } from '@/engine/loadPattern'
 import { bundle } from '@/engine/bundle'
 import { createRenderer } from '@/engine/renderer'
@@ -19,9 +19,11 @@ export function Preview() {
   const rendererRef = useRef<ReturnType<typeof createRenderer> | null>(null)
   const isRunning = usePreviewStore((s) => s.isRunning)
   const grid = usePreviewStore((s) => s.grid)
+  const fidelity = usePreviewStore((s) => s.fidelity)
   const previewSource = useEditorStore((s) => s.previewSource)
   const controlValues = useControlStore((s) => s.controlValues)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
+  const shimRef = useRef<ShimContext | null>(null)
   const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
@@ -63,12 +65,16 @@ export function Preview() {
     const gridWithDims = { ...usePreviewStore.getState().grid, ...canvasDims }
 
     const clock = createVirtualClock()
-    const shim = createShim({ grid: gridWithDims, getVirtualTime: () => clock.getTime() })
+    const shimConfig = { grid: gridWithDims, getVirtualTime: () => clock.getTime() }
+    // Fidelity mode runs the 16.16 fixed-point emit + shim; Fast preview runs
+    // the plain float64 emit + shim. The hardware `code` artifact is unaffected.
+    const shim = fidelity === 'fast' ? createShim(shimConfig) : createFxShim(shimConfig)
+    shimRef.current = shim
 
     let handle: ReturnType<typeof loadPattern>
     try {
-      const { code, metadata } = bundle(previewSource, LIBRARIES)
-      handle = loadPattern(code, metadata, shim.builtins)
+      const { code, fxCode, metadata } = bundle(previewSource, LIBRARIES)
+      handle = loadPattern(fidelity === 'fast' ? code : fxCode, metadata, shim.builtins)
       handleRef.current = handle
       useEditorStore.getState().setPatternVars(metadata.patternVars)
       useEditorStore.getState().setControls(metadata.controls)
@@ -85,8 +91,10 @@ export function Preview() {
         if (c.kind !== 'slider' && c.kind !== 'toggle') continue
         const stem = c.exportName.slice(c.kind.length)
         const varName = stem.charAt(0).toLowerCase() + stem.slice(1)
-        const v = exports[varName]
-        if (typeof v !== 'number') continue
+        const rawV = exports[varName]
+        if (typeof rawV !== 'number') continue
+        // Exports are raw int32 in fidelity mode; decode to the float UI domain.
+        const v = shim.decodeScalar(rawV)
         if (c.kind === 'slider') defaults[c.exportName] = Math.max(0, Math.min(1, v))
         else defaults[c.exportName] = v !== 0 ? 1 : 0
       }
@@ -136,15 +144,18 @@ export function Preview() {
     if (usePreviewStore.getState().isRunning) loop.start()
 
     return () => loop.stop()
-  }, [previewSource, canvasDims])
+  }, [previewSource, canvasDims, fidelity])
 
   // Forward control value changes to the live pattern handle
   useEffect(() => {
     const handle = handleRef.current
     if (!handle) return
+    // Control values arrive in the float UI domain; encode to the pattern's
+    // numeric domain (raw int32 in fidelity mode) before invoking callbacks.
+    const enc = shimRef.current?.encodeScalar ?? ((n: number) => n)
     for (const [name, value] of Object.entries(controlValues)) {
-      if (Array.isArray(value)) handle.controls[name]?.(...(value as number[]))
-      else handle.controls[name]?.(value)
+      if (Array.isArray(value)) handle.controls[name]?.(...(value as number[]).map(enc))
+      else handle.controls[name]?.(enc(value))
     }
     if (!usePreviewStore.getState().isRunning) {
       loopRef.current?.renderPreviewFrame()

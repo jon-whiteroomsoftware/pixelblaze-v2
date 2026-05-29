@@ -1,5 +1,6 @@
 import * as acorn from 'acorn'
 import { type PatternMetadata } from './loadPattern'
+import { emitFixedPoint } from './fxEmit'
 
 export interface BundleMetadata extends PatternMetadata {
   renderFns: { hasBeforeRender: boolean; hasRender2D: boolean; hasRender: boolean }
@@ -301,7 +302,7 @@ function inlineFn(
 export function bundle(
   patternSrc: string,
   libraries: Record<string, string>,
-): { code: string; metadata: BundleMetadata } {
+): { code: string; fxCode: string; metadata: BundleMetadata } {
   const patternAst = parseModule(patternSrc)
   const metadata = extractMetadata(patternAst)
 
@@ -309,7 +310,7 @@ export function bundle(
   const refs = collectLibraryRefs(patternAst, knownLibs)
 
   if (refs.length === 0) {
-    return { code: patternSrc, metadata }
+    return { code: patternSrc, fxCode: emitFixedPoint(patternSrc), metadata }
   }
 
   const libFnMaps: Record<string, LibFnMap> = {}
@@ -334,8 +335,10 @@ export function bundle(
     text: mangle(ref.namespace, ref.fnName),
   }))
 
+  const code = preamble + rewriteSource(patternSrc, patternRewrites)
   return {
-    code: preamble + rewriteSource(patternSrc, patternRewrites),
+    code,
+    fxCode: emitFixedPoint(code),
     metadata,
   }
 }
