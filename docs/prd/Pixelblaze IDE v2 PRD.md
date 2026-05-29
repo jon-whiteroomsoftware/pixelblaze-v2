@@ -131,6 +131,8 @@ Render loop (requestAnimationFrame):
 
 The app starts **paused**. Running state is preserved across pattern switches.
 
+> **Numeric model update.** ADR-0001 (run the preview as float64) is **superseded by ADR-0003**: the preview now defaults to faithful 16.16 fixed-point emulation so the preview matches hardware, with a per-pattern "fast preview" float64 escape hatch. See the feature PRD `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md`. Coordinate generation (step 3 above) is unchanged.
+
 ### User pattern storage
 
 User patterns are stored in **IndexedDB** under a dedicated object store. Each record: `{ id: string, name: string, src: string, updatedAt: number }`. Control values are **not** persisted — they are transient session state held in Zustand and reset to defaults on every page load.
@@ -163,6 +165,7 @@ The IDE operates entirely without a network connection or hardware controller. P
 - Library files can be opened in the editor for reading but are not editable.
 - v1 libraries: `anim` (easing, oscillators, timing), `sdf` (2D signed distance fields and boolean ops), `color` (palette, blend modes), `coord` (polar, coordinate transforms), `noise` (value noise, Perlin helpers).
 - Planned library content: scalar math helpers, polar coordinates, SDFs (circle, rect, polygon, segment), blend modes, value noise, palette interpolation, animation primitives.
+- Planned: a `shader` library of GLSL gap-fillers (`fract`, `step`, `dot2/3`, `normalize2/3`, `reflect`, `mat2` rotate, `toUV`, IQ palette, hardware-safe hash) supporting ShaderToy porting — see `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md`.
 
 ### Code Editor (Monaco)
 
@@ -359,4 +362,4 @@ Find and connect to a Pixelblaze controller on the local network. Use the contro
 - **Load pattern from disk** — import a `.js` pattern file previously downloaded from the ElectroMage Pixelblaze editor.
 - **Library function demos** — one runnable demo pattern per library function illustrating its behaviour.
 - **Progressive demo patterns** — a curated set of patterns that build in complexity step by step, teaching animation techniques.
-- **Shader import** — investigate importing GLSL shaders via an automated rewrite to Pixelblaze's language.
+- **Shader import (automated rewrite)** — investigate *automatically* rewriting GLSL shaders into Pixelblaze's language. Note: human-assisted ShaderToy porting (a `shader` library + a porting guide, on top of a hardware-fidelity preview) is specified separately in `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md`; only the fully-automated rewrite remains deferred here.
