@@ -4,22 +4,38 @@
 // Assumes: sin, cos, sqrt, abs, floor, min, max, clamp, PI
 
 // ─── Integer hashes ──────────────────────────────────────────────────────────
+//
+// Designed for 16.16 fixed-point fidelity. The original hashes used constants
+// like 374761393 and 0x27d4eb2d (far beyond ±32768, unrepresentable in 16.16)
+// and bit-shifts whose shift counts get scaled by 65536 under fixed-point emit
+// (a `>> 13` becomes `>> (13<<16)` ≡ `>> 0`) — both meaningless on hardware.
+//
+// These use only multiply / add with constants ≤ 32767, relying on faithful
+// int32 wrap of the raw fixed-point value (hardware does the same), so they are
+// bit-identical preview↔hardware under the fidelity engine. The integer part
+// wraps mod 65536, giving a ~16-bit hash — lower entropy than a 32-bit hash,
+// but ample for LED-scale visuals (ADR-0003).
+//
+// The final step `h * (1/65536)` is the key trick: 1/65536 lands on raw int 1,
+// so the multiply reinterprets the wrapped integer's low bits as a fraction in
+// (-0.5, 0.5); the floor-based fract then folds it into a stable [0, 1).
+// No `sin`/`perlin` — those are algorithmically divergent (ADR-0003) and unfit
+// for fidelity-critical hashing.
 
 function _hash2(ix, iy) {
-  var h = (ix * 374761393 + iy * 668265263) | 0;
-  h = (h ^ (h >> 13)) | 0;
-  h = (h * 1274126177) | 0;
-  h = (h ^ (h >> 16)) | 0;
-  return (h >>> 0) / 4294967296;
+  var h = ix * 1619 + iy * 31337 + 1013;
+  h = h * (h + 197);
+  h = h * 769;
+  var f = h * 0.0000152587890625; // × 1/65536 — reinterpret wrapped bits as fraction
+  return f - floor(f);
 }
 
 function _hash1(n) {
-  n = (n ^ 61) ^ (n >> 16);
-  n = n + (n << 3);
-  n = n ^ (n >> 4);
-  n = n * 0x27d4eb2d;
-  n = n ^ (n >> 15);
-  return ((n >>> 0) & 0xffff) / 65536;
+  var h = n * 1619 + 1013;
+  h = h * (h + 197);
+  h = h * 769;
+  var f = h * 0.0000152587890625; // × 1/65536 — reinterpret wrapped bits as fraction
+  return f - floor(f);
 }
 
 // ─── Value noise ─────────────────────────────────────────────────────────────
@@ -27,17 +43,17 @@ function _hash1(n) {
 // Smooth 1D value noise; range 0..1
 function noise1D(x) {
   var ix = floor(x);
-  var fx = x - ix;
-  var ux = fx * fx * (3 - 2 * fx);
+  var tx = x - ix;
+  var ux = tx * tx * (3 - 2 * tx);
   return _hash1(ix) + (_hash1(ix + 1) - _hash1(ix)) * ux;
 }
 
 // Smooth 2D value noise, range [0, 1]
 function noise2D(x, y) {
   var ix = floor(x), iy = floor(y);
-  var fx = x - ix,   fy = y - iy;
-  var ux = fx * fx * (3 - 2 * fx);
-  var uy = fy * fy * (3 - 2 * fy);
+  var tx = x - ix,   ty = y - iy;
+  var ux = tx * tx * (3 - 2 * tx);
+  var uy = ty * ty * (3 - 2 * ty);
   var a = _hash2(ix,     iy);
   var b = _hash2(ix + 1, iy);
   var c = _hash2(ix,     iy + 1);
@@ -47,23 +63,23 @@ function noise2D(x, y) {
 
 // ─── Gradient noise ──────────────────────────────────────────────────────────
 
-function _grad(ix, iy, fx, fy) {
-  var h  = (_hash2(ix, iy) * 8) | 0;
+function _grad(ix, iy, tx, ty) {
+  var h  = floor(_hash2(ix, iy) * 8);
   var gx = (h < 4) ? 1 : -1;
   var gy = (h < 2 || h >= 6) ? 1 : -1;
-  return gx * fx + gy * fy;
+  return gx * tx + gy * ty;
 }
 
 // Slightly more organic than value noise, range ≈ [0, 1]
 function gradNoise2D(x, y) {
   var ix = floor(x), iy = floor(y);
-  var fx = x - ix,   fy = y - iy;
-  var ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
-  var uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
-  var a  = _grad(ix,     iy,     fx,     fy);
-  var b  = _grad(ix + 1, iy,     fx - 1, fy);
-  var c  = _grad(ix,     iy + 1, fx,     fy - 1);
-  var d  = _grad(ix + 1, iy + 1, fx - 1, fy - 1);
+  var tx = x - ix,   ty = y - iy;
+  var ux = tx * tx * tx * (tx * (tx * 6 - 15) + 10);
+  var uy = ty * ty * ty * (ty * (ty * 6 - 15) + 10);
+  var a  = _grad(ix,     iy,     tx,     ty);
+  var b  = _grad(ix + 1, iy,     tx - 1, ty);
+  var c  = _grad(ix,     iy + 1, tx,     ty - 1);
+  var d  = _grad(ix + 1, iy + 1, tx - 1, ty - 1);
   var v  = a + ux * (b - a) + uy * (c - a) + ux * uy * (a - b - c + d);
   return v * 0.5 + 0.5;
 }
