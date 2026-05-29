@@ -191,6 +191,16 @@ export const PROBES: Probe[] = [
     samples: sweep(0, 255, 64).map((a) => ({ a: Math.round(a) })),
     reference: (a) => fxHash11Stage2(a),
   },
+  // #114: characterise device multiply precision on FRACTIONAL operands. The
+  // reference is exact `fx.mul`; any Δ is the low operand bits the device drops
+  // before multiplying (the lossy mul that collapsed the ×1/65536 reinterpret,
+  // #111). b = 1/3 carries a full fractional mantissa to expose the truncation;
+  // a sweeps [0,1) so the integer parts are 0 and only fractional bits matter.
+  {
+    kind: 'hash', name: 'mul-precision', fn: FN.mul,
+    samples: sweep(0, 1, 64).map((a) => ({ a, b: 1 / 3 })),
+    reference: (a, b) => fx.toFloat(fx.mul(fx.fromFloat(a), fx.fromFloat(b))),
+  },
 
   // ── behaviour discriminators ───────────────────────────────────────────────
   {
