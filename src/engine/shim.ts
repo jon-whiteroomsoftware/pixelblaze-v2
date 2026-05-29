@@ -1,3 +1,5 @@
+import { fx } from './fixedpoint'
+
 const PI2 = Math.PI * 2
 
 export interface ShimConfig {
@@ -305,6 +307,65 @@ export function createShim(config: ShimConfig): ShimContext {
   }
 
   return { builtins, capturedPixel, getBuiltin: (name: string) => builtins[name], transformPoint }
+}
+
+// ── Fixed-point shim ─────────────────────────────────────────────────────────
+//
+// Wraps every built-in at an fx.* seam: raw int32 in → float → built-in → raw int32 out.
+// The float64 shim handles all internal state (CTM, captures, prng, perlin).
+// The seam is per-function so individual wrappers can be replaced with LUTs later.
+//
+// capturedPixel() still returns floats — the renderer reads at the canvas boundary.
+// transformPoint() converts the float CTM output to raw int32 (render loop is agnostic).
+
+export function createFxShim(config: ShimConfig): ShimContext {
+  const floatShim = createShim(config)
+  const { builtins: floatBuiltins, capturedPixel, transformPoint: floatTP } = floatShim
+
+  // Wrap one function: numeric args converted raw→float, numeric result converted float→raw.
+  // Non-numeric args (callbacks, arrays) pass through so array/callback built-ins still work.
+  function fxWrap(fn: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown {
+    return (...rawArgs: unknown[]) => {
+      const floatArgs = rawArgs.map(a => typeof a === 'number' ? fx.toFloat(a) : a)
+      const result = fn(...floatArgs)
+      return typeof result === 'number' ? fx.fromFloat(result) : result
+    }
+  }
+
+  const fxBuiltins: Record<string, unknown> = {}
+
+  for (const [key, val] of Object.entries(floatBuiltins)) {
+    if (typeof val === 'function') {
+      fxBuiltins[key] = fxWrap(val as (...args: unknown[]) => unknown)
+    } else if (typeof val === 'number') {
+      fxBuiltins[key] = fx.fromFloat(val)
+    } else {
+      // Arrays (frequencyData, etc.) and other non-numeric values pass through unchanged.
+      fxBuiltins[key] = val
+    }
+  }
+
+  // mapPixels calls the pattern callback with (index, x, y, z) in float domain.
+  // Override so the callback receives raw int32 as the fixed-point transpiler expects.
+  fxBuiltins.mapPixels = (rawFn: (...args: unknown[]) => void) => {
+    ;(floatBuiltins.mapPixels as (...args: unknown[]) => void)(
+      (index: number, x: number, y: number, z: number) =>
+        rawFn(fx.fromFloat(index), fx.fromFloat(x), fx.fromFloat(y), fx.fromFloat(z))
+    )
+  }
+
+  // Render loop supplies float pixel coords; return raw int32 for the pattern's render2D/3D.
+  function transformPoint(x: number, y: number, z: number): [number, number, number] {
+    const [tx, ty, tz] = floatTP(x, y, z)
+    return [fx.fromFloat(tx), fx.fromFloat(ty), fx.fromFloat(tz)]
+  }
+
+  return {
+    builtins: fxBuiltins,
+    capturedPixel,
+    getBuiltin: (name: string) => fxBuiltins[name],
+    transformPoint,
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
