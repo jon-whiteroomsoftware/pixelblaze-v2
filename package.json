@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "harness": "tsx test/divergence-harness/harness.ts",
+    "spike": "tsx test/capability-spike/spike.ts",
     "prepare": "husky"
   },
   "repository": {
@@ -61,6 +62,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
+    "lz-string": "^1.5.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

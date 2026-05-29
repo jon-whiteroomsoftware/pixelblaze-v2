@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
+import LZString from 'lz-string'
 import {
   PixelblazeConnection,
+  MessageType,
+  FrameFlag,
+  encodeBinaryFrames,
+  decodeProgramList,
+  toUint8Array,
   type WebSocketLike,
 } from './PixelblazeConnection'
 
@@ -13,6 +19,7 @@ class FakeWebSocket implements WebSocketLike {
 
   readyState = 0 // CONNECTING
   sent: string[] = []
+  sentBinary: Uint8Array[] = []
   onopen: ((ev: unknown) => void) | null = null
   onclose: ((ev: unknown) => void) | null = null
   onerror: ((ev: unknown) => void) | null = null
@@ -20,9 +27,10 @@ class FakeWebSocket implements WebSocketLike {
 
   constructor(public url: string) {}
 
-  send(data: string): void {
+  send(data: string | Uint8Array): void {
     if (this.readyState !== FakeWebSocket.OPEN) throw new Error('not open')
-    this.sent.push(data)
+    if (typeof data === 'string') this.sent.push(data)
+    else this.sentBinary.push(data)
   }
 
   close(): void {
@@ -42,6 +50,11 @@ class FakeWebSocket implements WebSocketLike {
 
   simulateError(detail?: unknown): void {
     this.onerror?.(detail ?? {})
+  }
+
+  /** Deliver a raw binary frame (already framed) to the connection. */
+  simulateBinary(frame: Uint8Array): void {
+    this.onmessage?.({ data: frame })
   }
 
   lastFrame(): unknown {
@@ -219,6 +232,176 @@ describe('PixelblazeConnection', () => {
       } finally {
         vi.useRealTimers()
       }
+    })
+  })
+
+  // ── Phase 2: binary + extended JSON protocol (#108) ──────────────────────
+
+  describe('binary framing (pure helpers)', () => {
+    it('encodes a single short payload as one first|last frame', () => {
+      const frames = encodeBinaryFrames(MessageType.putSourceCode, Uint8Array.of(1, 2, 3))
+      expect(frames).toHaveLength(1)
+      expect(frames[0][0]).toBe(MessageType.putSourceCode)
+      expect(frames[0][1]).toBe(FrameFlag.first | FrameFlag.last)
+      expect([...frames[0].subarray(2)]).toEqual([1, 2, 3])
+    })
+
+    it('encodes an empty payload as one empty first|last frame', () => {
+      const frames = encodeBinaryFrames(MessageType.putSourceCode, new Uint8Array(0))
+      expect(frames).toHaveLength(1)
+      expect(frames[0][1]).toBe(FrameFlag.first | FrameFlag.last)
+      expect(frames[0]).toHaveLength(2) // header only
+    })
+
+    it('chunks at the body boundary with first / middle / last flags', () => {
+      // bodyMax=2, payload of 5 → frames of 2,2,1 → first, middle, last
+      const frames = encodeBinaryFrames(MessageType.putByteCode, Uint8Array.of(1, 2, 3, 4, 5), 2)
+      expect(frames.map((f) => f[1])).toEqual([
+        FrameFlag.first,
+        FrameFlag.middle,
+        FrameFlag.last,
+      ])
+      const reassembled = frames.flatMap((f) => [...f.subarray(2)])
+      expect(reassembled).toEqual([1, 2, 3, 4, 5])
+    })
+
+    it('decodes a program list payload into id/name entries', () => {
+      const text = 'abc123\tRainbow Melt\nXYZ\tKITT\n\nnotab\n'
+      const entries = decodeProgramList(new TextEncoder().encode(text))
+      expect(entries).toEqual([
+        { id: 'abc123', name: 'Rainbow Melt' },
+        { id: 'XYZ', name: 'KITT' },
+      ])
+    })
+
+    it('toUint8Array normalises ArrayBuffer / views and rejects strings', () => {
+      const u = Uint8Array.of(9, 8, 7)
+      expect(toUint8Array(u)).toBe(u)
+      expect([...toUint8Array(u.buffer)!]).toEqual([9, 8, 7])
+      expect(toUint8Array('nope')).toBeNull()
+    })
+  })
+
+  describe('listPrograms', () => {
+    it('sends {listPrograms:true} and decodes a single binary frame', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.listPrograms()
+      expect(socket.lastFrame()).toEqual({ listPrograms: true })
+
+      const body = new TextEncoder().encode('id1\tAlpha\nid2\tBeta')
+      const [frame] = encodeBinaryFrames(MessageType.getProgramList, body)
+      socket.simulateBinary(frame)
+
+      await expect(promise).resolves.toEqual([
+        { id: 'id1', name: 'Alpha' },
+        { id: 'id2', name: 'Beta' },
+      ])
+    })
+
+    it('reassembles a multi-frame program list', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.listPrograms()
+      const body = new TextEncoder().encode('id1\tAlpha\nid2\tBeta\nid3\tGamma')
+      // small bodyMax forces several frames
+      for (const f of encodeBinaryFrames(MessageType.getProgramList, body, 8)) {
+        socket.simulateBinary(f)
+      }
+      await expect(promise).resolves.toEqual([
+        { id: 'id1', name: 'Alpha' },
+        { id: 'id2', name: 'Beta' },
+        { id: 'id3', name: 'Gamma' },
+      ])
+    })
+
+    it('keeps interleaved message types separate during reassembly', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.listPrograms()
+      const body = new TextEncoder().encode('id1\tAlpha')
+      const [first, ...rest] = encodeBinaryFrames(MessageType.getProgramList, body, 4)
+      // an unrelated type-5 (previewFrame) blob arrives mid-stream and must not
+      // corrupt the program-list buffer
+      socket.simulateBinary(first)
+      socket.simulateBinary(Uint8Array.of(MessageType.previewFrame, FrameFlag.first | FrameFlag.last, 42))
+      for (const f of rest) socket.simulateBinary(f)
+      await expect(promise).resolves.toEqual([{ id: 'id1', name: 'Alpha' }])
+    })
+  })
+
+  describe('controls / brightness / activeProgram', () => {
+    it('getControls sends {getControls} and resolves with the reply object', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.getControls('pat1')
+      expect(socket.lastFrame()).toEqual({ getControls: 'pat1' })
+      socket.simulateMessage({ activeProgramId: 'pat1', controls: { sliderHue: 0.5 } })
+      await expect(promise).resolves.toEqual({
+        activeProgramId: 'pat1',
+        controls: { sliderHue: 0.5 },
+      })
+    })
+
+    it('setControls sends values and the save flag', async () => {
+      const { conn, socket } = await connected()
+      conn.setControls({ sliderHue: 0.25 }, true)
+      expect(socket.lastFrame()).toEqual({ setControls: { sliderHue: 0.25 }, save: true })
+    })
+
+    it('getConfig sends {getConfig:true} and merges the two reply packets', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.getConfig()
+      expect(socket.lastFrame()).toEqual({ getConfig: true })
+      // settings packet (top-level brightness) and sequencer packet arrive separately
+      socket.simulateMessage({ brightness: 0.4, pixelCount: 256, name: 'pb' })
+      socket.simulateMessage({
+        activeProgram: { activeProgramId: 'pat1', name: 'X', controls: { sliderA: 0.7 } },
+      })
+      await expect(promise).resolves.toEqual({
+        brightness: 0.4,
+        activeProgramId: 'pat1',
+        activeControls: { sliderA: 0.7 },
+      })
+    })
+
+    it('getConfig tolerates the two packets arriving in either order', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.getConfig()
+      socket.simulateMessage({ activeProgram: { activeProgramId: 'pat2' } })
+      socket.simulateMessage({ brightness: 0.9 })
+      await expect(promise).resolves.toEqual({
+        brightness: 0.9,
+        activeProgramId: 'pat2',
+        activeControls: undefined,
+      })
+    })
+
+    it('setActiveProgram sends {activeProgramId}', async () => {
+      const { conn, socket } = await connected()
+      conn.setActiveProgram('pat9')
+      expect(socket.lastFrame()).toEqual({ activeProgramId: 'pat9' })
+    })
+
+    it('setBrightness sends {brightness, save}', async () => {
+      const { conn, socket } = await connected()
+      conn.setBrightness(0.3)
+      expect(socket.lastFrame()).toEqual({ brightness: 0.3, save: false })
+    })
+  })
+
+  describe('putSourceCode (experimental push)', () => {
+    it('emits LZString-compressed source as type-1 binary frames', async () => {
+      const { conn, socket } = await connected()
+      const source = 'export function render(i){ hsv(i/16,1,1) }'
+      conn.putSourceCode(source)
+
+      expect(socket.sentBinary.length).toBeGreaterThan(0)
+      expect(socket.sentBinary[0][0]).toBe(MessageType.putSourceCode)
+      // first frame carries the `first` flag, last carries `last`
+      expect(socket.sentBinary[0][1] & FrameFlag.first).toBeTruthy()
+      const lastFrame = socket.sentBinary[socket.sentBinary.length - 1]
+      expect(lastFrame[1] & FrameFlag.last).toBeTruthy()
+
+      // bodies concatenate back to the original compressed payload
+      const body = socket.sentBinary.flatMap((f) => [...f.subarray(2)])
+      expect(body).toEqual([...LZString.compressToUint8Array(source)])
     })
   })
 
