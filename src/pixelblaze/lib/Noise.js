@@ -16,9 +16,16 @@
 // wraps mod 65536, giving a ~16-bit hash — lower entropy than a 32-bit hash,
 // but ample for LED-scale visuals (ADR-0003).
 //
-// The final step `h * (1/65536)` is the key trick: 1/65536 lands on raw int 1,
-// so the multiply reinterprets the wrapped integer's low bits as a fraction in
-// (-0.5, 0.5); the floor-based fract then folds it into a stable [0, 1).
+// The final step `h / 256 / 256` demotes the wrapped integer's low 16 bits into
+// a [0, 1) fraction; the floor-based fract then folds it into a stable [0, 1).
+// Both divisors are powers of two ≤ the 16 fractional bits, so the divide is
+// bit-exact on hardware regardless of its round/truncate mode (confirmed: the
+// device truncates division, yet `hash11_div` matched the fixed-point reference
+// to sub-ULP — divergence harness, fw 3.67, #113).
+//
+// NOT `h * (1/65536)`: the literal 0.0000152587890625 flushes to raw 0 in the
+// firmware's number parser, so `h * 0 = 0` collapsed every hash to 0 on the
+// device (#111). Power-of-two division avoids any sub-ULP literal entirely.
 // No `sin`/`perlin` — those are algorithmically divergent (ADR-0003) and unfit
 // for fidelity-critical hashing.
 
@@ -26,7 +33,7 @@ function _hash2(ix, iy) {
   var h = ix * 1619 + iy * 31337 + 1013;
   h = h * (h + 197);
   h = h * 769;
-  var f = h * 0.0000152587890625; // × 1/65536 — reinterpret wrapped bits as fraction
+  var f = h / 256 / 256; // demote wrapped low bits — power-of-two divide is bit-exact (#113)
   return f - floor(f);
 }
 
@@ -34,7 +41,7 @@ function _hash1(n) {
   var h = n * 1619 + 1013;
   h = h * (h + 197);
   h = h * 769;
-  var f = h * 0.0000152587890625; // × 1/65536 — reinterpret wrapped bits as fraction
+  var f = h / 256 / 256; // demote wrapped low bits — power-of-two divide is bit-exact (#113)
   return f - floor(f);
 }
 

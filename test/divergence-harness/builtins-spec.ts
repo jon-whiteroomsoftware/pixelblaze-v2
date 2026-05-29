@@ -24,6 +24,8 @@ export const FN = {
   exp: 14, log: 15, pow: 16,
   // #111 discriminators (localise where hash11 collapses to 0 on hardware)
   reint: 17, hash11_s1: 18, hash11_s2: 19, smallconst: 20,
+  // #113 candidate fix: demote via division instead of the dead ×1/65536 literal
+  div: 21, hash11_div: 22,
 } as const
 
 /** One 16.16 ULP — the finest distinction the device can express in vars JSON. */
@@ -42,7 +44,7 @@ function fxHash11(nFloat: number): number {
   let h = fx.add(fx.mul(n, C(1619)), C(1013))
   h = fx.mul(h, fx.add(h, C(197)))
   h = fx.mul(h, C(769))
-  const f = fx.mul(h, C(0.0000152587890625))
+  const f = fx.div(fx.div(h, C(256)), C(256))
   return fx.toFloat(fx.sub(f, fxFloor(f)))
 }
 
@@ -53,7 +55,7 @@ function fxHash21(ixFloat: number, iyFloat: number): number {
   let h = fx.add(fx.add(fx.mul(ix, C(1619)), fx.mul(iy, C(31337))), C(1013))
   h = fx.mul(h, fx.add(h, C(197)))
   h = fx.mul(h, C(769))
-  const f = fx.mul(h, C(0.0000152587890625))
+  const f = fx.div(fx.div(h, C(256)), C(256))
   return fx.toFloat(fx.sub(f, fxFloor(f)))
 }
 
@@ -76,6 +78,19 @@ function fxHash11Stage2(nFloat: number): number {
   let h = fx.add(fx.mul(C(nFloat), C(1619)), C(1013))
   h = fx.mul(h, fx.add(h, C(197)))
   const f = fx.mul(h, C(0.0000152587890625))
+  return fx.toFloat(fx.sub(f, fxFloor(f)))
+}
+
+// #113 candidate-fix reference — hash11 with the /256/256 demotion that avoids
+// the dead ×1/65536 literal. Uses `fx.div` (which rounds); if the device
+// truncates its divide instead, the device result diverges from this and the
+// bit-identity goal is unreachable via division.
+function fxHash11Div(nFloat: number): number {
+  const C = (v: number) => fx.fromFloat(v)
+  let h = fx.add(fx.mul(C(nFloat), C(1619)), C(1013))
+  h = fx.mul(h, fx.add(h, C(197)))
+  h = fx.mul(h, C(769))
+  const f = fx.div(fx.div(h, C(256)), C(256))
   return fx.toFloat(fx.sub(f, fxFloor(f)))
 }
 
@@ -202,7 +217,27 @@ export const PROBES: Probe[] = [
     reference: (a, b) => fx.toFloat(fx.mul(fx.fromFloat(a), fx.fromFloat(b))),
   },
 
+  // #113: the /256/256 demotion as a full hash. Must be (a) non-zero and (b)
+  // bit-identical to the fixed-point reference. Divergence here means device
+  // division is lossy and #113 can't reach bit-identity via division.
+  {
+    kind: 'hash', name: 'hash11_div', fn: FN.hash11_div,
+    samples: sweep(0, 255, 64).map((a) => ({ a: Math.round(a) })),
+    reference: (a) => fxHash11Div(a),
+  },
+
   // ── behaviour discriminators ───────────────────────────────────────────────
+  {
+    kind: 'behaviour', name: 'div-rounding', fn: FN.div,
+    question: 'Does 16.16 division ROUND or TRUNCATE the quotient? (2 / 3)',
+    // raw quotient = raw(2)·65536 / raw(3) = 131072/3 = 43690.67 — round → 43691,
+    // truncate → 43690 (1 ULP apart), so 2/3 cleanly separates the two.
+    a: 2, b: 3,
+    candidates: [
+      { label: 'round', value: 43691 / 65536 },
+      { label: 'truncate', value: 43690 / 65536 },
+    ],
+  },
   {
     kind: 'behaviour', name: 'small-const', fn: FN.smallconst,
     question: 'Does the literal 1/65536 (0.0000152587890625) compile to raw 1 or flush to 0?',

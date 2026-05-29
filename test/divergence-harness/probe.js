@@ -27,14 +27,14 @@ function hash11(n) {
   var h = n * 1619 + 1013
   h = h * (h + 197)
   h = h * 769
-  var f = h * 0.0000152587890625 // × 1/65536
+  var f = h / 256 / 256 // demote wrapped low bits — power-of-two divide is bit-exact (#113)
   return f - floor(f)
 }
 function hash21(ix, iy) {
   var h = ix * 1619 + iy * 31337 + 1013
   h = h * (h + 197)
   h = h * 769
-  var f = h * 0.0000152587890625 // × 1/65536
+  var f = h / 256 / 256 // demote wrapped low bits — power-of-two divide is bit-exact (#113)
   return f - floor(f)
 }
 
@@ -63,6 +63,23 @@ function hash11_s2(n) {
   return f - floor(f)
 }
 
+// ── #113 candidate fix: demote the wrapped integer to a [0,1) fraction WITHOUT
+// the dead ×1/65536 literal. `/256/256` uses only representable divisors (256 =
+// raw 0x1000000, well within ±32767) and never overflows the 32-bit raw on the
+// way down. Two questions this answers on real hardware:
+//   - div-rounding : does the firmware's 16.16 divide round or truncate?
+//   - hash11_div   : does the /256/256 demotion (a) produce a non-zero hash and
+//                    (b) stay bit-identical to the fixed-point reference? If div
+//                    is lossy/approximate, this diverges and #113's bit-identity
+//                    goal is unreachable — fall back to documenting a tolerance.
+function hash11_div(n) {
+  var h = n * 1619 + 1013
+  h = h * (h + 197)
+  h = h * 769
+  var f = h / 256 / 256 // reinterpret wrapped low bits as a fraction, no tiny literal
+  return f - floor(f)
+}
+
 function compute() {
   if (fn == 0)  return sin(a)
   if (fn == 1)  return cos(a)
@@ -85,6 +102,8 @@ function compute() {
   if (fn == 18) return hash11_s1(a)    // #111: hash11 stage 1 (pre-overflow)
   if (fn == 19) return hash11_s2(a)    // #111: hash11 through first overflow mul
   if (fn == 20) return 0.0000152587890625  // #111: does the 1/65536 literal compile to raw 1 or flush to 0?
+  if (fn == 21) return a / b           // #113: does 16.16 division round or truncate?
+  if (fn == 22) return hash11_div(a)   // #113: hash11 with /256/256 demotion (no tiny literal)
   return 0
 }
 

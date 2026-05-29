@@ -121,21 +121,25 @@ function iqPalette(t, ar, ag, ab, br, bg, bb, cr_, cg_, cb_, dr, dg, db) {
 //   - no bit-shifts (a `>> 13` becomes `>> (13<<16)` ≡ `>> 0` under emit),
 //   - no `~` (zeros the low 16 bits on hardware) and no `| 0` (a no-op under
 //     fidelity; use floor()),
-//   - the final `* (1/65536)` reinterprets the wrapped int32's low bits as a
-//     fraction, then floor-based fract folds it into a stable [0, 1).
+//   - the final `/ 256 / 256` demotes the wrapped int32's low 16 bits into a
+//     [0, 1) fraction, then floor-based fract folds it into a stable [0, 1).
+//     Both divisors are powers of two ≤ the 16 fractional bits, so the divide
+//     is bit-exact regardless of the device's round/truncate mode.
 //
-// VALIDATION-PENDING: these constants are a candidate. The fidelity engine runs
-// them bit-for-bit like hardware in the preview, but declaring them
-// "bit-identical preview↔hardware" requires the #91 divergence harness against
-// a real device (overflow wrap-vs-saturate confirmation). See the follow-up
-// issue. The visual output is correct in the preview regardless.
+// NOT `* (1/65536)`: that literal flushes to raw 0 in the firmware's number
+// parser and collapsed every hash to 0 on the device (#111). Power-of-two
+// division avoids the sub-ULP literal.
+//
+// VALIDATED bit-identical preview↔hardware via the divergence harness against a
+// real Pixelblaze (fw 3.67, 2026-05-29): `hash11_div` matched the fixed-point
+// reference to sub-ULP across the swept inputs (#113). ADR-0003.
 
 // Hash 2 integer cell coords → [0, 1)
 function hash21(ix, iy) {
   var h = ix * 1619 + iy * 31337 + 1013;
   h = h * (h + 197);
   h = h * 769;
-  var f = h * 0.0000152587890625; // × 1/65536 — reinterpret wrapped bits as fraction
+  var f = h / 256 / 256; // demote wrapped low bits — power-of-two divide is bit-exact (#113)
   return f - floor(f);
 }
 
@@ -144,6 +148,6 @@ function hash11(n) {
   var h = n * 1619 + 1013;
   h = h * (h + 197);
   h = h * 769;
-  var f = h * 0.0000152587890625; // × 1/65536 — reinterpret wrapped bits as fraction
+  var f = h / 256 / 256; // demote wrapped low bits — power-of-two divide is bit-exact (#113)
   return f - floor(f);
 }

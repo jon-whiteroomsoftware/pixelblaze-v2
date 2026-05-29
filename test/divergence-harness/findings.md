@@ -56,9 +56,33 @@ firmware 3.67, 2026-05-29.
     hash recipe while it depends on a sub-ULP literal. `Noise.js` `_hash1`/
     `_hash2` and `Shader.js` `hash11`/`hash21` need a redesign that never relies
     on a `1/65536`-scale literal (e.g. use `floor`/division or a larger-constant
-    fold), then re-probe. → **#113**
+    fold), then re-probe. → **#113 FIXED** (below).
   - `fx.mul` fidelity is **not** a concern after all (device ~1 ULP on
     fractional operands). → **#114 closed: not reproduced.**
+
+## #113 RESOLVED — power-of-two division demotion is bit-exact
+
+The dead `h * (1/65536)` tail is replaced by `h / 256 / 256`. Re-probed live
+(2026-05-29, fw 3.67):
+
+- **`hash11_div` (the `/256/256` recipe) matched the fixed-point reference to
+  max |Δ| = 5.3e-7** — sub-ULP (1 ULP = 1.5e-5), i.e. bit-identical, and
+  crucially **non-zero** for every input.
+- **`div-rounding` → truncate**: the device truncates 16.16 division (`2/3`
+  read back 1 ULP below the rounded value).
+
+Why truncation doesn't bite: at the tail `h` is **integer-valued**
+(raw = `h_int << 16`). Dividing by 256 is a power-of-two shift that lands
+exactly on a raw boundary — `h/256` → raw `(h_int mod 65536) << 8`, `/256`
+again → raw `(h_int mod 65536)`, both with **zero remainder**. With nothing to
+round, truncate-vs-round is moot, so the demotion is bit-exact. (256 is also
+well within ±32767 and the intermediate never overflows the 32-bit raw — the
+two failure modes that killed `×1/256×1/256` and `/65536`.)
+
+→ **ADR-0003's bit-identity claim stands**; `Noise.js`/`Shader.js` tails and
+comments updated to cite the power-of-two divide instead of the `1/65536`
+literal. The `hash11_div` / `div-rounding` probes are kept as regression
+evidence.
 
 ## Transport note (not a contradiction)
 

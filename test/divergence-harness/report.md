@@ -29,6 +29,7 @@ Produced by `npm run harness` (test/divergence-harness). The probe pattern is ha
 | `hash11_s1` | 64 | 0.91970825 | ❌ NO |
 | `hash11_s2` | 64 | 0.97302246 | ❌ NO |
 | `mul-precision` | 64 | 0.000015723633 | ✅ yes |
+| `hash11_div` | 64 | 5.2734375e-7 | ✅ yes |
 
 <details><summary>hash11 — sample values (device vs fixed-point reference)</summary>
 
@@ -108,7 +109,31 @@ Produced by `npm run harness` (test/divergence-harness). The probe pattern is ha
 
 </details>
 
+<details><summary>hash11_div — sample values (device vs fixed-point reference)</summary>
+
+| input | device | reference | Δ |
+|---|---|---|---|
+| a=0 | 0.72659300 | 0.72659302 | 1.7578125e-8 |
+| a=4 | 0.87313800 | 0.87313843 | 4.2773438e-7 |
+| a=8 | 0.25845300 | 0.25845337 | 3.6914063e-7 |
+| a=12 | 0.88253800 | 0.88253784 | 1.5820313e-7 |
+| a=16 | 0.74539200 | 0.74539185 | 1.5429688e-7 |
+| a=20 | 0.84701500 | 0.84701538 | 3.8085938e-7 |
+
+</details>
+
 ## Firmware behaviour — confirmed answers
+
+### div-rounding
+
+**Q:** Does 16.16 division ROUND or TRUNCATE the quotient? (2 / 3)  
+**Device returned:** `0.66665700`  
+**→ truncate**
+
+| candidate | predicted | \|Δ\| |
+|---|---|---|
+| round | 0.66667175 | 0.000014752930 |
+| truncate | 0.66665649 | 5.0585938e-7 |
 
 ### small-const
 
