@@ -13,6 +13,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
+    "harness": "tsx test/divergence-harness/harness.ts",
     "prepare": "husky"
   },
   "repository": {
@@ -36,6 +37,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^10.4.0",
@@ -44,10 +46,12 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4",
     "vite": "^8.0.14",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "ws": "^8.21.0"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
