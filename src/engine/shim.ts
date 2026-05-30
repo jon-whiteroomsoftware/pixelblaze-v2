@@ -359,6 +359,41 @@ export function createFxShim(config: ShimConfig): ShimContext {
     }
   }
 
+  // setPalette receives the palette array straight from the pattern, where every
+  // entry (positions and r/g/b, all 0..1) is raw int32. fxWrap leaves arrays
+  // untouched, so without this override the float paint() logic would read raw
+  // ints as floats — stops never match and colours blow far past 1.0 (the whole
+  // grid clamps to a single saturated hue). Decode each element raw→float here,
+  // mirroring the arg-decoding fxWrap does for scalar built-ins.
+  fxBuiltins.setPalette = (rawPal: unknown) => {
+    const pal = Array.isArray(rawPal) ? rawPal.map(v => typeof v === 'number' ? fx.toFloat(v) : v) : rawPal
+    ;(floatBuiltins.setPalette as (p: unknown) => void)(pal)
+  }
+
+  // ── Arrays are pattern-domain storage ──────────────────────────────────────
+  // fxWrap's "number arg raw→float, number result float→raw" rule is wrong for
+  // the array family: elements are already raw int32 (the pattern stored them),
+  // sums/reduces stay raw, and args written in must not be re-encoded — the same
+  // class of bug as setPalette above. Only the JS-generated indices handed to
+  // callbacks (and a raw offset coming back into replaceAt) need conversion.
+  // fxEmit already decodes subscripts as `(i)>>16`; mirror that here so the
+  // family is raw-correct end to end. (Sensor arrays like frequencyData are
+  // exposed as float zero-stubs and read 0 in either domain, so they need no
+  // such handling.)
+  const encIdx = (i: number) => fx.fromFloat(i)
+  const decIdx = (rawOffset: number) => rawOffset >> 16
+  fxBuiltins.array        = (rawN: number) => pbArray(Math.round(fx.toFloat(rawN)), encIdx, decIdx)
+  fxBuiltins.arrayLength  = (a: number[]) => fx.fromFloat(a.length)
+  fxBuiltins.arraySum     = (a: number[]) => a.reduce((s, v) => s + v, 0)
+  fxBuiltins.arrayForEach = (a: number[], fn: (v: number, i: number, a: number[]) => void) => a.forEach((v, i) => fn(v, encIdx(i), a))
+  fxBuiltins.arrayReduce  = (a: number[], fn: (acc: number, v: number, i: number, a: number[]) => number, init: number) => a.reduce((acc, v, i, arr) => fn(acc, v, encIdx(i), arr), init)
+  fxBuiltins.arraySort    = (a: number[]) => { a.sort((x, y) => x - y); return a }
+  fxBuiltins.arraySortBy  = (a: number[], fn: (x: number, y: number) => number) => { a.sort(fn); return a }
+  fxBuiltins.arrayMutate  = (a: number[], fn: (v: number, i: number, a: number[]) => number) => { a.forEach((v, i) => { a[i] = fn(v, encIdx(i), a) }); return a }
+  fxBuiltins.arrayMapTo   = (src: number[], dest: number[], fn: (v: number, i: number, a: number[]) => number) => { src.forEach((v, i) => { if (i < dest.length) dest[i] = fn(v, encIdx(i), src) }); return dest }
+  fxBuiltins.arrayReplace = (a: number[], ...args: number[]) => { args.forEach((v, i) => { a[i] = v }); return a }
+  fxBuiltins.arrayReplaceAt = (a: number[], offset: number, ...args: number[]) => { const o = decIdx(offset); args.forEach((v, i) => { a[o + i] = v }); return a }
+
   // mapPixels calls the pattern callback with (index, x, y, z) in float domain.
   // Override so the callback receives raw int32 as the fixed-point transpiler expects.
   fxBuiltins.mapPixels = (rawFn: (...args: unknown[]) => void) => {
@@ -403,7 +438,15 @@ function mat4Mul(a: number[], b: number[]): number[] {
   return o
 }
 
-function pbArray(n: number): number[] {
+// `encodeIndex`/`decodeIndex` convert between the JS integer indices this proxy
+// works in and the pattern's numeric domain. They default to the identity (the
+// float shim), and the fixed-point shim passes raw↔int codecs so callback
+// indices arrive as raw int32 and an incoming raw `replaceAt` offset is decoded.
+function pbArray(
+  n: number,
+  encodeIndex: (i: number) => number = (i) => i,
+  decodeIndex: (raw: number) => number = (i) => i,
+): number[] {
   const raw: number[] = new Array(Math.floor(n)).fill(0)
   return new Proxy(raw, {
     get(target, prop, receiver) {
@@ -412,10 +455,10 @@ function pbArray(n: number): number[] {
         if (!isNaN(i) && i >= 0) return target[Math.floor(i)]
         switch (prop) {
           case 'sum':       return () => target.reduce((s, v) => s + v, 0)
-          case 'mutate':    return (fn: (v: number, i: number, a: number[]) => number) => { target.forEach((v, i) => { target[i] = fn(v, i, target) }); return receiver }
-          case 'mapTo':     return (dest: number[], fn: (v: number, i: number, a: number[]) => number) => { target.forEach((v, i) => { if (i < dest.length) dest[i] = fn(v, i, target) }); return dest }
+          case 'mutate':    return (fn: (v: number, i: number, a: number[]) => number) => { target.forEach((v, i) => { target[i] = fn(v, encodeIndex(i), target) }); return receiver }
+          case 'mapTo':     return (dest: number[], fn: (v: number, i: number, a: number[]) => number) => { target.forEach((v, i) => { if (i < dest.length) dest[i] = fn(v, encodeIndex(i), target) }); return dest }
           case 'replace':   return (...args: number[]) => { args.forEach((v, i) => { target[i] = v }); return receiver }
-          case 'replaceAt': return (offset: number, ...args: number[]) => { args.forEach((v, i) => { target[offset + i] = v }); return receiver }
+          case 'replaceAt': return (offset: number, ...args: number[]) => { const o = decodeIndex(offset); args.forEach((v, i) => { target[o + i] = v }); return receiver }
           case 'sortBy':    return (fn: (a: number, b: number) => number) => { target.sort(fn); return receiver }
           case 'sort':      return () => { target.sort((a, b) => a - b); return receiver }
         }

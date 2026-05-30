@@ -168,6 +168,131 @@ describe('fx shim: hsv captures float RGB', () => {
   })
 })
 
+// ── setPalette / paint: palette array is raw int32, captures float RGB ────────
+
+describe('fx shim: setPalette decodes the raw-int32 palette', () => {
+  // A two-stop palette pos→r,g,b, all 0..1, as the pattern builds it: raw int32.
+  const rawPalette = [
+    0.0, 1.0, 0.0, 0.0, // pos 0: red
+    1.0, 0.0, 0.0, 1.0, // pos 1: blue
+  ].map(fx.fromFloat)
+
+  it('paint(0) → captures the first stop as float (red), not a clamped int', () => {
+    const { builtins, capturedPixel } = makeShim()
+    ;(builtins.setPalette as (p: number[]) => void)(rawPalette)
+    ;(builtins.paint as (pos: number, b?: number) => void)(0)
+    const [r, g, b] = capturedPixel()
+    expect(Math.abs(r - 1)).toBeLessThanOrEqual(TOLERANCE)
+    expect(Math.abs(g - 0)).toBeLessThanOrEqual(TOLERANCE)
+    expect(Math.abs(b - 0)).toBeLessThanOrEqual(TOLERANCE)
+  })
+
+  it('paint near 1 → captures close to the last stop (blue)', () => {
+    const { builtins, capturedPixel } = makeShim()
+    ;(builtins.setPalette as (p: number[]) => void)(rawPalette)
+    // exactly 1.0 wraps to 0 in paint(); sample just shy of the top stop.
+    ;(builtins.paint as (pos: number, b?: number) => void)(fx.fromFloat(0.99))
+    const [r, , b] = capturedPixel()
+    expect(b).toBeGreaterThan(0.95)
+    expect(r).toBeLessThan(0.05)
+  })
+
+  it('paint(0.5) → interpolates within [0,1], never blowing past 1.0', () => {
+    const { builtins, capturedPixel } = makeShim()
+    ;(builtins.setPalette as (p: number[]) => void)(rawPalette)
+    ;(builtins.paint as (pos: number, b?: number) => void)(fx.fromFloat(0.5))
+    const [r, g, b] = capturedPixel()
+    for (const c of [r, g, b]) {
+      expect(c).toBeGreaterThanOrEqual(0)
+      expect(c).toBeLessThanOrEqual(1)
+    }
+    expect(Math.abs(r - 0.5)).toBeLessThanOrEqual(TOLERANCE)
+    expect(Math.abs(b - 0.5)).toBeLessThanOrEqual(TOLERANCE)
+  })
+})
+
+// ── Array family: pattern-domain storage (raw int32 elements) ─────────────────
+
+describe('fx shim: array family stays in the raw domain', () => {
+  // Build a raw array [1, 2, 3] as the pattern would (elements raw int32).
+  function rawArray(...vals: number[]): number[] {
+    const make = makeShim().builtins.array as (n: number) => number[]
+    const a = make(fx.fromFloat(vals.length))
+    vals.forEach((v, i) => { a[i] = fx.fromFloat(v) })
+    return a
+  }
+
+  it('arrayLength returns the count as raw int32', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(1, 2, 3)
+    expect((builtins.arrayLength as (a: number[]) => number)(a)).toBe(fx.fromFloat(3))
+  })
+
+  it('arraySum keeps the raw sum (no double-encode)', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(1, 2, 3)
+    const sum = (builtins.arraySum as (a: number[]) => number)(a)
+    expect(Math.abs(fx.toFloat(sum) - 6)).toBeLessThanOrEqual(TOLERANCE)
+  })
+
+  it('arrayForEach hands the callback raw int32 indices', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(10, 20, 30)
+    const seenIdx: number[] = []
+    ;(builtins.arrayForEach as (a: number[], fn: (v: number, i: number) => void) => void)(
+      a, (_v, i) => seenIdx.push(i)
+    )
+    expect(seenIdx).toEqual([0, fx.fromFloat(1), fx.fromFloat(2)])
+  })
+
+  it('arrayReduce passes init through raw and returns a raw accumulator', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(1, 2, 3)
+    const total = (builtins.arrayReduce as (a: number[], fn: (acc: number, v: number) => number, init: number) => number)(
+      a, (acc, v) => acc + v, fx.fromFloat(10)
+    )
+    expect(Math.abs(fx.toFloat(total) - 16)).toBeLessThanOrEqual(TOLERANCE)
+  })
+
+  it('arrayReplace stores raw args verbatim (not re-encoded as float)', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(0, 0, 0)
+    ;(builtins.arrayReplace as (a: number[], ...args: number[]) => void)(
+      a, fx.fromFloat(0.25), fx.fromFloat(0.5)
+    )
+    expect(Math.abs(fx.toFloat(a[0]) - 0.25)).toBeLessThanOrEqual(TOLERANCE)
+    expect(Math.abs(fx.toFloat(a[1]) - 0.5)).toBeLessThanOrEqual(TOLERANCE)
+  })
+
+  it('arrayReplaceAt decodes a raw offset into an integer index', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(0, 0, 0, 0)
+    ;(builtins.arrayReplaceAt as (a: number[], offset: number, ...args: number[]) => void)(
+      a, fx.fromFloat(2), fx.fromFloat(0.75)
+    )
+    expect(Math.abs(fx.toFloat(a[2]) - 0.75)).toBeLessThanOrEqual(TOLERANCE)
+  })
+
+  it('arrayMutate sees raw indices and stores raw return values', () => {
+    const { builtins } = makeShim()
+    const a = rawArray(0, 0, 0)
+    // write each slot's index (as a 0..1 value) back into the array
+    ;(builtins.arrayMutate as (a: number[], fn: (v: number, i: number) => number) => void)(
+      a, (_v, i) => i // i already raw; storing it round-trips
+    )
+    expect(a[0]).toBe(0)
+    expect(a[1]).toBe(fx.fromFloat(1))
+    expect(a[2]).toBe(fx.fromFloat(2))
+  })
+
+  it('proxy .mutate also receives raw indices', () => {
+    const a = rawArray(0, 0)
+    ;(a as unknown as { mutate: (fn: (v: number, i: number) => number) => void })
+      .mutate((_v, i) => i)
+    expect(a[1]).toBe(fx.fromFloat(1))
+  })
+})
+
 // ── time ──────────────────────────────────────────────────────────────────────
 
 describe('fx shim: time', () => {
