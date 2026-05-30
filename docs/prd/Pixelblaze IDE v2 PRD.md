@@ -201,7 +201,7 @@ The right pane shows a configurable grid of LED dots rendered on a Canvas 2D ele
 
 **User controls in the preview pane:**
 - **Brightness**: slider from 0 to 1. Mirrors the brightness setting available on the hardware controller.
-- **Grid configuration**: number of rows, number of columns, LED spacing, glow amount. Glow can be disabled entirely.
+- **Grid configuration**: number of rows and columns. Plus two preview-only viewport controls — **preview light size** (how large each light source is drawn, as a fraction of inter-dot pitch) and **diffusion** (blur merging the sources; can be turned to zero). Both are display-only and never reach the map or hardware. See [ADR-0006](../adr/0006-preview-light-size-and-diffusion.md).
 - **Playback speed**: multiplier applied to `delta` and `time()` via the virtual clock. Preset values: 0.1×, 0.5×, 1×, 2×.
 
 ### Pattern UI Controls
@@ -287,7 +287,7 @@ Arrays are shown with each element and its index. The data is sampled at the end
 12. Syntax checker — Pixelblaze rule validator, unit tested
 
 ### Phase 4 — First pixels on screen
-13. Canvas LED grid — glowing dots, configurable rows/cols/spacing/glow
+13. Canvas LED grid — glowing dots, configurable rows/cols + preview light size/diffusion
 14. rAF render loop — calls `beforeRender` + `render2D`, collects pixel colours
 15. Wire-up smoke test — seed pattern renders correctly in the preview pane
 
@@ -310,7 +310,7 @@ Arrays are shown with each element and its index. The data is sampled at the end
 26. Run/pause pill toggle — state preserved across pattern switches, starts paused
 27. Playback speed control — virtual clock scaling (0.1×–2×)
 28. Brightness control (0–1)
-29. Grid config controls — rows, cols, spacing, glow amount, glow on/off
+29. Grid config controls — rows, cols, preview light size, diffusion amount (zero = off)
 30. Periodic sync tick — on clean compile, auto-save to IndexedDB and push new code to the preview
 
 ### Phase 8 — Pattern controls and var watcher

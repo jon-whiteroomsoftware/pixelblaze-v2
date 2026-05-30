@@ -47,7 +47,7 @@ An ordered, explicitly-positioned set of points standing in for a physical LED i
 _Avoid_: layout, geometry, coordinate set, pixel mapping.
 
 **Preview grid**:
-The degenerate **map**: a uniform 2D plane of glowing LED dots (Canvas 2D). Historically the only layout (a single global grid); now the default stock 2D map, with its rows/cols/spacing reframed as that map's generator parameters.
+The degenerate **map**: a uniform 2D plane of glowing LED dots. Historically the only layout (a single global grid); now the default stock 2D map, with its rows/cols reframed as that map's generator parameters. Its internal pixel *pitch* (the fit-to-container `spacing`, derived from container width ÷ cols) is a pure layout detail, distinct from the user-facing **preview light size** knob — the pitch positions the dots, light size only scales how large they're drawn.
 
 **Dimensionality** (of a pattern or map):
 Which of **1D / 2D / 3D** a pattern runs as, or a map supplies — always the **display/layout** dimension, never a coordinate-argument count. Named by the render fn via a bijection: `render` → 1D, `render2D` → 2D, `render3D` → 3D. A `render()` pattern is **1D** even though it takes zero coordinates, because a strip of LEDs is inherently a 1D layout. A pattern's dimensionality is the highest render fn it defines.
@@ -62,8 +62,16 @@ The cosmetic path a 1D pattern's pixels are *drawn* along — line, ring, polygo
 _Avoid_: calling a 1D shape a "map"; calling a 2D/3D map a "shape."
 
 **Viewport** (or **camera**):
-The display side of the preview — orbit/turntable, the uniform spacing scale, fit-to-container, depth cueing, the `diffusion` blur, and (for 1D) the shape embedding. Owns everything about *how* pixels are drawn; owns nothing the pattern can observe (spacing and shape stay invisible to a pattern because `sample` is normalized independently). The viewport's control set is gated on the *display* dimension (a 3D embedding shows orbit controls even for a 1D pattern), not the pattern's dimensionality.
-_Avoid_: conflating viewport spacing with map geometry — spacing never reaches `sample`.
+The display side of the preview — orbit/turntable, fit-to-container, depth cueing, **preview light size**, the **diffusion** blur, and (for 1D) the shape embedding. Owns everything about *how* pixels are drawn; owns nothing the pattern can observe (light size, diffusion, and shape stay invisible to a pattern because `sample` is normalized independently). The viewport's control set is gated on the *display* dimension (a 3D embedding shows orbit controls even for a 1D pattern), not the pattern's dimensionality.
+_Avoid_: conflating viewport light size with map geometry — neither light size nor diffusion ever reaches `sample` or the hardware.
+
+**Preview light size** (or **light size**):
+A purely cosmetic viewport control setting how large each drawn light source (the glowing dot in 1D/2D, the orb in 3D) appears, as a fraction of the inter-dot pitch — so "almost touching" lands at the same felt point in every dimension regardless of pixel count or camera zoom. It grows the light sources *in place*: positions and the layout's extent never move (the line keeps its length, the plane/cube keep their bounds). A preview-only construct — never serialized into a **map** and never sent to a **controller** (that physical density is the map's job, not this). A global viewing-comfort pref, persisted, not per-pattern.
+_Avoid_: "spacing" (the old name — it implied moving the dots apart, which it never did); "LED size" / "dot size" (read as hardware or undersell the 3D orb); conflating with **diffusion**.
+
+**Diffusion**:
+A purely cosmetic viewport control blurring the drawn light sources together, like a physical diffuser over real LEDs. At 0 the sources are crisp and individually distinct; at full diffusion they merge into an opaque field with no individual source visible. Strictly independent of **preview light size** (it never changes a source's size) and of **brightness** (the field never looks darker overall as diffusion rises — energy is conserved; peaks may soften but nothing dims). Mechanism may differ per display dimension so long as the *feel* is uniform across 1D/2D/3D. Preview-only — never serialized into a **map** or sent to a **controller**. A global viewing-comfort pref, persisted, not per-pattern.
+_Avoid_: "glow" (the old PRD term); letting diffusion change brightness or source size.
 
 **Precise renderer**:
 The default renderer, running the preview with the same 16.16 fixed-point numeric behaviour as the hardware (range ±32768, precision ~1/65536, int32-wrap overflow, faithful multiply) so that what the preview shows matches what a physical Pixelblaze does. The underlying numeric behaviour is _fixed-point fidelity_.
