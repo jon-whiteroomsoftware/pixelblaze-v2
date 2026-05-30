@@ -11,7 +11,7 @@
 //   length(v)       → hypot(x, y) / hypot3(x, y, z)
 //   abs/floor/...    → abs/floor/min/max/pow/sqrt/...
 //
-// Assumes built-ins: floor, clamp, hypot, cos, sin, PI2.
+// Assumes built-ins: floor, clamp, hypot, cos, sin, exp, PI2.
 //
 // ── Out-var contract ─────────────────────────────────────────────────────────
 // Multi-output helpers cannot return a vector (no arrays — per-pixel allocation
@@ -34,6 +34,16 @@ function sign(x) { return x < 0 ? -1 : (x > 0 ? 1 : 0); }
 
 // GLSL saturate / HLSL clamp-to-unit: clamp(x, 0, 1)
 function saturate(x) { return clamp(x, 0, 1); }
+
+// GLSL tanh — not a Pixelblaze built-in. The textbook form (e^2x-1)/(e^2x+1)
+// overflows the 16.16 range once e^2x passes ±32768 (|x| ≳ 5.2), so clamp to ±5
+// first; tanh has already saturated to ±0.9999 there, so the clamp is invisible.
+// This bakes in the guard ShaderToy authors hand-roll as "stanh" to kill the
+// black-artifact overflow, so ports can call Shader.tanh directly.
+function tanh(x) {
+  var e = exp(2 * clamp(x, -5, 5));
+  return (e - 1) / (e + 1);
+}
 
 // 2D dot product
 function dot2(ax, ay, bx, by) { return ax * bx + ay * by; }

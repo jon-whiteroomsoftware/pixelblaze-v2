@@ -1,0 +1,98 @@
+// Zippy Zaps — port of "Zippy Zaps" by SnoopethDuckDuck (ShaderToy, 394 chars).
+//   Original GLSL: https://www.shadertoy.com/view/XXyGzh
+//
+// A code-golfed electric-arc field: 18 iterations fold a centred uv through a
+// per-iteration cos-matrix twist, accumulate a vec4 colour from the reciprocal
+// length of a sin field, then tone-map. Decoding the golf was the bulk of the
+// work — the original packs everything into a single for-loop's comma body and
+// leans on vec4/mat2/swizzle tricks Pixelblaze has none of, so every vector is
+// unrolled to scalars here.
+//
+// Faithful-port notes (see docs/guides/Porting ShaderToy shaders to Pixelblaze):
+//   • iTime → `t`, accumulated in beforeRender. The loop's own `++t` becomes a
+//     per-iteration `tt = tt + 1` (the original increments t once per pass).
+//   • aspect → Shader.toUV(x,y,1): square grids match the original's
+//     (2*frag-res)/res.y short-axis normalisation; non-square stretch (#116).
+//   • tanh → Shader.tanh (overflow-guarded; matches the shader's "stanh" hint).
+//   • No magic-constant hash and no fract here, so Gotchas A and C don't apply.
+//   • PERF: 18 passes × ~13 transcendentals per pixel is heavy for the
+//     main-thread Precise renderer. Use the Fast renderer to iterate, drop the
+//     grid size, or lower the `iterations` slider; do the final check Precise.
+//
+// z is the constant vec4(1,2,3,0); its .wxzw swizzle ×11 is (0,11,33,0), the
+// three phase offsets fed into the per-pass cos-matrix.
+
+// Iteration count (perf/detail). Raw 0..1 → floor(4 + v*15) → 4..19 (18 passes
+// at the default, matching the original's `++i < 19.`).
+export var iterations = 1
+export function sliderIterations(v) { iterations = v }
+
+// iTime, in seconds (IDE speed control is pre-folded into delta).
+export var t = 0
+export function beforeRender(delta) {
+  t = t + delta * 0.001
+}
+
+export function render2D(index, x, y) {
+  var iters = floor(4 + iterations * 15) // 4..19
+
+  // u = .2*(u+u-v)/v.y  →  centred, short-axis-normalised, scaled by 0.2.
+  Shader.toUV(x, y, 1)
+  var px = 0.2 * ux, py = 0.2 * uy
+
+  // vec4 z = o = vec4(1,2,3,0); z stays constant, o accumulates.
+  var ox = 1, oy = 2, oz = 3, ow = 0
+
+  var a = 0.5
+  var tt = t
+  var vx = 0, vy = 0 // v, (re)assigned each pass before use
+
+  for (var i = 1; i < iters; i = i + 1) {
+    tt = tt + 1   // ++t  (first thing the loop body does)
+    a = a + 0.03  // a += .03
+
+    // v = cos(tt - 7*u*pow(a,i)) - 5*u   (componentwise)
+    var p = pow(a, i)
+    vx = cos(tt - 7 * px * p) - 5 * px
+    vy = cos(tt - 7 * py * p) - 5 * py
+
+    // u *= mat2(cos(i + .02*tt - z.wxzw*11)).  Phases: (0,11,33,0) offsets, and
+    // cos0 == cos3 since both offsets are 0. Row-vector × matrix:
+    //   u.x' = u.x*cos0 + u.y*cos1 ;  u.y' = u.x*cos2 + u.y*cos3
+    var b = i + 0.02 * tt
+    var c0 = cos(b), c1 = cos(b - 11), c2 = cos(b - 33), c3 = c0
+    var nux = px * c0 + py * c1
+    var nuy = px * c2 + py * c3
+    px = nux; py = nuy
+
+    // u += tanh(40*dot(u,u)*cos(1e2*u.yx + tt))/2e2 + .2*a*u + cos(...)/3e2
+    var du = px * px + py * py
+    // u.yx swizzle: x-component reads u.y, y-component reads u.x.
+    var t1x = Shader.tanh(40 * du * cos(100 * py + tt)) / 200
+    var t1y = Shader.tanh(40 * du * cos(100 * px + tt)) / 200
+    var doo = ox * ox + oy * oy + oz * oz + ow * ow
+    var sc = cos(4 / exp(doo / 100) + tt) / 300 // scalar, added to both components
+    px = px + t1x + 0.2 * a * px + sc
+    py = py + t1y + 0.2 * a * py + sc
+
+    // o += (1 + cos(z+tt)) / length((1 + i*dot(v,v)) * sin(1.5*u/(.5-dot(u,u)) - 9*u.yx + tt))
+    var dvv = vx * vx + vy * vy
+    var scale = 1 + i * dvv
+    var denom = 0.5 - (px * px + py * py)
+    var sx = sin(1.5 * px / denom - 9 * py + tt)
+    var sy = sin(1.5 * py / denom - 9 * px + tt)
+    var L = scale * hypot(sx, sy)
+    ox = ox + (1 + cos(1 + tt)) / L
+    oy = oy + (1 + cos(2 + tt)) / L
+    oz = oz + (1 + cos(3 + tt)) / L
+    ow = ow + (1 + cos(0 + tt)) / L
+  }
+
+  // o = 25.6 / (min(o,13) + 164/o) - dot(u,u)/250   (o ≥ (1,2,3,…) so no div-by-0)
+  var dfin = (px * px + py * py) / 250
+  rgb(
+    25.6 / (min(ox, 13) + 164 / ox) - dfin,
+    25.6 / (min(oy, 13) + 164 / oy) - dfin,
+    25.6 / (min(oz, 13) + 164 / oz) - dfin,
+  )
+}

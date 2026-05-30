@@ -70,7 +70,7 @@ describe('demo smoke tests', () => {
 
   // Shader-library demos with fewer than 4 controls sit outside the loop above
   // (NeonSquircles has 1 slider; ShaderShowcase has 2) — still guard the ports.
-  for (const file of ['NeonSquircles.js', 'ShaderShowcase.js']) {
+  for (const file of ['NeonSquircles.js', 'ShaderShowcase.js', 'ZippyZaps.js']) {
     for (const mode of ['fast', 'fidelity'] as const) {
       it(`${file} bundles, runs, and lights pixels (${mode})`, () => {
         let result!: ReturnType<typeof runDemo>
