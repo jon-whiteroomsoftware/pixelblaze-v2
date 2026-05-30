@@ -1,13 +1,32 @@
 const DB_NAME = 'pixelblaze-ide'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_PATTERNS = 'patterns'
 const STORE_SETTINGS = 'settings'
+const STORE_MAPS = 'maps'
 
 export interface PatternRecord {
   id: string
   name: string
   src: string
   controls: Record<string, number | number[]>
+  updatedAt: number
+  // Per-pattern layout selection (ADR-0004/0005). Optional and schemaless:
+  // a record without these derives defaults on read (native dimensionality +
+  // the global grid seed), so adding them needs no DB_VERSION bump.
+  mapId?: string
+  params?: Record<string, number>  // the active map's generator params
+  pixelCount?: number
+  shapeId?: string                 // 1D viewport shape embedding, if wrapped
+}
+
+// A persisted user map (Phase 2 writes these; stock maps are generated, never
+// stored). Serializable form of a PixelMap: a generator descriptor + params.
+export interface MapRecord {
+  id: string
+  name: string
+  dim: 1 | 2 | 3
+  generator: string                // e.g. 'plane'
+  params: Record<string, number>
   updatedAt: number
 }
 
@@ -25,6 +44,11 @@ export function openDb(dbOverride?: IDBFactory): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
         db.createObjectStore(STORE_SETTINGS)
+      }
+      // v2: user maps live alongside patterns. Additive — existing pattern and
+      // settings data carry over untouched across the 1 -> 2 upgrade.
+      if (!db.objectStoreNames.contains(STORE_MAPS)) {
+        db.createObjectStore(STORE_MAPS, { keyPath: 'id' })
       }
     }
     req.onsuccess = (e) => {
@@ -92,6 +116,39 @@ export async function deletePattern(
 ): Promise<void> {
   const d = db ?? (await openDb())
   await wrap(tx(d, STORE_PATTERNS, 'readwrite').delete(id))
+}
+
+// ── maps (user maps; stock maps are generated, never persisted) ──────────────
+
+export async function createMap(record: MapRecord, db?: IDBDatabase): Promise<void> {
+  const d = db ?? (await openDb())
+  await wrap(tx(d, STORE_MAPS, 'readwrite').put(record))
+}
+
+export async function listMaps(db?: IDBDatabase): Promise<MapRecord[]> {
+  const d = db ?? (await openDb())
+  return wrap<MapRecord[]>(tx(d, STORE_MAPS, 'readonly').getAll())
+}
+
+export async function getMap(id: string, db?: IDBDatabase): Promise<MapRecord | undefined> {
+  const d = db ?? (await openDb())
+  return wrap<MapRecord | undefined>(tx(d, STORE_MAPS, 'readonly').get(id))
+}
+
+export async function updateMap(
+  id: string,
+  changes: Partial<Omit<MapRecord, 'id'>>,
+  db?: IDBDatabase,
+): Promise<void> {
+  const d = db ?? (await openDb())
+  const existing = await wrap<MapRecord | undefined>(tx(d, STORE_MAPS, 'readonly').get(id))
+  if (!existing) throw new Error(`Map ${id} not found`)
+  await wrap(tx(d, STORE_MAPS, 'readwrite').put({ ...existing, ...changes }))
+}
+
+export async function deleteMap(id: string, db?: IDBDatabase): Promise<void> {
+  const d = db ?? (await openDb())
+  await wrap(tx(d, STORE_MAPS, 'readwrite').delete(id))
 }
 
 export async function getSetting<T>(
