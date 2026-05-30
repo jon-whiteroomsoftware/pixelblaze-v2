@@ -8,6 +8,18 @@ import {
   pointSize,
   projectIndex,
   type Locked2DGrid,
+  DEFAULT_ORBIT,
+  MAX_ELEVATION,
+  clampElevation,
+  orbitRotate,
+  fit3DScale,
+  FIT_3D_MARGIN,
+  projectOrbit,
+  depthCue,
+  applyTurntableDrag,
+  applyTrackballDrag,
+  advanceAutoOrbit,
+  type OrbitCamera,
 } from './camera'
 
 describe('camera — freeze guard', () => {
@@ -84,5 +96,94 @@ describe('camera — locked-2D projection', () => {
     expect(projectIndex(1, { rows: 2, cols: 2, spacing: 20 })).toEqual(
       projectIndex(1, { rows: 2, cols: 2, spacing: 5 })
     )
+  })
+})
+
+describe('camera — orbit rotation', () => {
+  const identity: OrbitCamera = { azimuth: 0, elevation: 0, roll: 0 }
+
+  it('is the identity at zero azimuth/elevation/roll', () => {
+    const p: [number, number, number] = [0.2, -0.3, 0.4]
+    const r = orbitRotate(p, identity)
+    expect(r[0]).toBeCloseTo(0.2, 10)
+    expect(r[1]).toBeCloseTo(-0.3, 10)
+    expect(r[2]).toBeCloseTo(0.4, 10)
+  })
+
+  it('preserves length (rotation is rigid)', () => {
+    const p: [number, number, number] = [0.5, -0.5, 0.5]
+    const len = Math.hypot(...p)
+    const r = orbitRotate(p, { azimuth: 1.1, elevation: -0.7, roll: 0.4 })
+    expect(Math.hypot(...r)).toBeCloseTo(len, 10)
+  })
+
+  it('azimuth spins about the vertical axis (y unchanged)', () => {
+    const r = orbitRotate([0.5, 0.25, 0], { azimuth: Math.PI / 2, elevation: 0, roll: 0 })
+    expect(r[1]).toBeCloseTo(0.25, 10) // vertical component untouched
+  })
+})
+
+describe('camera — elevation clamp', () => {
+  it('clamps plain-drag elevation to a stable horizon', () => {
+    expect(clampElevation(Math.PI)).toBeCloseTo(MAX_ELEVATION, 10)
+    expect(clampElevation(-Math.PI)).toBeCloseTo(-MAX_ELEVATION, 10)
+    expect(clampElevation(0.3)).toBeCloseTo(0.3, 10)
+  })
+})
+
+describe('camera — 3D fit-to-container', () => {
+  it('scales so the worst-case rotated extent maps within the margin', () => {
+    const scale = fit3DScale()
+    // A unit-cube corner sits at the half-diagonal; after scaling it must land
+    // exactly on the margin, never outside clip space.
+    const corner: [number, number, number] = [1, 1, 1]
+    const { clip } = projectOrbit(corner, { azimuth: 0, elevation: 0, roll: 0 }, scale)
+    const extent = Math.hypot(clip[0], clip[1])
+    expect(extent).toBeLessThanOrEqual(FIT_3D_MARGIN + 1e-9)
+  })
+
+  it('keeps every point inside clip space under arbitrary rotation', () => {
+    const scale = fit3DScale()
+    const cam: OrbitCamera = { azimuth: 1.3, elevation: -0.9, roll: 0.5 }
+    for (const pos of [[0, 0, 0], [1, 0, 1], [0, 1, 0], [1, 1, 1]] as [number, number, number][]) {
+      const { clip } = projectOrbit(pos, cam, scale)
+      expect(Math.abs(clip[0])).toBeLessThanOrEqual(FIT_3D_MARGIN + 1e-9)
+      expect(Math.abs(clip[1])).toBeLessThanOrEqual(FIT_3D_MARGIN + 1e-9)
+    }
+  })
+})
+
+describe('camera — depth cueing', () => {
+  it('nearer dots are brighter and larger than farther ones', () => {
+    const half = 0.5 * Math.sqrt(3)
+    const near = depthCue(half)
+    const far = depthCue(-half)
+    expect(near.brightnessMul).toBeGreaterThan(far.brightnessMul)
+    expect(near.sizeMul).toBeGreaterThan(far.sizeMul)
+    expect(near.brightnessMul).toBeCloseTo(1, 10)
+  })
+
+  it('clamps out-of-range depth', () => {
+    expect(depthCue(99).brightnessMul).toBeCloseTo(depthCue(10).brightnessMul, 10)
+  })
+})
+
+describe('camera — orbit interaction', () => {
+  it('turntable drag yaws azimuth and clamps elevation', () => {
+    const next = applyTurntableDrag(DEFAULT_ORBIT, 50, 10000)
+    expect(next.azimuth).toBeGreaterThan(DEFAULT_ORBIT.azimuth)
+    expect(next.elevation).toBeCloseTo(MAX_ELEVATION, 10)
+    expect(next.roll).toBe(DEFAULT_ORBIT.roll)
+  })
+
+  it('trackball drag pitches freely past the horizon clamp', () => {
+    const next = applyTrackballDrag({ azimuth: 0, elevation: 0, roll: 0 }, 0, 10000, 0.01)
+    expect(next.elevation).toBeGreaterThan(MAX_ELEVATION)
+  })
+
+  it('auto-orbit advances azimuth over time', () => {
+    const next = advanceAutoOrbit(DEFAULT_ORBIT, 1000, 0.3)
+    expect(next.azimuth).toBeCloseTo(DEFAULT_ORBIT.azimuth + 0.3, 10)
+    expect(next.elevation).toBe(DEFAULT_ORBIT.elevation)
   })
 })

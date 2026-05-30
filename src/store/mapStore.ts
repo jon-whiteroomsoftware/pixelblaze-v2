@@ -6,7 +6,7 @@ import {
   updateMap,
   deleteMap,
 } from '@/engine/storage'
-import { createPlaneMap, type PixelMap } from '@/engine/maps'
+import { createPlaneMap, createCubeMap, type PixelMap } from '@/engine/maps'
 import { SHAPES, type ShapeId } from '@/engine/shapes'
 import type { LayoutSource } from '@/engine/layout'
 
@@ -17,6 +17,8 @@ export const DEFAULT_SHAPE_ID: ShapeId = 'line'
 // Default modeled pixel count for a 1D shape embedding when a pattern carries no
 // persisted count (a typical short strip). Map layouts default to rows×cols.
 export const DEFAULT_SHAPE_PIXEL_COUNT = 100
+// Points per axis for the stock cube lattice (side³ pixels = 512 at 8).
+export const DEFAULT_CUBE_SIDE = 8
 
 // Reconstruct a runtime PixelMap (with its resolve fn) from a serializable
 // generator descriptor. The generator registry grows as stock generators land
@@ -28,6 +30,8 @@ export function buildMap(
   params: Record<string, number>,
 ): PixelMap {
   switch (generator) {
+    case 'cube':
+      return createCubeMap({ side: params.side ?? DEFAULT_CUBE_SIDE }, { id, name })
     case 'plane':
     default:
       return createPlaneMap({ rows: params.rows ?? 32, cols: params.cols ?? 32 }, { id, name })
@@ -40,7 +44,20 @@ export function mapFromRecord(r: MapRecord): PixelMap {
 
 // Built-in stock maps — generated, never persisted. The default plane uses the
 // global grid seed defaults; per-pattern params are threaded in later slices.
-export const STOCK_MAPS: PixelMap[] = [createPlaneMap({ rows: 32, cols: 32 })]
+export const STOCK_MAPS: PixelMap[] = [
+  createPlaneMap({ rows: 32, cols: 32 }),
+  createCubeMap({ side: DEFAULT_CUBE_SIDE }),
+]
+
+// Resolve a map id to its runtime PixelMap (stock or user). Falls back to the
+// stock plane for an unknown id, mirroring `buildMap`'s default.
+export function resolveMap(mapId: string, userMaps: MapRecord[]): PixelMap {
+  const stock = STOCK_MAPS.find((m) => m.id === mapId)
+  if (stock) return stock
+  const user = userMaps.find((m) => m.id === mapId)
+  if (user) return mapFromRecord(user)
+  return STOCK_MAPS[0]
+}
 
 // The layout catalogue the "Shape" dropdown filters: every viewport shape plus
 // every available map (stock + user). The pure `layoutOptions` helper does the

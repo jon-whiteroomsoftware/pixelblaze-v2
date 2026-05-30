@@ -78,3 +78,144 @@ export function projectIndex(index: number, grid: Locked2DGrid): [number, number
 export function projectPos(pos: [number, number]): [number, number] {
   return [pos[0] * 2 - 1, 1 - pos[1] * 2]
 }
+
+// ── Orbit camera (3D) ───────────────────────────────────────────────────────
+//
+// The 3D-display half of the preview camera (#129). Pure: the renderer wraps
+// these in WebGL, but all geometry — rotation, orthographic projection, depth
+// cueing, and fit-to-container — lives and is unit-tested here.
+//
+// Coordinate convention: a map's 3D `pos` is normalized [0,1]³ (parallel to the
+// 2D plane). The camera centres it to [-0.5,0.5]³ about the model centroid,
+// rotates, then scales into clip space. The view looks down -Z, so a larger
+// rotated z is NEARER the camera (drives depth cueing).
+
+type Vec3 = [number, number, number]
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v
+}
+
+export interface OrbitCamera {
+  azimuth: number // turntable yaw about the vertical (Y) axis, radians
+  elevation: number // pitch about X, radians; clamped for the turntable horizon
+  roll: number // about the view (Z) axis, radians; only a trackball sets this
+}
+
+// Default three-quarter view: a gentle yaw and downward tilt so all three axes
+// read on open. reset-view returns here; auto-orbit advances `azimuth` from it.
+export const DEFAULT_ORBIT: OrbitCamera = { azimuth: 0.6, elevation: 0.5, roll: 0 }
+
+// Turntable elevation clamp — just shy of straight down/up so the horizon stays
+// stable (no gimbal flip). Plain drag is clamped to this; trackball is free.
+export const MAX_ELEVATION = (Math.PI / 2) * 0.98
+
+export function clampElevation(e: number): number {
+  return Math.max(-MAX_ELEVATION, Math.min(MAX_ELEVATION, e))
+}
+
+// Rotate a centred point by the camera orientation: Rz(roll)·Rx(elevation)·Ry(azimuth).
+export function orbitRotate(p: Vec3, cam: OrbitCamera): Vec3 {
+  const [x, y, z] = p
+  // Ry(azimuth)
+  const ca = Math.cos(cam.azimuth)
+  const sa = Math.sin(cam.azimuth)
+  const x1 = ca * x + sa * z
+  const y1 = y
+  const z1 = -sa * x + ca * z
+  // Rx(elevation)
+  const ce = Math.cos(cam.elevation)
+  const se = Math.sin(cam.elevation)
+  const x2 = x1
+  const y2 = ce * y1 - se * z1
+  const z2 = se * y1 + ce * z1
+  // Rz(roll)
+  const cr = Math.cos(cam.roll)
+  const sr = Math.sin(cam.roll)
+  return [cr * x2 - sr * y2, sr * x2 + cr * y2, z2]
+}
+
+// Half the space diagonal of the centred unit cube — the largest distance any
+// point can sit from the centre, hence the worst-case extent under any rotation.
+const HALF_DIAGONAL = 0.5 * Math.sqrt(3)
+
+// Margin so the orbiting model never touches the canvas edge at any angle.
+export const FIT_3D_MARGIN = 0.9
+
+// The scale taking centred [-0.5,0.5]³ coords into clip space such that the
+// model's worst-case extent maps to ±margin — i.e. it always fits, spin or not.
+// Square aspect (the 3D canvas is square); pure, no container arg needed beyond
+// the margin since clip space is already normalized.
+export function fit3DScale(margin: number = FIT_3D_MARGIN): number {
+  return margin / HALF_DIAGONAL
+}
+
+// Orthographic projection of a normalized [0,1]³ position through the orbit
+// camera: returns clip-space (x,y) (y up) and the rotated depth (larger = nearer).
+export function projectOrbit(
+  pos: Vec3,
+  cam: OrbitCamera,
+  scale: number = fit3DScale(),
+): { clip: [number, number]; depth: number } {
+  const centred: Vec3 = [pos[0] - 0.5, pos[1] - 0.5, pos[2] - 0.5]
+  const [rx, ry, rz] = orbitRotate(centred, cam)
+  return { clip: [rx * scale, ry * scale], depth: rz }
+}
+
+export interface DepthCue {
+  brightnessMul: number
+  sizeMul: number
+}
+
+// Depth cueing: nearer dots are larger and brighter, so the orbit reads as 3D
+// despite order-independent additive blending. `depth` is `projectOrbit`'s
+// rotated z in [-HALF_DIAGONAL, +HALF_DIAGONAL]; t=0 is the farthest point,
+// t=1 the nearest. Multipliers interpolate between the far and near ends.
+export function depthCue(
+  depth: number,
+  opts: { nearBright?: number; farBright?: number; nearSize?: number; farSize?: number } = {},
+): DepthCue {
+  const { nearBright = 1, farBright = 0.4, nearSize = 1, farSize = 0.55 } = opts
+  const t = clamp01((depth + HALF_DIAGONAL) / (2 * HALF_DIAGONAL))
+  return {
+    brightnessMul: farBright + (nearBright - farBright) * t,
+    sizeMul: farSize + (nearSize - farSize) * t,
+  }
+}
+
+// ── Orbit interaction (pure drag math) ──────────────────────────────────────
+
+// Plain drag = turntable: horizontal pixels yaw azimuth, vertical pixels pitch
+// elevation (clamped to a stable horizon). Roll is untouched.
+export function applyTurntableDrag(
+  cam: OrbitCamera,
+  dx: number,
+  dy: number,
+  sensitivity: number = 0.01,
+): OrbitCamera {
+  return {
+    azimuth: cam.azimuth + dx * sensitivity,
+    elevation: clampElevation(cam.elevation + dy * sensitivity),
+    roll: cam.roll,
+  }
+}
+
+// Shift-drag = free trackball: horizontal yaws, vertical pitches WITHOUT clamp,
+// so the model can tumble past vertical and accumulate roll-like freedom.
+export function applyTrackballDrag(
+  cam: OrbitCamera,
+  dx: number,
+  dy: number,
+  sensitivity: number = 0.01,
+): OrbitCamera {
+  return {
+    azimuth: cam.azimuth + dx * sensitivity,
+    elevation: cam.elevation + dy * sensitivity,
+    roll: cam.roll,
+  }
+}
+
+// Auto-orbit: advance the azimuth turntable by `delta` ms at `speed` rad/sec.
+export function advanceAutoOrbit(cam: OrbitCamera, deltaMs: number, speed: number = 0.3): OrbitCamera {
+  return { ...cam, azimuth: cam.azimuth + (deltaMs / 1000) * speed }
+}

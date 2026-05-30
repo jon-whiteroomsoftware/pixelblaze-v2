@@ -14,6 +14,10 @@ interface EditorState {
   // The active pattern's native dimensionality (highest render fn) — drives the
   // read-only title-bar dimensionality indicator and the default layout on open.
   nativeDim: 1 | 2 | 3
+  // The active LAYOUT's display dimensionality (the shape/map being drawn), which
+  // can differ from `nativeDim` (a 1D pattern on a 3D shape displays as 3D). Gates
+  // the viewport's camera control set (#129, ADR-0005).
+  displayDim: 1 | 2 | 3
   setCompileStatus: (status: CompileStatus) => void
   setSource: (source: string) => void
   setIsReadOnly: (value: boolean) => void
@@ -22,6 +26,7 @@ interface EditorState {
   setPatternVars: (vars: string[]) => void
   setControls: (controls: PatternMetadata['controls']) => void
   setNativeDim: (dim: 1 | 2 | 3) => void
+  setDisplayDim: (dim: 1 | 2 | 3) => void
 }
 
 export const editorInitialState = {
@@ -33,6 +38,7 @@ export const editorInitialState = {
   patternVars: [] as string[],
   controls: [] as PatternMetadata['controls'],
   nativeDim: 2 as 1 | 2 | 3,
+  displayDim: 2 as 1 | 2 | 3,
 }
 
 export const useEditorStore = create<EditorState>()((set) => ({
@@ -45,4 +51,5 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setPatternVars: (patternVars) => set({ patternVars }),
   setControls: (controls) => set({ controls }),
   setNativeDim: (nativeDim) => set({ nativeDim }),
+  setDisplayDim: (displayDim) => set({ displayDim }),
 }))

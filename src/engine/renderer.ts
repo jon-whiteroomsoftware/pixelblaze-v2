@@ -6,6 +6,10 @@ import {
   pointSize,
   projectIndex,
   projectPos,
+  projectOrbit,
+  depthCue,
+  DEFAULT_ORBIT,
+  type OrbitCamera,
   type Locked2DGrid,
 } from './camera'
 
@@ -28,19 +32,33 @@ export interface Renderer {
   // grid (`projectIndex`). The grid path is left untouched when null, so the
   // reveal-2D plane is bit-for-bit unchanged.
   setShapePositions(positions: [number, number][] | null): void
+  // Switch to the 3D orbit path: draw positions come from normalized [0,1]³ `pos`
+  // projected through the orbit camera each paint, with depth cueing. `null`
+  // leaves 3D mode (back to the 2D grid/shape path). Sizes the canvas to a square
+  // `canvasPx`.
+  set3DPositions(
+    positions: [number, number, number][] | null,
+    opts?: { canvasPx?: number },
+  ): void
+  // Update the orbit camera (auto-orbit advance, drag, reset). No-op in 2D mode.
+  setCamera(camera: OrbitCamera): void
 }
+
+// Un-cued 3D dot diameter as a fraction of the square canvas edge, before
+// per-dot depth cueing. Exported so the UI's diffusion blur can match it.
+export const BASE_DOT_FRACTION = 0.02
 
 const DIM_FACTOR = 0.15
 
 const VERT_SRC = `
 attribute vec2 a_pos;
 attribute vec3 a_color;
-uniform float u_pointSize;
+attribute float a_size;
 varying vec3 v_color;
 void main() {
   v_color = a_color;
   gl_Position = vec4(a_pos, 0.0, 1.0);
-  gl_PointSize = u_pointSize;
+  gl_PointSize = a_size;
 }
 `
 
@@ -94,24 +112,32 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
       paint: () => undefined,
       updateGrid(newGrid) { grid = clampGrid(newGrid); applySize() },
       setShapePositions: () => undefined,
+      set3DPositions: () => undefined,
+      setCamera: () => undefined,
     }
   }
 
   const program = createProgram(gl)
   const posBuffer = gl.createBuffer()!
   const colorBuffer = gl.createBuffer()!
+  const sizeBuffer = gl.createBuffer()!
   const aPos = gl.getAttribLocation(program, 'a_pos')
   const aColor = gl.getAttribLocation(program, 'a_color')
-  const uPointSize = gl.getUniformLocation(program, 'u_pointSize')
+  const aSize = gl.getAttribLocation(program, 'a_size')
 
-  // Locked-2D positions depend only on the grid, not the frame, so they're
-  // rebuilt on grid change rather than per paint. `positions` is the clip-space
-  // (x,y) per drawable index; `drawCount` is how many of those we actually draw.
+  // 2D positions depend only on the grid, not the frame, so they're rebuilt on
+  // grid change rather than per paint. `positions` is the clip-space (x,y) per
+  // drawable index; `drawCount` is how many of those we actually draw.
   let positions = new Float32Array(0)
+  let sizes = new Float32Array(0)
   let drawCount = 0
   // When set, draw positions come from a viewport shape embedding (1D path)
   // rather than the locked-2D grid. Null keeps the legacy grid path.
   let shapePos: [number, number][] | null = null
+  // When set, the renderer is in 3D orbit mode: positions/sizes are recomputed
+  // per paint from `pos3D` + `camera`. Takes precedence over the 2D paths.
+  let pos3D: [number, number, number][] | null = null
+  let camera: OrbitCamera = DEFAULT_ORBIT
 
   function rebuildPositions(): void {
     const coords: number[] = []
@@ -131,8 +157,11 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     }
     positions = new Float32Array(coords)
     drawCount = coords.length / 2
+    sizes = new Float32Array(drawCount).fill(pointSize(grid))
     gl!.bindBuffer(gl!.ARRAY_BUFFER, posBuffer)
     gl!.bufferData(gl!.ARRAY_BUFFER, positions, gl!.STATIC_DRAW)
+    gl!.bindBuffer(gl!.ARRAY_BUFFER, sizeBuffer)
+    gl!.bufferData(gl!.ARRAY_BUFFER, sizes, gl!.STATIC_DRAW)
   }
 
   rebuildPositions()
@@ -144,7 +173,36 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   const colors = () => new Float32Array(drawCount * 3)
   let colorData = colors()
 
+  // Recompute per-vertex clip positions and sizes from the live camera, and
+  // return the per-vertex brightness multiplier (folded into colour at paint).
+  // No depth sort — additive blend is order-independent (#129).
+  function project3D(): Float32Array {
+    if (!pos3D) return new Float32Array(0)
+    const cap = Math.min(pos3D.length, MAX_PIXEL_COUNT)
+    drawCount = cap
+    if (positions.length !== cap * 2) positions = new Float32Array(cap * 2)
+    if (sizes.length !== cap) sizes = new Float32Array(cap)
+    const bright = new Float32Array(cap)
+    // Base dot diameter tracks the canvas size; depth cueing then scales it
+    // per-dot (nearer = larger).
+    const baseSize = Math.max(1, canvas.width * BASE_DOT_FRACTION)
+    for (let i = 0; i < cap; i++) {
+      const { clip, depth } = projectOrbit(pos3D[i], camera)
+      const cue = depthCue(depth)
+      positions[i * 2] = clip[0]
+      positions[i * 2 + 1] = clip[1]
+      sizes[i] = Math.max(1, baseSize * cue.sizeMul)
+      bright[i] = cue.brightnessMul
+    }
+    gl!.bindBuffer(gl!.ARRAY_BUFFER, posBuffer)
+    gl!.bufferData(gl!.ARRAY_BUFFER, positions, gl!.DYNAMIC_DRAW)
+    gl!.bindBuffer(gl!.ARRAY_BUFFER, sizeBuffer)
+    gl!.bufferData(gl!.ARRAY_BUFFER, sizes, gl!.DYNAMIC_DRAW)
+    return bright
+  }
+
   function paint(pixels: [number, number, number][], brightness: number, dimmed: boolean): void {
+    const bright3D = pos3D ? project3D() : null
     const count = Math.min(drawCount, pixels.length, clampPixelCount(pixels.length))
     if (colorData.length !== drawCount * 3) colorData = colors()
 
@@ -152,20 +210,25 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     const scale = brightness * dimScale
     for (let i = 0; i < count; i++) {
       const [r, g, b] = pixels[i]
-      colorData[i * 3] = clamp01(r * scale)
-      colorData[i * 3 + 1] = clamp01(g * scale)
-      colorData[i * 3 + 2] = clamp01(b * scale)
+      // Depth cueing multiplies brightness per-vertex in 3D mode (nearer = brighter).
+      const ds = scale * (bright3D ? bright3D[i] : 1)
+      colorData[i * 3] = clamp01(r * ds)
+      colorData[i * 3 + 1] = clamp01(g * ds)
+      colorData[i * 3 + 2] = clamp01(b * ds)
     }
 
     const ctx = gl as WebGLRenderingContext
     ctx.viewport(0, 0, canvas.width, canvas.height)
     ctx.clear(ctx.COLOR_BUFFER_BIT)
     ctx.useProgram(program)
-    ctx.uniform1f(uPointSize, pointSize(grid))
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, posBuffer)
     ctx.enableVertexAttribArray(aPos)
     ctx.vertexAttribPointer(aPos, 2, ctx.FLOAT, false, 0, 0)
+
+    ctx.bindBuffer(ctx.ARRAY_BUFFER, sizeBuffer)
+    ctx.enableVertexAttribArray(aSize)
+    ctx.vertexAttribPointer(aSize, 1, ctx.FLOAT, false, 0, 0)
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, colorBuffer)
     ctx.bufferData(ctx.ARRAY_BUFFER, colorData, ctx.DYNAMIC_DRAW)
@@ -177,6 +240,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function updateGrid(newGrid: RendererGridConfig): void {
     grid = clampGrid(newGrid)
+    if (pos3D) return // 3D mode owns its own square canvas size
     applySize()
     rebuildPositions()
     colorData = colors()
@@ -188,7 +252,32 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     colorData = colors()
   }
 
-  return { paint, updateGrid, setShapePositions }
+  function set3DPositions(
+    p: [number, number, number][] | null,
+    opts: { canvasPx?: number } = {},
+  ): void {
+    pos3D = p
+    if (p) {
+      if (opts.canvasPx) {
+        const px = Math.max(1, Math.round(opts.canvasPx))
+        canvas.width = px
+        canvas.height = px
+      }
+      drawCount = Math.min(p.length, MAX_PIXEL_COUNT)
+      colorData = colors()
+    } else {
+      // Leaving 3D mode: restore the 2D canvas + positions.
+      applySize()
+      rebuildPositions()
+      colorData = colors()
+    }
+  }
+
+  function setCamera(c: OrbitCamera): void {
+    camera = c
+  }
+
+  return { paint, updateGrid, setShapePositions, set3DPositions, setCamera }
 }
 
 function clamp01(v: number): number {

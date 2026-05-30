@@ -1,3 +1,5 @@
 export type { MapPoint, PixelMap } from './types'
 export { createPlaneMap, planePoint } from './plane'
 export type { PlaneParams } from './plane'
+export { createCubeMap, cubePoint, cubePixelCount } from './cube'
+export type { CubeParams } from './cube'
