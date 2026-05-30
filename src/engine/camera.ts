@@ -185,6 +185,16 @@ export function depthCue(
 
 // ── Orbit interaction (pure drag math) ──────────────────────────────────────
 
+// Plain drag is constrained to a single cardinal axis (the spec): one gesture
+// either yaws or pitches, never both. `dominantAxis` picks which from the
+// gesture's accumulated travel; the caller locks it for the rest of the drag.
+// 'x' → horizontal → azimuth; 'y' → vertical → elevation. Ties favour 'x'.
+export type DragAxis = 'x' | 'y'
+
+export function dominantAxis(dx: number, dy: number): DragAxis {
+  return Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'
+}
+
 // Plain drag = turntable: horizontal pixels yaw azimuth, vertical pixels pitch
 // elevation (clamped to a stable horizon). Roll is untouched.
 export function applyTurntableDrag(

@@ -18,6 +18,7 @@ import {
   depthCue,
   applyTurntableDrag,
   applyTrackballDrag,
+  dominantAxis,
   advanceAutoOrbit,
   type OrbitCamera,
 } from './camera'
@@ -179,6 +180,13 @@ describe('camera — orbit interaction', () => {
   it('trackball drag pitches freely past the horizon clamp', () => {
     const next = applyTrackballDrag({ azimuth: 0, elevation: 0, roll: 0 }, 0, 10000, 0.01)
     expect(next.elevation).toBeGreaterThan(MAX_ELEVATION)
+  })
+
+  it('dominant axis picks the larger travel, ties favour x', () => {
+    expect(dominantAxis(10, 3)).toBe('x')
+    expect(dominantAxis(3, 10)).toBe('y')
+    expect(dominantAxis(-10, 3)).toBe('x')
+    expect(dominantAxis(5, 5)).toBe('x')
   })
 
   it('auto-orbit advances azimuth over time', () => {
