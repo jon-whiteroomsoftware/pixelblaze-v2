@@ -30,6 +30,12 @@ interface PatternState {
   renamePattern: (id: string, name: string) => Promise<void>
   removePattern: (id: string) => Promise<void>
   updatePatternSrc: (id: string, src: string) => Promise<void>
+  // Persist the per-pattern layout selection (ADR-0004/0005) onto the record, in
+  // both IndexedDB and the in-memory list, so reopening restores it this session.
+  updatePatternLayout: (
+    id: string,
+    layout: Pick<PatternRecord, 'mapId' | 'shapeId' | 'params' | 'pixelCount'>,
+  ) => Promise<void>
 }
 
 export const patternInitialState = {
@@ -95,5 +101,15 @@ export const usePatternStore = create<PatternState>()((set, get) => ({
         p.id === id ? { ...p, src, updatedAt } : p,
       ),
     }))
+  },
+
+  updatePatternLayout: async (id, layout) => {
+    set((s) => ({
+      userPatterns: s.userPatterns.map((p) => (p.id === id ? { ...p, ...layout } : p)),
+    }))
+    // The src/updatedAt bump is intentionally skipped: layout is a display-side
+    // concern, not an edit to the pattern's code, so it shouldn't reorder the
+    // recents list. Persist the layout fields only.
+    await updatePattern(id, layout).catch(() => {})
   },
 }))

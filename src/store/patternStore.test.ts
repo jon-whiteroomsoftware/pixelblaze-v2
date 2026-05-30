@@ -33,3 +33,17 @@ describe('patternStore', () => {
     expect(usePatternStore.getState().activePatternId).toBeNull()
   })
 })
+
+describe('updatePatternLayout', () => {
+  it('merges the layout selection onto the in-memory record', async () => {
+    usePatternStore.setState({
+      userPatterns: [{ id: 'p1', name: 'P1', src: '', controls: {}, updatedAt: 1 }],
+    })
+    await usePatternStore.getState().updatePatternLayout('p1', {
+      shapeId: 'ring',
+      pixelCount: 64,
+    })
+    const rec = usePatternStore.getState().userPatterns[0]
+    expect(rec).toMatchObject({ id: 'p1', shapeId: 'ring', pixelCount: 64 })
+  })
+})

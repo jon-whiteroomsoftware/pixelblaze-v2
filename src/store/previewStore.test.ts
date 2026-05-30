@@ -109,4 +109,31 @@ describe('mergePersistedPreview', () => {
     expect(merged.grid.rows).toBe(256)
     expect(merged.grid.cols).toBe(256)
   })
+
+  it('defaults spacingScale to 1 when absent from a pre-feature blob', () => {
+    const current = usePreviewStore.getState()
+    expect(mergePersistedPreview({ grid: current.grid }, current).spacingScale).toBe(1)
+  })
+
+  it('preserves and clamps a persisted spacingScale', () => {
+    const current = usePreviewStore.getState()
+    expect(mergePersistedPreview({ spacingScale: 2 }, current).spacingScale).toBe(2)
+    expect(mergePersistedPreview({ spacingScale: 99 }, current).spacingScale).toBe(4)
+    expect(mergePersistedPreview({ spacingScale: 0 }, current).spacingScale).toBe(0.25)
+  })
+})
+
+describe('spacingScale', () => {
+  it('defaults to 1 (fit-to-container, no-regression)', () => {
+    expect(usePreviewStore.getState().spacingScale).toBe(1)
+  })
+
+  it('setSpacingScale clamps to the comfort range', () => {
+    usePreviewStore.getState().setSpacingScale(2)
+    expect(usePreviewStore.getState().spacingScale).toBe(2)
+    usePreviewStore.getState().setSpacingScale(100)
+    expect(usePreviewStore.getState().spacingScale).toBe(4)
+    usePreviewStore.getState().setSpacingScale(-5)
+    expect(usePreviewStore.getState().spacingScale).toBe(0.25)
+  })
 })

@@ -4,13 +4,25 @@ import { useEditorStore } from '@/store/editorStore'
 import { useControlStore } from '@/store/controlStore'
 import { WatchPanel } from '@/components/WatchPanel'
 import { ControlsPanel } from '@/components/ControlsPanel'
+import { usePatternStore } from '@/store/patternStore'
+import {
+  useMapStore,
+  DEFAULT_MAP_ID,
+  DEFAULT_SHAPE_ID,
+  DEFAULT_SHAPE_PIXEL_COUNT,
+} from '@/store/mapStore'
 import { createShim, createFxShim, type ShimContext } from '@/engine/shim'
-import { loadPattern } from '@/engine/loadPattern'
+import { loadPattern, nativeDimension } from '@/engine/loadPattern'
 import { bundle } from '@/engine/bundle'
 import { createRenderer } from '@/engine/renderer'
 import { createRenderLoop, type RenderLoop } from '@/engine/renderLoop'
 import { createVirtualClock } from '@/engine/virtualClock'
 import { createPlaneMap } from '@/engine/maps'
+import { clampPixelCount } from '@/engine/camera'
+import { layoutSource as buildLayoutSource } from '@/store/mapStore'
+import { resolveLayoutSelection } from '@/engine/layout'
+import { SHAPES, embedPositions, type ShapeId } from '@/engine/shapes'
+import type { MapPoint } from '@/engine/maps'
 import { LIBRARIES } from '@/pixelblaze/libs'
 
 export function Preview() {
@@ -20,9 +32,14 @@ export function Preview() {
   const rendererRef = useRef<ReturnType<typeof createRenderer> | null>(null)
   const isRunning = usePreviewStore((s) => s.isRunning)
   const grid = usePreviewStore((s) => s.grid)
+  const spacingScale = usePreviewStore((s) => s.spacingScale)
   const fidelity = usePreviewStore((s) => s.fidelity)
   const previewSource = useEditorStore((s) => s.previewSource)
   const controlValues = useControlStore((s) => s.controlValues)
+  const activePatternId = usePatternStore((s) => s.activePatternId)
+  const activeMapId = useMapStore((s) => s.activeMapId)
+  const activeShapeId = useMapStore((s) => s.activeShapeId)
+  const activePixelCount = useMapStore((s) => s.activePixelCount)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
   const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
@@ -38,7 +55,8 @@ export function Preview() {
     const ro = new ResizeObserver(([entry]) => {
       const { width } = entry.contentRect
       const { cols } = usePreviewStore.getState().grid
-      const spacing = Math.max(1, width / cols)
+      // Auto-fit to container, then apply the uniform spacing scale (§5) on top.
+      const spacing = Math.max(1, (width / cols) * usePreviewStore.getState().spacingScale)
       setCanvasDims({ spacing })
       if (rendererRef.current) {
         rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing })
@@ -49,13 +67,13 @@ export function Preview() {
     return () => ro.disconnect()
   }, [])
 
-  // Recompute spacing when cols changes without a container resize
+  // Recompute spacing when cols or the spacing scale changes without a resize
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const { width } = el.getBoundingClientRect()
-    setCanvasDims({ spacing: Math.max(1, width / grid.cols) })
-  }, [grid.cols])
+    setCanvasDims({ spacing: Math.max(1, (width / grid.cols) * spacingScale) })
+  }, [grid.cols, spacingScale])
 
   // Rebuild the loop whenever source or spacing changes
   useEffect(() => {
@@ -65,22 +83,66 @@ export function Preview() {
 
     const gridWithDims = { ...usePreviewStore.getState().grid, ...canvasDims }
 
-    // Reveal-2D: the active map is the stock uniform plane, its rows/cols taken
-    // from the global grid seed (per-pattern map selection lands in a later
-    // slice). Resolve it once per rebuild into the points the loop and shim
-    // iterate; the plane's row-major `sample` reproduces the old grid loop's
-    // `x = col/(cols-1)` coordinates exactly (no-regression).
-    const pixelCount = gridWithDims.rows * gridWithDims.cols
-    const mapPoints = createPlaneMap({
-      rows: gridWithDims.rows,
-      cols: gridWithDims.cols,
-    }).resolve(pixelCount)
+    // Bundle first so the pattern's native dimensionality (highest render fn) is
+    // known before resolving its layout — the dropdown filters by it (ADR-0005).
+    let bundled: ReturnType<typeof bundle>
+    try {
+      bundled = bundle(previewSource, LIBRARIES)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      queueMicrotask(() => setRuntimeError(msg))
+      return
+    }
+    const { code, fxCode, metadata } = bundled
+    const nativeDim = nativeDimension(metadata.renderFns)
+    useEditorStore.getState().setNativeDim(nativeDim)
+
+    // Resolve the active layout (ADR-0005): a 1D pattern draws on a viewport
+    // shape embedding (pos-only, empty `sample`); a 2D pattern on a map. The pure
+    // helper corrects a stale persisted selection to the dimension's default, and
+    // we reflect any correction back so the "Shape" dropdown stays in sync.
+    const { userMaps } = useMapStore.getState()
+    const selection = resolveLayoutSelection(
+      { mapId: activeMapId, shapeId: activeShapeId },
+      nativeDim,
+      buildLayoutSource({ userMaps }),
+    )
+    if (selection.mapId && selection.mapId !== activeMapId) {
+      useMapStore.getState().setActiveMap(selection.mapId)
+    }
+    if (selection.shapeId && selection.shapeId !== activeShapeId) {
+      useMapStore.getState().setActiveShape(selection.shapeId as ShapeId)
+    }
+
+    // 1D shape: pos-only embedding over an empty sample (count from the persisted
+    // value or a 1D default). 2D map: row-major plane reproducing the legacy grid
+    // loop's coordinates exactly (no-regression), count = rows×cols.
+    let pixelCount: number
+    let mapPoints: MapPoint[]
+    let shapePositions: [number, number][] | null = null
+    if (selection.shapeId) {
+      const shape = SHAPES[selection.shapeId as ShapeId]
+      pixelCount = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
+      shapePositions = embedPositions(shape, pixelCount)
+      mapPoints = shapePositions.map((pos) => ({ sample: [], pos }))
+    } else {
+      // 1a stock plane: tracks the global grid seed (per-pattern map params land
+      // in a later slice). Build it AT the grid dims so the sampled coordinates
+      // line up with the renderer's locked-2D grid layout exactly — a fixed-size
+      // stock plane would tile/overflow against a differently-sized grid. count
+      // is therefore rows×cols, not the persisted pixelCount.
+      pixelCount = gridWithDims.rows * gridWithDims.cols
+      mapPoints = createPlaneMap({
+        rows: gridWithDims.rows,
+        cols: gridWithDims.cols,
+      }).resolve(pixelCount)
+    }
 
     const clock = createVirtualClock()
     const shimConfig = {
       mapPoints,
       pixelCount,
-      dimensions: 2 as const,
+      dimensions: nativeDim,
       getVirtualTime: () => clock.getTime(),
     }
     // The Precise renderer runs the 16.16 fixed-point emit + shim; the Fast
@@ -91,7 +153,6 @@ export function Preview() {
 
     let handle: ReturnType<typeof loadPattern>
     try {
-      const { code, fxCode, metadata } = bundle(previewSource, LIBRARIES)
       handle = loadPattern(fidelity === 'fast' ? code : fxCode, metadata, shim.builtins)
       handleRef.current = handle
       useEditorStore.getState().setPatternVars(metadata.patternVars)
@@ -138,6 +199,9 @@ export function Preview() {
 
     const renderer = createRenderer(canvas, gridWithDims)
     rendererRef.current = renderer
+    // Drive draw positions from the 1D shape embedding when one is active; null
+    // leaves the locked-2D grid path untouched (the plane stays bit-for-bit).
+    renderer.setShapePositions(shapePositions)
 
     const paint = (pixels: [number, number, number][], brightness: number, dimmed: boolean) => {
       renderer.paint(pixels, brightness, dimmed)
@@ -187,7 +251,35 @@ export function Preview() {
     if (usePreviewStore.getState().isRunning) loop.start()
 
     return () => loop.stop()
-  }, [previewSource, canvasDims, fidelity])
+  }, [previewSource, canvasDims, fidelity, activeMapId, activeShapeId, activePixelCount])
+
+  // Hydrate the per-pattern layout on open (ADR-0004/0005): restore the record's
+  // persisted mapId/shapeId/pixelCount, falling back to defaults when absent so a
+  // freshly-opened pattern doesn't inherit the previous one's selection. The
+  // build effect's resolveLayoutSelection then validates these against the
+  // pattern's native dimensionality. Camera/spacing are global, not restored here.
+  useEffect(() => {
+    if (!activePatternId) return
+    const rec = usePatternStore.getState().userPatterns.find((p) => p.id === activePatternId)
+    const m = useMapStore.getState()
+    m.setActiveMap(rec?.mapId ?? DEFAULT_MAP_ID)
+    m.setActiveShape((rec?.shapeId as ShapeId) ?? DEFAULT_SHAPE_ID)
+    m.setActivePixelCount(rec?.pixelCount ?? null)
+  }, [activePatternId])
+
+  // Persist the active layout back onto the PatternRecord whenever it changes, so
+  // reopening restores the layout the pattern was authored against. Both knobs
+  // and the count ride along; the pure resolver picks the right one per native
+  // dimensionality on the next open. No-op without an active user pattern.
+  useEffect(() => {
+    if (!activePatternId) return
+    usePatternStore.getState().updatePatternLayout(activePatternId, {
+      mapId: activeMapId,
+      shapeId: activeShapeId,
+      pixelCount: activePixelCount ?? undefined,
+      params: { rows: grid.rows, cols: grid.cols },
+    })
+  }, [activePatternId, activeMapId, activeShapeId, activePixelCount, grid.rows, grid.cols])
 
   // Forward control value changes to the live pattern handle
   useEffect(() => {

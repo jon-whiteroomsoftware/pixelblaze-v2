@@ -3,6 +3,7 @@ import { Settings } from 'lucide-react'
 import { usePreviewStore } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
 import { MAX_GRID_AXIS } from '@/engine/camera'
+import { MIN_SPACING_SCALE, MAX_SPACING_SCALE } from '@/store/previewStore'
 
 const PRIMARY_BUILTIN_VARS = ['elapsed', 'pixelCount']
 
@@ -46,6 +47,8 @@ export function PreviewSettings() {
   const brightness = usePreviewStore((s) => s.brightness)
   const setBrightness = usePreviewStore((s) => s.setBrightness)
   const diffusion = usePreviewStore((s) => s.grid.diffusion)
+  const spacingScale = usePreviewStore((s) => s.spacingScale)
+  const setSpacingScale = usePreviewStore((s) => s.setSpacingScale)
   const fidelity = usePreviewStore((s) => s.fidelity)
   const setFidelity = usePreviewStore((s) => s.setFidelity)
   const gridRows = usePreviewStore((s) => s.grid.rows)
@@ -127,6 +130,18 @@ export function PreviewSettings() {
                   step={0.01}
                   value={brightness}
                   onChange={(e) => setBrightness(Number(e.target.value))}
+                  className="w-full accent-amber-500"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-zinc-500">Spacing</span>
+                <input
+                  type="range"
+                  min={MIN_SPACING_SCALE}
+                  max={MAX_SPACING_SCALE}
+                  step={0.05}
+                  value={spacingScale}
+                  onChange={(e) => setSpacingScale(Number(e.target.value))}
                   className="w-full accent-amber-500"
                 />
               </label>

@@ -16,6 +16,10 @@ interface PreviewState {
   speed: number
   brightness: number
   grid: GridConfig
+  // Uniform camera scale (§5, ADR-0005): a display-only, pattern-invisible
+  // multiplier on the auto-fit dot spacing. 1 = today's fit-to-container layout
+  // (no-regression). Global viewport-comfort pref — persisted, not per-pattern.
+  spacingScale: number
   fidelity: FidelityMode
   watchedBuiltins: string[]
   watchedPatternVars: string[]
@@ -26,6 +30,7 @@ interface PreviewState {
   setFidelity: (fidelity: FidelityMode) => void
   setSpeed: (speed: number) => void
   setBrightness: (brightness: number) => void
+  setSpacingScale: (scale: number) => void
   setGrid: (partial: Partial<GridConfig>) => void
   setWatchedBuiltins: (vars: string[]) => void
   setWatchedPatternVars: (vars: string[]) => void
@@ -42,6 +47,7 @@ export const previewInitialState = {
     spacing: 20,
     diffusion: 0.5,
   },
+  spacingScale: 1,
   // The Fast renderer (float64) is the default on load: it's the smoother,
   // good-enough preview. The Precise renderer (16.16 fixed-point) is an opt-in
   // for checking hardware-accurate behaviour — and even it isn't bit-exact
@@ -61,17 +67,30 @@ function clampGrid(grid: GridConfig): GridConfig {
   return { ...grid, rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols) }
 }
 
+// Spacing scale is a comfort multiplier: clamp to a sane spread so a stale or
+// fat-fingered value can neither collapse dots to a point nor balloon them off
+// the canvas. The 1× default reproduces fit-to-container exactly.
+export const MIN_SPACING_SCALE = 0.25
+export const MAX_SPACING_SCALE = 4
+function clampSpacingScale(scale: number): number {
+  if (!Number.isFinite(scale)) return 1
+  return Math.max(MIN_SPACING_SCALE, Math.min(MAX_SPACING_SCALE, scale))
+}
+
 // Deep-merge persisted state over the live state so a persisted `grid` that
 // predates a newly-added field (e.g. `diffusion`) falls back to its default
 // instead of arriving as `undefined`. The default shallow merge would replace
 // the whole grid object, dropping any key the saved blob never had. Dimensions
 // are clamped here so a stale oversized blob can never reach the renderer.
 export function mergePersistedPreview(persisted: unknown, current: PreviewState): PreviewState {
-  const p = (persisted ?? {}) as Partial<Pick<PreviewState, 'brightness' | 'speed' | 'grid'>>
+  const p = (persisted ?? {}) as Partial<
+    Pick<PreviewState, 'brightness' | 'speed' | 'grid' | 'spacingScale'>
+  >
   return {
     ...current,
     ...p,
     grid: clampGrid({ ...current.grid, ...(p.grid ?? {}) }),
+    spacingScale: clampSpacingScale(p.spacingScale ?? current.spacingScale),
   }
 }
 
@@ -84,6 +103,7 @@ export const usePreviewStore = create<PreviewState>()(
       setFidelity: (fidelity) => set({ fidelity }),
       setSpeed: (speed) => set({ speed }),
       setBrightness: (brightness) => set({ brightness }),
+      setSpacingScale: (scale) => set({ spacingScale: clampSpacingScale(scale) }),
       setGrid: (partial) => set((s) => ({ grid: clampGrid({ ...s.grid, ...partial }) })),
       setWatchedBuiltins: (watchedBuiltins) => set({ watchedBuiltins }),
       setWatchedPatternVars: (watchedPatternVars) => set({ watchedPatternVars }),
@@ -91,7 +111,12 @@ export const usePreviewStore = create<PreviewState>()(
     }),
     {
       name: 'pixelblaze-preview',
-      partialize: (s) => ({ brightness: s.brightness, speed: s.speed, grid: s.grid }),
+      partialize: (s) => ({
+        brightness: s.brightness,
+        speed: s.speed,
+        grid: s.grid,
+        spacingScale: s.spacingScale,
+      }),
       merge: mergePersistedPreview,
     }
   )

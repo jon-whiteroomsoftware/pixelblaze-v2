@@ -6,6 +6,7 @@ import { CompileStatusBadge } from '@/components/CompileStatusBadge'
 import { PatternList } from '@/components/PatternList'
 import { Preview } from '@/components/Preview'
 import { PreviewSettings } from '@/components/PreviewSettings'
+import { ShapeSelector } from '@/components/ShapeSelector'
 import { SpeedSelector } from '@/components/SpeedSelector'
 import { PaneHeader } from '@/components/PaneHeader'
 import { usePreviewStore } from '@/store/previewStore'
@@ -61,6 +62,7 @@ export default function App() {
   const addPattern = usePatternStore((s) => s.addPattern)
   const setActivePattern = usePatternStore((s) => s.setActivePattern)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
+  const nativeDim = useEditorStore((s) => s.nativeDim)
   const source = useEditorStore((s) => s.source)
   const compileStatus = useEditorStore((s) => s.compileStatus)
   const setSource = useEditorStore((s) => s.setSource)
@@ -266,9 +268,18 @@ export default function App() {
         <Splitter onDrag={handleRightDrag} />
         <aside data-testid="preview-pane" className="shrink-0 flex flex-col" style={{ width: rightWidth }}>
           <PaneHeader>
-            <span className="flex-1 min-w-0 flex items-center">
+            <span className="flex-1 min-w-0 flex items-center gap-1.5">
               <span className="truncate">{previewPatternName || '—'}</span>
+              {previewPatternName && (
+                <span
+                  title={`Native dimensionality: ${nativeDim}D (highest render fn)`}
+                  className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-500 border border-zinc-700 leading-none tabular-nums"
+                >
+                  {nativeDim}D
+                </span>
+              )}
             </span>
+            <ShapeSelector />
             <PreviewSettings />
             <SpeedSelector />
             <button

@@ -11,6 +11,9 @@ interface EditorState {
   previewPatternName: string
   patternVars: string[]
   controls: PatternMetadata['controls']
+  // The active pattern's native dimensionality (highest render fn) — drives the
+  // read-only title-bar dimensionality indicator and the default layout on open.
+  nativeDim: 1 | 2 | 3
   setCompileStatus: (status: CompileStatus) => void
   setSource: (source: string) => void
   setIsReadOnly: (value: boolean) => void
@@ -18,6 +21,7 @@ interface EditorState {
   setPreviewPatternName: (name: string) => void
   setPatternVars: (vars: string[]) => void
   setControls: (controls: PatternMetadata['controls']) => void
+  setNativeDim: (dim: 1 | 2 | 3) => void
 }
 
 export const editorInitialState = {
@@ -28,6 +32,7 @@ export const editorInitialState = {
   previewPatternName: '',
   patternVars: [] as string[],
   controls: [] as PatternMetadata['controls'],
+  nativeDim: 2 as 1 | 2 | 3,
 }
 
 export const useEditorStore = create<EditorState>()((set) => ({
@@ -39,4 +44,5 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setPreviewPatternName: (previewPatternName) => set({ previewPatternName }),
   setPatternVars: (patternVars) => set({ patternVars }),
   setControls: (controls) => set({ controls }),
+  setNativeDim: (nativeDim) => set({ nativeDim }),
 }))

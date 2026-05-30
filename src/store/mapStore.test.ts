@@ -4,8 +4,10 @@ import {
   mapInitialState,
   selectActiveMap,
   mapFromRecord,
+  layoutSource,
   STOCK_MAPS,
   DEFAULT_MAP_ID,
+  DEFAULT_SHAPE_ID,
   type MapRecord,
 } from './mapStore'
 
@@ -77,5 +79,27 @@ describe('mapFromRecord', () => {
     const map = mapFromRecord(USER_MAP)
     expect(map.dim).toBe(2)
     expect(map.resolve(16)[5].sample).toEqual([1 / 3, 1 / 3]) // col 1, row 1 of 4x4
+  })
+})
+
+describe('shape + pixel-count selection', () => {
+  it('defaults activeShapeId to the line shape', () => {
+    expect(useMapStore.getState().activeShapeId).toBe(DEFAULT_SHAPE_ID)
+  })
+
+  it('setActiveShape and setActivePixelCount update state', () => {
+    useMapStore.getState().setActiveShape('ring')
+    useMapStore.getState().setActivePixelCount(64)
+    expect(useMapStore.getState().activeShapeId).toBe('ring')
+    expect(useMapStore.getState().activePixelCount).toBe(64)
+  })
+})
+
+describe('layoutSource', () => {
+  it('gathers every shape plus stock and user maps', () => {
+    const src = layoutSource({ userMaps: [USER_MAP] })
+    expect(src.shapes.map((s) => s.id)).toEqual(['line', 'ring'])
+    expect(src.maps.map((m) => m.id)).toContain(STOCK_MAPS[0].id)
+    expect(src.maps.map((m) => m.id)).toContain('u1')
   })
 })
