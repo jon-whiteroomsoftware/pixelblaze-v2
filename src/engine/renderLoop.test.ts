@@ -11,7 +11,9 @@ function makeMockClock(): VirtualClock {
 function makeMockHandle(): PatternHandle {
   return {
     beforeRender: vi.fn(),
+    render: vi.fn(),
     render2D: vi.fn(),
+    render3D: vi.fn(),
     getExports: vi.fn(() => ({})),
     controls: {},
   }

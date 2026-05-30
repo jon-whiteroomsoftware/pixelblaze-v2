@@ -1,9 +1,9 @@
 import * as acorn from 'acorn'
-import { type PatternMetadata } from './loadPattern'
+import { type PatternMetadata, type RenderFns } from './loadPattern'
 import { emitFixedPoint } from './fxEmit'
 
 export interface BundleMetadata extends PatternMetadata {
-  renderFns: { hasBeforeRender: boolean; hasRender2D: boolean; hasRender: boolean }
+  renderFns: RenderFns
 }
 
 // ── AST utilities ────────────────────────────────────────────────────────────
@@ -30,20 +30,25 @@ function parseModule(src: string): unknown {
 
 // ── metadata extraction ──────────────────────────────────────────────────────
 
-const RENDER_FN_NAMES = new Set(['beforeRender', 'render2D', 'render'])
+const RENDER_FN_NAMES = new Set(['beforeRender', 'render2D', 'render', 'render3D'])
 const CONTROL_PREFIXES = ['hsvPicker', 'rgbPicker', 'slider', 'toggle'] as const
 
 function labelFromSuffix(suffix: string): string {
   return suffix.replace(/([A-Z])/g, ' $1').trim()
 }
 
-const SKIP_VAR_NAMES = new Set([...['beforeRender', 'render2D', 'render']])
+const SKIP_VAR_NAMES = new Set([...['beforeRender', 'render2D', 'render', 'render3D']])
 
 function extractMetadata(ast: unknown): BundleMetadata {
   const exportedVars: string[] = []
   const patternVars: string[] = []
   const controls: PatternMetadata['controls'] = []
-  const renderFns = { hasBeforeRender: false, hasRender2D: false, hasRender: false }
+  const renderFns: RenderFns = {
+    hasBeforeRender: false,
+    hasRender2D: false,
+    hasRender: false,
+    hasRender3D: false,
+  }
   const seen = new Set<string>()
 
   function addVar(name: string): void {
@@ -134,10 +139,11 @@ function extractPickerVars(decl: Record<string, unknown>): string[] {
   return paramNames.map((p) => assigned.get(p) ?? '')
 }
 
-function markRenderFn(name: string, fns: BundleMetadata['renderFns']): void {
+function markRenderFn(name: string, fns: RenderFns): void {
   if (name === 'beforeRender') fns.hasBeforeRender = true
   else if (name === 'render2D') fns.hasRender2D = true
   else if (name === 'render') fns.hasRender = true
+  else if (name === 'render3D') fns.hasRender3D = true
 }
 
 // ── library parsing ──────────────────────────────────────────────────────────

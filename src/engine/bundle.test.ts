@@ -49,12 +49,20 @@ describe('bundle — no library refs', () => {
     expect(metadata.renderFns.hasBeforeRender).toBe(true)
     expect(metadata.renderFns.hasRender2D).toBe(true)
     expect(metadata.renderFns.hasRender).toBe(false)
+    expect(metadata.renderFns.hasRender3D).toBe(false)
   })
 
   it('detects non-exported render functions', () => {
     const src = `function render(index) {}`
     const { metadata } = bundle(src, {})
     expect(metadata.renderFns.hasRender).toBe(true)
+  })
+
+  it('detects render3D', () => {
+    const src = `export function render3D(index, x, y, z) {}`
+    const { metadata } = bundle(src, {})
+    expect(metadata.renderFns.hasRender3D).toBe(true)
+    expect(metadata.renderFns.hasRender2D).toBe(false)
   })
 
   it('extracts slider controls', () => {

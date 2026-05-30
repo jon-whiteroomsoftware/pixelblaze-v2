@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { loadPattern } from './loadPattern'
-import type { PatternMetadata } from './loadPattern'
+import { loadPattern, nativeDimension } from './loadPattern'
+import type { PatternMetadata, RenderFns } from './loadPattern'
 
 // Minimal built-ins that let patterns run without reference errors
 const minimalBuiltins: Record<string, unknown> = {
@@ -50,6 +50,79 @@ describe('loadPattern handle', () => {
     const code = `export var x = 0;`
     const handle = loadPattern(code, meta(['x']), minimalBuiltins)
     expect(() => handle.render2D(0, 0.5, 0.5)).not.toThrow()
+  })
+
+  it('exposes a 1D render slot that dispatches to render(index)', () => {
+    const calls: number[] = []
+    const code = `function render(index) { calls.push(index); }`
+    const handle = loadPattern(code, meta([]), { ...minimalBuiltins, calls })
+    handle.render(5)
+    expect(calls).toEqual([5])
+  })
+
+  it('provides no-op render slot when the pattern does not define render', () => {
+    const code = `export var x = 0;`
+    const handle = loadPattern(code, meta(['x']), minimalBuiltins)
+    expect(() => handle.render(0)).not.toThrow()
+  })
+
+  it('dispatches render3D to render3D when defined', () => {
+    const calls: number[][] = []
+    const code = `function render3D(index, x, y, z) { calls.push([index, x, y, z]); }`
+    const handle = loadPattern(code, meta([]), { ...minimalBuiltins, calls })
+    handle.render3D(2, 0.1, 0.2, 0.3)
+    expect(calls).toEqual([[2, 0.1, 0.2, 0.3]])
+  })
+
+  it('render3D falls back to render2D, dropping z', () => {
+    const calls: number[][] = []
+    const code = `function render2D(index, x, y) { calls.push([index, x, y]); }`
+    const handle = loadPattern(code, meta([]), { ...minimalBuiltins, calls })
+    handle.render3D(2, 0.1, 0.2, 0.3)
+    expect(calls).toEqual([[2, 0.1, 0.2]])
+  })
+
+  it('render3D falls back to render, dropping x/y/z', () => {
+    const calls: number[] = []
+    const code = `function render(index) { calls.push(index); }`
+    const handle = loadPattern(code, meta([]), { ...minimalBuiltins, calls })
+    handle.render3D(7, 0.1, 0.2, 0.3)
+    expect(calls).toEqual([7])
+  })
+
+  it('provides no-op render3D when no render fn is defined', () => {
+    const code = `export var x = 0;`
+    const handle = loadPattern(code, meta(['x']), minimalBuiltins)
+    expect(() => handle.render3D(0, 0, 0, 0)).not.toThrow()
+  })
+})
+
+// ── nativeDimension ─────────────────────────────────────────────────────────
+
+describe('nativeDimension', () => {
+  function fns(over: Partial<RenderFns>): RenderFns {
+    return { hasBeforeRender: false, hasRender2D: false, hasRender: false, hasRender3D: false, ...over }
+  }
+
+  it('returns 1 for a render-only pattern', () => {
+    expect(nativeDimension(fns({ hasRender: true }))).toBe(1)
+  })
+
+  it('returns 2 for a render2D pattern', () => {
+    expect(nativeDimension(fns({ hasRender2D: true }))).toBe(2)
+  })
+
+  it('returns 3 for a render3D pattern', () => {
+    expect(nativeDimension(fns({ hasRender3D: true }))).toBe(3)
+  })
+
+  it('picks the highest render fn when several are defined', () => {
+    expect(nativeDimension(fns({ hasRender: true, hasRender2D: true, hasRender3D: true }))).toBe(3)
+  })
+
+  it('defaults to 2 when no render fn (or no metadata) is present', () => {
+    expect(nativeDimension(fns({}))).toBe(2)
+    expect(nativeDimension(undefined)).toBe(2)
   })
 })
 

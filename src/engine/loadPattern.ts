@@ -1,3 +1,12 @@
+// Which render functions a pattern defines. Threaded from bundle() so the
+// runtime can dispatch by dimensionality and the UI can label the pattern.
+export interface RenderFns {
+  hasBeforeRender: boolean
+  hasRender2D: boolean
+  hasRender: boolean
+  hasRender3D: boolean
+}
+
 export interface PatternMetadata {
   exportedVars: string[]
   patternVars: string[]  // all top-level var declarations, exported or not
@@ -9,13 +18,32 @@ export interface PatternMetadata {
     // in arg order. Lets the UI seed the swatch from the pattern's init values.
     pickerVars?: string[]
   }[]
+  // Present when produced by bundle(); absent in hand-built test metadata.
+  renderFns?: RenderFns
 }
 
 export interface PatternHandle {
   beforeRender: (delta: number) => void
+  // Dimensional render slots. Each dispatches at its own dimensionality and
+  // falls back down the chain render3D -> render2D -> render -> noop, so asking
+  // for a higher dimension than the pattern defines drops the extra coords.
+  render: (index: number) => void
   render2D: (index: number, x: number, y: number) => void
+  render3D: (index: number, x: number, y: number, z: number) => void
   getExports: () => Record<string, unknown>
   controls: Record<string, (...args: number[]) => void>
+}
+
+// A pattern's native dimensionality is the highest render fn it defines:
+// render3D -> 3, render2D -> 2, render -> 1. Drives the default layout picked
+// on open and the title-bar label (not per-frame dispatch). Patterns defining
+// no render fn fall back to 2 (the historical preview default).
+export function nativeDimension(renderFns: RenderFns | undefined): 1 | 2 | 3 {
+  if (!renderFns) return 2
+  if (renderFns.hasRender3D) return 3
+  if (renderFns.hasRender2D) return 2
+  if (renderFns.hasRender) return 1
+  return 2
 }
 
 export function loadPattern(
@@ -44,8 +72,10 @@ function buildEpilogue(metadata: PatternMetadata): string {
   return [
     'return {',
     '  beforeRender:typeof beforeRender==="function"?beforeRender:function(delta){},',
-    // Fall back to 1D render(index) if render2D is not defined
+    // Dimensional render slots with the fallback chain render3D -> render2D -> render -> noop.
+    '  render:typeof render==="function"?render:function(index){},',
     '  render2D:typeof render2D==="function"?render2D:(typeof render==="function"?function(index,x,y){render(index);}:function(index,x,y){}),',
+    '  render3D:typeof render3D==="function"?render3D:(typeof render2D==="function"?function(index,x,y,z){render2D(index,x,y);}:(typeof render==="function"?function(index,x,y,z){render(index);}:function(index,x,y,z){})),',
     `  getExports:function(){return{${getExportsEntries}};},`,
     `  controls:{${controlsEntries}},`,
     '};',
