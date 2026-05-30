@@ -5,6 +5,20 @@ export interface RendererGridConfig {
   diffusion?: number
 }
 
+// Hard ceiling on grid dimensions. A runaway value (e.g. a stale persisted
+// blob) would size the canvas and pixel loop to something that freezes the
+// tab, so every layer that accepts a dimension clamps to this. Engine is the
+// leaf module, so the constant lives here and the store/UI import it.
+export const MAX_GRID_DIM = 256
+
+export function clampGridDim(n: number): number {
+  return Math.max(1, Math.min(MAX_GRID_DIM, Math.floor(n) || 1))
+}
+
+function clampGrid<T extends RendererGridConfig>(grid: T): T {
+  return { ...grid, rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols) }
+}
+
 export interface Renderer {
   paint(pixels: [number, number, number][], brightness: number, dimmed: boolean): void
   updateGrid(grid: RendererGridConfig): void
@@ -13,7 +27,7 @@ export interface Renderer {
 const DIM_FACTOR = 0.15
 
 export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererGridConfig): Renderer {
-  let grid = initialGrid
+  let grid = clampGrid(initialGrid)
   const ctx = canvas.getContext('2d')
 
   function applySize(): void {
@@ -27,7 +41,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   if (!ctx) {
     return {
       paint: () => undefined,
-      updateGrid(newGrid) { grid = newGrid; applySize() },
+      updateGrid(newGrid) { grid = clampGrid(newGrid); applySize() },
     }
   }
 
@@ -67,7 +81,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   }
 
   function updateGrid(newGrid: RendererGridConfig): void {
-    grid = newGrid
+    grid = clampGrid(newGrid)
     applySize()
   }
 

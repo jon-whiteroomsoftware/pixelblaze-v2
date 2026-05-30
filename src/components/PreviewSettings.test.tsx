@@ -87,11 +87,11 @@ describe('PreviewSettings', () => {
     const user = userEvent.setup()
     render(<PreviewSettings />)
     await user.click(screen.getByRole('button', { name: /preview settings/i }))
-    // Default is the precise (fidelity) renderer
-    expect(screen.getByRole('radio', { name: 'Precise' })).toHaveAttribute('aria-checked', 'true')
-    await user.click(screen.getByRole('radio', { name: 'Fast' }))
-    expect(usePreviewStore.getState().fidelity).toBe('fast')
+    // Default on load is the fast (float64) renderer
     expect(screen.getByRole('radio', { name: 'Fast' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('radio', { name: 'Precise' }))
+    expect(usePreviewStore.getState().fidelity).toBe('fidelity')
+    expect(screen.getByRole('radio', { name: 'Precise' })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('grid size inputs show current rows and cols', async () => {
@@ -123,5 +123,17 @@ describe('PreviewSettings', () => {
     await user.clear(screen.getByRole('spinbutton', { name: /grid columns/i }))
     await user.type(screen.getByRole('spinbutton', { name: /grid columns/i }), '10{Enter}')
     expect(usePreviewStore.getState().grid.cols).toBe(10)
+  })
+
+  it('clamps an oversized grid entry to 256 on commit', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    await user.clear(screen.getByRole('spinbutton', { name: /grid columns/i }))
+    await user.type(screen.getByRole('spinbutton', { name: /grid columns/i }), '99999')
+    await user.click(screen.getByRole('button', { name: /ok/i }))
+    expect(usePreviewStore.getState().grid.cols).toBe(256)
+    // Draft input is corrected to the clamped value too
+    expect(screen.getByRole('spinbutton', { name: /grid columns/i })).toHaveValue(256)
   })
 })

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { clampGridDim } from '../engine/renderer'
 
 export interface GridConfig {
   rows: number
@@ -41,10 +42,11 @@ export const previewInitialState = {
     spacing: 20,
     diffusion: 0.5,
   },
-  // The Precise renderer (16.16 fixed-point) is the default; the Fast renderer
-  // is the float64 escape hatch. Transient session state for now — persistence
-  // is #90.
-  fidelity: 'fidelity' as FidelityMode,
+  // The Fast renderer (float64) is the default on load: it's the smoother,
+  // good-enough preview. The Precise renderer (16.16 fixed-point) is an opt-in
+  // for checking hardware-accurate behaviour — and even it isn't bit-exact
+  // without the device. Transient session state for now — persistence is #90.
+  fidelity: 'fast' as FidelityMode,
   watchedBuiltins: ['elapsed', 'pixelCount'] as string[],
   watchedPatternVars: [] as string[],
   watchValues: {} as Record<string, unknown>,
@@ -53,16 +55,23 @@ export const previewInitialState = {
   fps: null as number | null,
 }
 
+// Clamp a (possibly partial) grid's dimensions to the renderer's hard ceiling.
+// Guards against an absurdly large persisted value freezing the tab on load.
+function clampGrid(grid: GridConfig): GridConfig {
+  return { ...grid, rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols) }
+}
+
 // Deep-merge persisted state over the live state so a persisted `grid` that
 // predates a newly-added field (e.g. `diffusion`) falls back to its default
 // instead of arriving as `undefined`. The default shallow merge would replace
-// the whole grid object, dropping any key the saved blob never had.
+// the whole grid object, dropping any key the saved blob never had. Dimensions
+// are clamped here so a stale oversized blob can never reach the renderer.
 export function mergePersistedPreview(persisted: unknown, current: PreviewState): PreviewState {
   const p = (persisted ?? {}) as Partial<Pick<PreviewState, 'brightness' | 'speed' | 'grid'>>
   return {
     ...current,
     ...p,
-    grid: { ...current.grid, ...(p.grid ?? {}) },
+    grid: clampGrid({ ...current.grid, ...(p.grid ?? {}) }),
   }
 }
 
@@ -75,7 +84,7 @@ export const usePreviewStore = create<PreviewState>()(
       setFidelity: (fidelity) => set({ fidelity }),
       setSpeed: (speed) => set({ speed }),
       setBrightness: (brightness) => set({ brightness }),
-      setGrid: (partial) => set((s) => ({ grid: { ...s.grid, ...partial } })),
+      setGrid: (partial) => set((s) => ({ grid: clampGrid({ ...s.grid, ...partial }) })),
       setWatchedBuiltins: (watchedBuiltins) => set({ watchedBuiltins }),
       setWatchedPatternVars: (watchedPatternVars) => set({ watchedPatternVars }),
       setWatchValues: (watchValues) => set({ watchValues }),

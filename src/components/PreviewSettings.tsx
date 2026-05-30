@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Settings } from 'lucide-react'
 import { usePreviewStore } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
+import { MAX_GRID_DIM } from '@/engine/renderer'
 
 const PRIMARY_BUILTIN_VARS = ['elapsed', 'pixelCount']
 
@@ -60,8 +61,9 @@ export function PreviewSettings() {
   const [draftCols, setDraftCols] = useState(String(gridCols))
 
   function commitGridSize() {
-    const rows = Math.max(1, parseInt(draftRows, 10) || gridRows)
-    const cols = Math.max(1, parseInt(draftCols, 10) || gridCols)
+    const clamp = (n: number) => Math.min(MAX_GRID_DIM, Math.max(1, n))
+    const rows = clamp(parseInt(draftRows, 10) || gridRows)
+    const cols = clamp(parseInt(draftCols, 10) || gridCols)
     setDraftRows(String(rows))
     setDraftCols(String(cols))
     setGrid({ rows, cols })
@@ -181,6 +183,7 @@ export function PreviewSettings() {
                 aria-label="Grid columns"
                 type="number"
                 min={1}
+                max={MAX_GRID_DIM}
                 value={draftCols}
                 onChange={(e) => setDraftCols(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && commitGridSize()}
@@ -191,6 +194,7 @@ export function PreviewSettings() {
                 aria-label="Grid rows"
                 type="number"
                 min={1}
+                max={MAX_GRID_DIM}
                 value={draftRows}
                 onChange={(e) => setDraftRows(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && commitGridSize()}

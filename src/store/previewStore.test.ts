@@ -50,6 +50,20 @@ describe('previewStore', () => {
     expect(grid.cols).toBe(32)
   })
 
+  it('setGrid clamps dimensions above 256 to 256', () => {
+    usePreviewStore.getState().setGrid({ rows: 100000, cols: 257 })
+    const { grid } = usePreviewStore.getState()
+    expect(grid.rows).toBe(256)
+    expect(grid.cols).toBe(256)
+  })
+
+  it('setGrid clamps dimensions below 1 up to 1', () => {
+    usePreviewStore.getState().setGrid({ rows: 0, cols: -5 })
+    const { grid } = usePreviewStore.getState()
+    expect(grid.rows).toBe(1)
+    expect(grid.cols).toBe(1)
+  })
+
   it('starts with elapsed and pixelCount watched by default', () => {
     expect(usePreviewStore.getState().watchedBuiltins).toEqual(['elapsed', 'pixelCount'])
     expect(usePreviewStore.getState().watchedPatternVars).toEqual([])
@@ -86,5 +100,13 @@ describe('mergePersistedPreview', () => {
     const current = usePreviewStore.getState()
     const persisted = { grid: { rows: 16, cols: 16, spacing: 20, diffusion: 0.6 } }
     expect(mergePersistedPreview(persisted, current).grid.diffusion).toBe(0.6)
+  })
+
+  it('clamps an oversized persisted grid to 256 on load', () => {
+    const current = usePreviewStore.getState()
+    const persisted = { grid: { rows: 999999, cols: 500, spacing: 20, diffusion: 0.5 } }
+    const merged = mergePersistedPreview(persisted, current)
+    expect(merged.grid.rows).toBe(256)
+    expect(merged.grid.cols).toBe(256)
   })
 })
