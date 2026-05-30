@@ -42,8 +42,28 @@ The engine component that turns pattern source into a transpiled artifact: it pa
 **Var watcher**:
 The preview-pane table showing the live values of a pattern's `export var` globals, sampled after each rendered frame.
 
+**Pixel map** (or **map**):
+An ordered, explicitly-positioned set of points standing in for a physical LED installation — list position is the LED **index**, and each point carries where it sits in space. Workspace-owned and selectable per pattern (a controller is an optional downstream consumer, not a prerequisite). A uniform grid is the simplest map, not a separate concept.
+_Avoid_: layout, geometry, coordinate set, pixel mapping.
+
 **Preview grid**:
-The configurable matrix of glowing LED dots (Canvas 2D) that stands in for a physical LED installation. A single global grid, not per-pattern.
+The degenerate **map**: a uniform 2D plane of glowing LED dots (Canvas 2D). Historically the only layout (a single global grid); now the default stock 2D map, with its rows/cols/spacing reframed as that map's generator parameters.
+
+**Dimensionality** (of a pattern or map):
+Which of **1D / 2D / 3D** a pattern runs as, or a map supplies — always the **display/layout** dimension, never a coordinate-argument count. Named by the render fn via a bijection: `render` → 1D, `render2D` → 2D, `render3D` → 3D. A `render()` pattern is **1D** even though it takes zero coordinates, because a strip of LEDs is inherently a 1D layout. A pattern's dimensionality is the highest render fn it defines.
+_Avoid_: sampling dimensionality (collapses display dimension with arg count — they differ), dimension count.
+
+**Sample / position** (of a map point):
+Two independent per-point channels. **sample** — the coordinates fed to the render fn (`[]` for 1D, `[x,y]` for 2D, `[x,y,z]` for 3D); always owned by the **map**. **pos** — where the dot is *drawn* (a 2D or 3D point). `pos` is **dual-sourced**: *map-intrinsic* when the map encodes real geometry (grid, cube, a measured installation), but *viewport-supplied* when the pattern leaves position free (a 1D `render()` pattern, whose `sample` is empty — see **Shape**). They coincide for a grid; they diverge for a ring (sample `[]`, pos a 2D circle, viewport-supplied) or a 2D-on-3D drape (sample `[x,y]`, pos 3D, map-intrinsic).
+_Avoid_: using "coordinates" unqualified — say sample or pos.
+
+**Shape** (viewport embedding):
+The cosmetic path a 1D pattern's pixels are *drawn* along — line, ring, polygon, helix/spiral. Because a 1D `render()` pattern's `sample` is empty, the shape changes only `pos`, never what the pattern computes, so it belongs to the **viewport**, not the map. A shape becomes *semantic* (real pattern input) only when the pattern consumes coordinates — at which point it is a 2D/3D **map**, not a shape. In the UI a single "Shape" dropdown spans both; in code the cosmetic 1D shapes are viewport embeddings and the semantic 2D/3D shapes are maps. A shape's display dimension may exceed the pattern's (a 1D pattern on a helix displays in 3D).
+_Avoid_: calling a 1D shape a "map"; calling a 2D/3D map a "shape."
+
+**Viewport** (or **camera**):
+The display side of the preview — orbit/turntable, the uniform spacing scale, fit-to-container, depth cueing, the `diffusion` blur, and (for 1D) the shape embedding. Owns everything about *how* pixels are drawn; owns nothing the pattern can observe (spacing and shape stay invisible to a pattern because `sample` is normalized independently). The viewport's control set is gated on the *display* dimension (a 3D embedding shows orbit controls even for a 1D pattern), not the pattern's dimensionality.
+_Avoid_: conflating viewport spacing with map geometry — spacing never reaches `sample`.
 
 **Precise renderer**:
 The default renderer, running the preview with the same 16.16 fixed-point numeric behaviour as the hardware (range ±32768, precision ~1/65536, int32-wrap overflow, faithful multiply) so that what the preview shows matches what a physical Pixelblaze does. The underlying numeric behaviour is _fixed-point fidelity_.
