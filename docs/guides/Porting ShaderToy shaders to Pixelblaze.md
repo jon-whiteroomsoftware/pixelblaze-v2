@@ -228,5 +228,5 @@ These rely on GPU features Pixelblaze's per-pixel model has no equivalent for. T
 
 - `src/pixelblaze/lib/Shader.js` — the library inventory and the out-var contract, in code.
 - `src/pixelblaze/demos/Kishimisu.js`, `NeonSquircles.js` — worked ports built on `Shader.*` (`toUV`, `fract`, `iqPalette`, `rot2`).
-- `docs/prd/Feature — Hardware-Fidelity Preview & ShaderToy Porting.md` — why Fidelity is the default and how the two divergences (numeric vs algorithmic) differ.
+- `docs/prd/Feature - Hardware-Fidelity Preview & ShaderToy Porting.md` — why Fidelity is the default and how the two divergences (numeric vs algorithmic) differ.
 - `docs/adr/0003-fixed-point-fidelity-default.md` — the fixed-point fidelity decision.

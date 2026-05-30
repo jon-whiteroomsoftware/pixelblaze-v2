@@ -227,7 +227,7 @@ Markdown in `docs/` (in-app surfacing deferred). Audience: *someone who found a 
 ```
 docs/
   prd/
-    Feature — Hardware-Fidelity Preview & ShaderToy Porting.md   (this doc)
+    Feature - Hardware-Fidelity Preview & ShaderToy Porting.md   (this doc)
   adr/
     0001-... (superseded)   0003-fixed-point-fidelity-default.md
   guides/

@@ -3,7 +3,7 @@
 **Status:** in progress — Phase 1 shipped (comms layer #106, manual divergence harness #107) and the Phase 2 capability spike landed (#108); the UI arc (Phases 2–3) remains ungreenlit, with the bytecode-push go/no-go open (#112)
 **Type:** Feature PRD (companion to `Pixelblaze IDE v2 PRD.md`)
 **Supersedes:** the main PRD's deferred "Hardware upload" bullet (Deferred → Hardware upload)
-**Related:** `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md` (this feature unblocks its divergence harness); ADR-0002 (main-thread execution); **ADR-0004 (to be written) — local bridge for hardware connectivity**
+**Related:** `Feature - Hardware-Fidelity Preview & ShaderToy Porting.md` (this feature unblocks its divergence harness); ADR-0002 (main-thread execution); **ADR-0004 (to be written) — local bridge for hardware connectivity**
 
 ---
 
@@ -132,7 +132,7 @@ Not designed. Recorded as direction:
 ```
 docs/
   prd/
-    Feature — Hardware Connectivity.md          (this doc)
+    Feature - Hardware Connectivity.md          (this doc)
   adr/
     0004-local-bridge-hardware-connectivity.md  (to be written, bridge phase)
 src/

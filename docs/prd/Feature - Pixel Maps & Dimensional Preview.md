@@ -3,7 +3,7 @@
 **Status:** proposed — not yet greenlit
 **Type:** Feature PRD (companion to `Pixelblaze IDE v2 PRD.md`)
 **Supersedes:** the main PRD's Deferred items "1D `render(index)` support" and "`render3D` support"; reframes the single global **Preview grid** as the degenerate case of a first-class **map**
-**Related:** ADR-0002 (main-thread execution — unchanged; its deferred-worker analysis now lives in *Threading model* below); ADR-0003 (fixed-point fidelity — the new spatial layer must preserve its numeric seam); **ADR-0004 (`pixelCount` modeled independently of the map)** and **ADR-0005 (display `pos` is dual-sourced: map-intrinsic geometry vs. viewport shape embedding)** — the two data-model decisions this feature rests on; `Feature — Hardware Connectivity.md` (Phase 3 map push/pull rides its local bridge)
+**Related:** ADR-0002 (main-thread execution — unchanged; its deferred-worker analysis now lives in *Threading model* below); ADR-0003 (fixed-point fidelity — the new spatial layer must preserve its numeric seam); **ADR-0004 (`pixelCount` modeled independently of the map)** and **ADR-0005 (display `pos` is dual-sourced: map-intrinsic geometry vs. viewport shape embedding)** — the two data-model decisions this feature rests on; `Feature - Hardware Connectivity.md` (Phase 3 map push/pull rides its local bridge)
 
 ---
 
@@ -255,7 +255,7 @@ Make a workspace map deployable to, and readable from, a real device — as a **
 
 - **Push** — write a selected map to the device's single map slot. Guarded and explicit, because it overwrites the installation's physical-layout description (destructive if that map was measured by hand). Likely a confirmation + a clear "this configures the device, not the pattern" framing.
 - **Pull / read-back** — import the device's current map into the IDE, so the preview reflects what's actually deployed. Arguably the safer and more useful first direction.
-- **Transport** — reuses `PixelblazeConnection` and the local bridge from `Feature — Hardware Connectivity.md`; map read/write protocol support is a capability to confirm in that feature's Phase 2 spike. No new transport here.
+- **Transport** — reuses `PixelblazeConnection` and the local bridge from `Feature - Hardware Connectivity.md`; map read/write protocol support is a capability to confirm in that feature's Phase 2 spike. No new transport here.
 - **Convenience composite (optional)** — "deploy this pattern *and* ensure the device's map is X," with eyes open that it touches physical-layout config.
 
 ---
@@ -265,7 +265,7 @@ Make a workspace map deployable to, and readable from, a real device — as a **
 ```
 docs/
   prd/
-    Feature — Pixel Maps & Dimensional Preview.md     (this doc)
+    Feature - Pixel Maps & Dimensional Preview.md     (this doc)
 src/
   engine/
     camera.ts          → NEW pure projection/orbit/depth/fit/light-size-scale
