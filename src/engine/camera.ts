@@ -69,3 +69,12 @@ export function projectIndex(index: number, grid: Locked2DGrid): [number, number
   const y = 1 - ((row + 0.5) / rows) * 2
   return [x, y]
 }
+
+// Project a normalized [0,1]² display position (a map's intrinsic `pos`, or a
+// viewport shape embedding) into WebGL clip space [-1,1]² with the y axis up.
+// The locked-2D camera's pos path, parallel to the index path above; unlike
+// `projectIndex` it draws wherever `pos` says, so it carries 1D shapes (line,
+// ring) and any non-grid layout.
+export function projectPos(pos: [number, number]): [number, number] {
+  return [pos[0] * 2 - 1, 1 - pos[1] * 2]
+}

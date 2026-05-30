@@ -5,6 +5,7 @@ import {
   MAX_PIXEL_COUNT,
   pointSize,
   projectIndex,
+  projectPos,
   type Locked2DGrid,
 } from './camera'
 
@@ -22,6 +23,11 @@ function clampGrid<T extends RendererGridConfig>(grid: T): T {
 export interface Renderer {
   paint(pixels: [number, number, number][], brightness: number, dimmed: boolean): void
   updateGrid(grid: RendererGridConfig): void
+  // Drive the draw positions from a viewport shape embedding (1D line/ring) given
+  // as normalized [0,1]² `pos` per index, or `null` to fall back to the locked-2D
+  // grid (`projectIndex`). The grid path is left untouched when null, so the
+  // reveal-2D plane is bit-for-bit unchanged.
+  setShapePositions(positions: [number, number][] | null): void
 }
 
 const DIM_FACTOR = 0.15
@@ -87,6 +93,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     return {
       paint: () => undefined,
       updateGrid(newGrid) { grid = clampGrid(newGrid); applySize() },
+      setShapePositions: () => undefined,
     }
   }
 
@@ -102,14 +109,25 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   // (x,y) per drawable index; `drawCount` is how many of those we actually draw.
   let positions = new Float32Array(0)
   let drawCount = 0
+  // When set, draw positions come from a viewport shape embedding (1D path)
+  // rather than the locked-2D grid. Null keeps the legacy grid path.
+  let shapePos: [number, number][] | null = null
 
   function rebuildPositions(): void {
-    const cap = Math.min(grid.rows * grid.cols, MAX_PIXEL_COUNT)
     const coords: number[] = []
-    for (let i = 0; i < cap; i++) {
-      const clip = projectIndex(i, grid)
-      if (!clip) break
-      coords.push(clip[0], clip[1])
+    if (shapePos) {
+      const cap = Math.min(shapePos.length, MAX_PIXEL_COUNT)
+      for (let i = 0; i < cap; i++) {
+        const [x, y] = projectPos(shapePos[i])
+        coords.push(x, y)
+      }
+    } else {
+      const cap = Math.min(grid.rows * grid.cols, MAX_PIXEL_COUNT)
+      for (let i = 0; i < cap; i++) {
+        const clip = projectIndex(i, grid)
+        if (!clip) break
+        coords.push(clip[0], clip[1])
+      }
     }
     positions = new Float32Array(coords)
     drawCount = coords.length / 2
@@ -164,7 +182,13 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     colorData = colors()
   }
 
-  return { paint, updateGrid }
+  function setShapePositions(p: [number, number][] | null): void {
+    shapePos = p
+    rebuildPositions()
+    colorData = colors()
+  }
+
+  return { paint, updateGrid, setShapePositions }
 }
 
 function clamp01(v: number): number {
