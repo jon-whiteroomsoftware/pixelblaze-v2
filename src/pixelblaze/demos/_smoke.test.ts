@@ -53,7 +53,7 @@ function runDemo(file: string, mode: 'fast' | 'fidelity' = 'fast') {
 }
 
 describe('demo smoke tests', () => {
-  for (const file of ['PlasmaNebula.js', 'Caustics.js', 'KaleidoBloom.js', 'Kishimisu.js']) {
+  for (const file of ['PlasmaNebula.js', 'Caustics.js', 'KaleidoBloom.js', 'Kishimisu.js', 'PhantomStar.js']) {
     it(`${file} bundles, runs, lights pixels, and exposes sliders`, () => {
       let result!: ReturnType<typeof runDemo>
       expect(() => { result = runDemo(file) }).not.toThrow()
@@ -70,7 +70,7 @@ describe('demo smoke tests', () => {
 
   // Shader-library demos with fewer than 4 controls sit outside the loop above
   // (NeonSquircles has 1 slider; ShaderShowcase has 2) — still guard the ports.
-  for (const file of ['NeonSquircles.js', 'ShaderShowcase.js', 'ZippyZaps.js']) {
+  for (const file of ['NeonSquircles.js', 'ShaderShowcase.js', 'ZippyZaps.js', 'IQPalettes.js']) {
     for (const mode of ['fast', 'fidelity'] as const) {
       it(`${file} bundles, runs, and lights pixels (${mode})`, () => {
         let result!: ReturnType<typeof runDemo>

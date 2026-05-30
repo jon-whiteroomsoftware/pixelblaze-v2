@@ -21,7 +21,7 @@ import {
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
 
-const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps']
+const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
 const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom']
 const GROUPED_DEMOS = new Set([...OPENGL_DEMOS, ...BRAND_NEW_DEMOS])
 

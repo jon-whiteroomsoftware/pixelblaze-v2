@@ -182,11 +182,29 @@ Patterns run **on the main thread** (ADR-0002), and Fidelity's fixed-point arith
 
 ---
 
-## 4. Worked example
+## 4. Worked examples
 
-> _Stub — to be completed by the cold port in #97._
->
-> A classic ShaderToy shader, ported start-to-finish strictly through this guide, will live here: the original GLSL, the scalar-flattened plan, the finished Pixelblaze pattern, and a note on every gotcha it tripped. Any gap the port surfaces (a missing `Shader.*` helper, an unclear mapping) gets folded back into the library and this guide rather than worked around locally.
+Two shaders ported start-to-finish strictly through this guide. Read the headers in the demo files — each documents its GLSL source, the scalar-flattened plan, and every gotcha it tripped, inline next to the code.
+
+### A. IQ Palettes — the clean case (`src/pixelblaze/demos/IQPalettes.js`)
+
+Inigo Quilez's cosine-palette reference card. The shader's core (`a + b*cos(2π(c·t+d))`) maps **1:1 onto `Shader.iqPalette`**, so this is the port where the toolkit does almost all the work. What's still worth noting — the decisions the guide tells you to make:
+
+- It uses **raw `[0,1]` uv** (`fragCoord/iResolution`), not the centred short-axis idiom — so we use `render2D`'s `x, y` directly and *don't* route through `Shader.toUV`. (Knowing when *not* to centre is itself part of the mapping.)
+- `smoothstep(0.49, 0.47, …)` has **descending edges**, which Pixelblaze's `smoothstep` doesn't accept — rewritten as `1 - smoothstep(0.47, 0.49, …)`.
+- `fract` → `Shader.fract` (Gotcha C), even though the argument is non-negative here.
+- No magic-constant hash and no large constants, so Gotcha A never fires — confirmed by the Fidelity smoke test.
+
+No library gap surfaced: a faithful, bit-identical port built only from `Shader.*` + built-ins.
+
+### B. Phantom Star — the gotcha case (`src/pixelblaze/demos/PhantomStar.js`)
+
+A volumetric raymarched IFS fractal (aiekick's "Phantom Mode"). Heavier and less mechanical — it surfaced two things the clean case didn't:
+
+- **Gotcha E in practice.** A ~95-step raymarcher with a 5-iteration fold per step is far over budget if ported naïvely. The fix is faithful, not a shortcut: every `rot(iTime*…)` angle in the fold is **time-only, not position-dependent**, so all that `sin`/`cos` is hoisted into `beforeRender` and computed once per frame instead of per-step per-pixel.
+- **The `fx` identifier shadow.** Naming a local `var fx` (an obvious choice for "the folded x") **silently breaks the Precise renderer** — the emitted fixed-point code addresses its runtime as `fx`, so the local shadows it and `fx.lt(…)` reads your number instead. The Fast renderer hides this; the Precise smoke test caught it immediately. Lesson folded into the library notes: never shadow `fx`.
+
+No new `Shader.*` helper was needed for either, which is the result #97 was checking for — the existing library + built-ins cover a fresh, non-trivial port.
 
 ---
 
