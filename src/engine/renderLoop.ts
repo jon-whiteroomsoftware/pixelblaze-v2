@@ -86,14 +86,15 @@ export function createRenderLoop(config: RenderLoopConfig): RenderLoop {
     }
     // Windowed FPS: count the frames elapsed since the window opened and report
     // the average once it fills, smoothing per-frame jitter and capping updates
-    // at ~2/sec. The opening frame marks t0 and isn't itself counted.
+    // at ~2/sec. The opening frame marks t0 and isn't itself counted. Reported
+    // unrounded; the readout formats to one decimal place.
     if (fpsWindowStart === null) {
       fpsWindowStart = ts
     } else {
       fpsFrames++
       const windowMs = ts - fpsWindowStart
       if (windowMs >= FPS_WINDOW_MS) {
-        config.onFps?.(Math.round((fpsFrames * 1000) / windowMs))
+        config.onFps?.((fpsFrames * 1000) / windowMs)
         fpsWindowStart = ts
         fpsFrames = 0
       }

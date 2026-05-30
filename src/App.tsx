@@ -53,7 +53,6 @@ function Splitter({ onDrag }: { onDrag: (dx: number) => void }) {
 export default function App() {
   const isRunning = usePreviewStore((s) => s.isRunning)
   const toggle = usePreviewStore((s) => s.toggle)
-  const fps = usePreviewStore((s) => s.fps)
 
   const activePatternId = usePatternStore((s) => s.activePatternId)
   const activeLibraryName = usePatternStore((s) => s.activeLibraryName)
@@ -269,14 +268,6 @@ export default function App() {
           <PaneHeader>
             <span className="flex-1 min-w-0 flex items-center">
               <span className="truncate">{previewPatternName || '—'}</span>
-              {fps !== null && (
-                <span
-                  className="shrink-0 ml-2 text-[12px] font-mono tabular-nums text-zinc-600 leading-none"
-                  title="Frames per second"
-                >
-                  {fps}fps
-                </span>
-              )}
             </span>
             <PreviewSettings />
             <SpeedSelector />

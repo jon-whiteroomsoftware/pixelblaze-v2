@@ -148,8 +148,8 @@ export function PreviewSettings() {
                   className="flex rounded border border-zinc-700 overflow-hidden"
                 >
                   {([
-                    ['fidelity', 'Fidelity', 'Fidelity (16.16 fixed-point, hardware-accurate)'],
-                    ['fast', 'Precision', 'Precision (float64, fast preview)'],
+                    ['fast', 'Fast', 'Fast (float64, plain JS preview)'],
+                    ['fidelity', 'Precise', 'Precise (16.16 fixed-point, hardware-accurate)'],
                   ] as const).map(([value, label, title]) => (
                     <button
                       key={value}

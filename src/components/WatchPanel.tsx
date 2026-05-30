@@ -16,22 +16,39 @@ export function WatchPanel() {
   const watchedBuiltins = usePreviewStore((s) => s.watchedBuiltins)
   const watchedPatternVars = usePreviewStore((s) => s.watchedPatternVars)
   const watchValues = usePreviewStore((s) => s.watchValues)
+  const fps = usePreviewStore((s) => s.fps)
+  const fidelity = usePreviewStore((s) => s.fidelity)
 
-  const hasBuiltins = watchedBuiltins.length > 0
   const hasPatternVars = watchedPatternVars.length > 0
-
-  if (!hasBuiltins && !hasPatternVars) return null
+  // The built-ins area always shows the fps / renderer readout. fps and renderer
+  // hold the left column down rows 1 and 2; the watched built-ins flow into the
+  // right column, so the default reads:
+  //   fps        elapsed
+  //   renderer   pixelCount
+  // Any further watched built-ins wrap onto the rows below.
+  const fpsValue = fps === null ? '—' : fps.toFixed(1)
+  const rendererValue = fidelity === 'fast' ? 'fast' : 'precise'
+  const builtinCells: { name: string; value: string }[] = [{ name: 'fps', value: fpsValue }]
+  if (watchedBuiltins[0] !== undefined) {
+    builtinCells.push({ name: watchedBuiltins[0], value: formatValue(watchValues[watchedBuiltins[0]]) })
+  }
+  builtinCells.push({ name: 'renderer', value: rendererValue })
+  for (let i = 1; i < watchedBuiltins.length; i++) {
+    builtinCells.push({ name: watchedBuiltins[i], value: formatValue(watchValues[watchedBuiltins[i]]) })
+  }
 
   return (
     <div className="font-mono text-xs border-t border-zinc-800 mt-2 pt-2 pb-3 pr-3">
-      {hasBuiltins && (
-        <section className="mb-3">
-          <h4 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-1">
-            Built-ins
-          </h4>
-          <WatchRows names={watchedBuiltins} values={watchValues} />
-        </section>
-      )}
+      <section className="mb-3">
+        <h4 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-1">
+          Built-ins
+        </h4>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+          {builtinCells.map((cell) => (
+            <ReadoutCell key={cell.name} name={cell.name} value={cell.value} />
+          ))}
+        </div>
+      </section>
       {hasPatternVars && (
         <section>
           <h4 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-1">
@@ -40,6 +57,15 @@ export function WatchPanel() {
           <WatchRows names={watchedPatternVars} values={watchValues} />
         </section>
       )}
+    </div>
+  )
+}
+
+function ReadoutCell({ name, value }: { name: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2 min-w-0">
+      <span className="text-zinc-400 truncate">{name}</span>
+      <span className="text-amber-400 tabular-nums truncate">{value}</span>
     </div>
   )
 }

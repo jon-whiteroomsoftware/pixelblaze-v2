@@ -338,11 +338,12 @@ describe('onFps', () => {
       paint: vi.fn(), onFps,
     })
     loop.start()
-    // Open the window at t0, then 30 frames ~16.67ms apart filling 500ms → 60fps
+    // Open the window at t0, then 30 frames ~16.67ms apart filling 500ms → 60fps.
+    // Reported unrounded, so assert against the float (the readout formats it).
     frame(0)
     for (let i = 1; i <= 30; i++) frame(i * (500 / 30))
     expect(onFps).toHaveBeenCalledOnce()
-    expect(onFps).toHaveBeenCalledWith(60)
+    expect(onFps.mock.calls[0][0]).toBeCloseTo(60, 5)
   })
 
   it('does not report before the window fills', () => {

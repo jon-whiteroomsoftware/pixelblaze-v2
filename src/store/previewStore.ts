@@ -41,8 +41,9 @@ export const previewInitialState = {
     spacing: 20,
     diffusion: 0.5,
   },
-  // Fidelity (16.16 fixed-point) is the default; Fast preview is the float64
-  // escape hatch. Transient session state for now — persistence is #90.
+  // The Precise renderer (16.16 fixed-point) is the default; the Fast renderer
+  // is the float64 escape hatch. Transient session state for now — persistence
+  // is #90.
   fidelity: 'fidelity' as FidelityMode,
   watchedBuiltins: ['elapsed', 'pixelCount'] as string[],
   watchedPatternVars: [] as string[],

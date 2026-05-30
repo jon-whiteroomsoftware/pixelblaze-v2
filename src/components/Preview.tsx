@@ -66,8 +66,9 @@ export function Preview() {
 
     const clock = createVirtualClock()
     const shimConfig = { grid: gridWithDims, getVirtualTime: () => clock.getTime() }
-    // Fidelity mode runs the 16.16 fixed-point emit + shim; Fast preview runs
-    // the plain float64 emit + shim. The hardware `code` artifact is unaffected.
+    // The Precise renderer runs the 16.16 fixed-point emit + shim; the Fast
+    // renderer runs the plain float64 emit + shim. The hardware `code` artifact
+    // is unaffected.
     const shim = fidelity === 'fast' ? createShim(shimConfig) : createFxShim(shimConfig)
     shimRef.current = shim
 

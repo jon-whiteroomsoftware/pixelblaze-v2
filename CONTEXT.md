@@ -45,13 +45,13 @@ The preview-pane table showing the live values of a pattern's `export var` globa
 **Preview grid**:
 The configurable matrix of glowing LED dots (Canvas 2D) that stands in for a physical LED installation. A single global grid, not per-pattern.
 
-**Fixed-point fidelity**:
-Running the preview with the same 16.16 fixed-point numeric behaviour as the hardware (range ±32768, precision ~1/65536, int32-wrap overflow, faithful multiply) so that what the preview shows matches what a physical Pixelblaze does. The default preview mode.
-_Avoid_: emulation accuracy, hardware mode.
+**Precise renderer**:
+The default renderer, running the preview with the same 16.16 fixed-point numeric behaviour as the hardware (range ±32768, precision ~1/65536, int32-wrap overflow, faithful multiply) so that what the preview shows matches what a physical Pixelblaze does. The underlying numeric behaviour is _fixed-point fidelity_.
+_Avoid_: Fidelity mode, emulation accuracy, hardware mode.
 
-**Fast preview**:
-The opt-out escape hatch that renders in plain float64 instead of fixed-point fidelity, for smooth editing of heavy patterns that are too slow under fidelity. A speed-over-truth toggle.
-_Avoid_: float mode, preview accuracy off.
+**Fast renderer**:
+The opt-out escape hatch that renders in plain float64 instead of fixed-point fidelity, for smooth editing of heavy patterns that are too slow under the Precise renderer. A speed-over-truth toggle.
+_Avoid_: fast preview, float mode, preview accuracy off.
 
 **Divergence**:
 A difference between preview output and real-hardware output. Two independent kinds: _numeric divergence_ (float64 vs 16.16 — closed by fixed-point fidelity) and _algorithmic divergence_ (the shim's `perlin`/`prng`/transcendentals implementing different algorithms than firmware — documented, not chased).

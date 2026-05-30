@@ -6,7 +6,7 @@ You found a shader on [ShaderToy](https://www.shadertoy.com) you want running on
 
 **What does the mechanical work:** the `Shader` library (`src/pixelblaze/lib/Shader.js`) fills the GLSL gaps Pixelblaze's built-ins don't already cover — a floor-based `fract`, `step`, vector helpers, the IQ palette, a hardware-safe hash. It is loaded automatically; call it as `Shader.*` with no import. It deliberately **never re-implements a built-in** — `mix`, `smoothstep`, `clamp`, `mod`, `hypot` are already there and GLSL-shaped, so you map straight onto them.
 
-**The one thing to internalise:** the preview defaults to **Fidelity mode**, which emulates the hardware's 16.16 fixed-point arithmetic. That is the point — a pattern that looks right in Fidelity will look right on the device. The most common GLSL idiom that *looks* fine but breaks on hardware is the magic-constant hash (`fract(sin(x)*43758.5453)`); see [Gotcha A](#a-the-1616-overflow-cliff-the-1-porting-hazard).
+**The one thing to internalise:** the preview defaults to the **Precise renderer**, which emulates the hardware's 16.16 fixed-point arithmetic. That is the point — a pattern that looks right under the Precise renderer will look right on the device. The most common GLSL idiom that *looks* fine but breaks on hardware is the magic-constant hash (`fract(sin(x)*43758.5453)`); see [Gotcha A](#a-the-1616-overflow-cliff-the-1-porting-hazard).
 
 ---
 
@@ -15,8 +15,8 @@ You found a shader on [ShaderToy](https://www.shadertoy.com) you want running on
 1. **Draft and verify in ShaderToy first.** Get the original rendering correctly in the browser so you have a reference image to compare against. Note its `iTime`, `iResolution`, and `iMouse` dependencies.
 2. **Flatten vectors to scalars.** Pixelblaze has no `vec2`/`vec3`/`mat2` and no per-pixel dynamic allocation (the only allocatable type is the array, and arrays can't be freed). Rewrite each vector as its scalar components — `vec2 p` becomes `px, py` — *on paper* before you touch the editor. This is the bulk of the manual work; see the [mapping reference](#2-mapping-reference).
 3. **Port the body** into `render2D(index, x, y)`, substituting built-ins and `Shader.*` per the mapping table. Lift per-frame uniforms (`iTime`) into `beforeRender`.
-4. **Check in Fidelity preview.** Compare side-by-side with your ShaderToy reference. Most divergence at this stage is one of the five [gotchas](#3-gotchas) — overflow, aspect, `fract`/`frac`, `iTime`, or perf.
-5. **Tune.** Expose the shader's magic numbers as `export var` sliders so you can dial it in live. Drop to **Fast preview** (the float64 escape hatch) if a heavy pattern is too slow to iterate on, but always do the final check in Fidelity.
+4. **Check in the Precise renderer.** Compare side-by-side with your ShaderToy reference. Most divergence at this stage is one of the five [gotchas](#3-gotchas) — overflow, aspect, `fract`/`frac`, `iTime`, or perf.
+5. **Tune.** Expose the shader's magic numbers as `export var` sliders so you can dial it in live. Drop to the **Fast renderer** (the float64 escape hatch) if a heavy pattern is too slow to iterate on, but always do the final check in the Precise renderer.
 
 ---
 
@@ -114,7 +114,7 @@ float h = fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 1. **Unrepresentable constant.** `43758.5453` is comfortably inside ±32768, but the intermediate `value × 65536` (how the raw int is formed) and the products built from these large magic numbers **overflow int32 and wrap** rather than saturating. The hash's whole job is to *amplify* tiny input differences into chaos, so an overflow-wrap doesn't degrade gracefully — it produces a *different* chaotic value than the GPU, and the texture is wrong.
 2. **`sin` is algorithmically divergent.** Even with no overflow, the firmware's `sin` is not bit-identical to the preview's (ADR-0003). Feeding a divergent `sin` into a hash multiplies the divergence.
 
-In a float64 "fast preview" both problems are invisible — which is exactly why **Fidelity mode is the default**. It surfaces the bug before you upload.
+Under the float64 **Fast renderer** both problems are invisible — which is exactly why the **Precise renderer is the default**. It surfaces the bug before you upload.
 
 **The fix:** don't port the magic-constant hash at all. Use the library's integer hash, which is pure multiply/add over representable constants and **validated bit-identical preview↔hardware** (divergence harness, fw 3.67):
 
@@ -175,8 +175,8 @@ Use `t` anywhere the shader used `iTime`. For values that should loop cleanly, p
 
 Patterns run **on the main thread** (ADR-0002), and Fidelity's fixed-point arithmetic is **~3–8× slower** than float64. Your cost is roughly *pixels × per-pixel work*, and ShaderToy shaders love per-pixel loops (octaves, raymarch steps).
 
-- 16×16 and 32×32 grids with typical fragment shaders stay interactive in Fidelity.
-- Deep raymarchers on 64×64 will not — that's what the **Fast preview** toggle is for (iterate in float64, do the final fidelity check at the grid size you'll actually run).
+- 16×16 and 32×32 grids with typical fragment shaders stay interactive under the Precise renderer.
+- Deep raymarchers on 64×64 will not — that's what the **Fast renderer** toggle is for (iterate in float64, do the final precise check at the grid size you'll actually run).
 - **No dynamic allocation in the hot path.** Arrays are the only allocatable type and can't be freed, so allocating per-pixel leaks. Pre-allocate any array once at module scope.
 - A syntactically valid infinite loop **freezes the tab** (main-thread execution) — bound every loop with a constant or a slider-fed count, never a data-dependent `while` that might not terminate.
 

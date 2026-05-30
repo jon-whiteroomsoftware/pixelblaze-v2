@@ -13,7 +13,7 @@ This feature makes the IDE preview **faithful to Pixelblaze hardware's 16.16 fix
 
 It ships in four phases:
 
-1. **Hardware-fidelity preview** — a 16.16 fixed-point emulation engine, the default render mode, with a float64 "fast preview" escape hatch.
+1. **Hardware-fidelity preview** — a 16.16 fixed-point emulation engine (the default "Precise" renderer), with a float64 "Fast" renderer escape hatch.
 2. **De-bug existing assets** — fix the latent hardware bugs the fidelity engine now exposes (notably `Noise.js` hashes and `PlasmaNebula`'s star hash) and the square-grid coordinate assumptions.
 3. **`Shader` library + porting guide** — the porting-specific abstraction layer and documentation.
 4. **Demo overhaul** — harden all five shader-style demos, refactor the two explicit ports onto `Shader.*`, and validate the toolkit with one fresh cold port done strictly through the guide.
@@ -94,12 +94,12 @@ The fixed-point emit wraps each operator node from the Acorn AST in an `fx` help
 - The runtime (`loadPattern`) chooses the emit based on the active fidelity mode and evaluates via the existing `new Function(...builtins, body)` path, injecting the **fixed-point built-in shim** (raw-in/raw-out wrappers) instead of the float64 shim when in fidelity mode.
 - Numeric literals and built-in constants (`PI`, `PI2`, …) are converted to raw at emit time.
 
-### Fast-preview escape hatch
+### Fast-renderer escape hatch
 
-- A per-pattern toggle: **Fidelity** (default) ↔ **Fast preview** (float64).
+- A per-pattern toggle: **Precise** (default) ↔ **Fast** (float64).
 - Heaviness is intrinsic to a pattern, so the choice is **persisted with the pattern** (extends the IndexedDB pattern record), not held only in transient session state.
-- Surfaced as a preview-pane control near playback. Default for new and imported patterns is Fidelity.
-- (Future, not v1: auto-suggest fast preview when a pattern's fidelity frame time exceeds a budget.)
+- Surfaced as a preview-pane control near playback. Default for new and imported patterns is the Precise renderer.
+- (Future, not v1: auto-suggest the Fast renderer when a pattern's frame time under the Precise renderer exceeds a budget.)
 
 ### Divergence harness
 
@@ -218,7 +218,7 @@ Markdown in `docs/` (in-app surfacing deferred). Audience: *someone who found a 
 - **Harden all five** shader-style demos under the fidelity engine: `Kishimisu`, `NeonSquircles`, `Caustics`, `PlasmaNebula`, `KaleidoBloom`.
 - **Refactor the two explicit ports** (`Kishimisu`, `NeonSquircles`) onto `Shader.*` (`toUV`, `fract`, `iqPalette`, `rot2`, …).
 - **One fresh cold port** of a classic ShaderToy shader done strictly by following the guide — the real end-to-end validation that the library + guide work, and the source of the guide's worked example. Gaps it surfaces feed back into `Shader.js`.
-- Each demo is verified visually in Fidelity mode and, where it uses probeable built-ins, against the divergence harness.
+- Each demo is verified visually in the Precise renderer and, where it uses probeable built-ins, against the divergence harness.
 
 ---
 

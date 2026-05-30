@@ -131,7 +131,7 @@ Render loop (requestAnimationFrame):
 
 The app starts **paused**. Running state is preserved across pattern switches.
 
-> **Numeric model update.** ADR-0001 (run the preview as float64) is **superseded by ADR-0003**: the preview now defaults to faithful 16.16 fixed-point emulation so the preview matches hardware, with a per-pattern "fast preview" float64 escape hatch. See the feature PRD `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md`. Coordinate generation (step 3 above) is unchanged.
+> **Numeric model update.** ADR-0001 (run the preview as float64) is **superseded by ADR-0003**: the preview now defaults to faithful 16.16 fixed-point emulation so the preview matches hardware, with a per-pattern "Fast" renderer (float64) escape hatch. See the feature PRD `Feature — Hardware-Fidelity Preview & ShaderToy Porting.md`. Coordinate generation (step 3 above) is unchanged.
 
 ### User pattern storage
 
