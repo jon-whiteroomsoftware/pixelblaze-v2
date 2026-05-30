@@ -61,6 +61,14 @@ describe('camera — fit-to-container & sizing', () => {
     expect(pointSize({ rows: 8, cols: 8, spacing: 20 })).toBe(20)
     expect(pointSize({ rows: 8, cols: 8, spacing: 0.4 })).toBe(1)
   })
+
+  it('dot scale grows/shrinks the dot without touching the canvas size', () => {
+    const grid = { rows: 8, cols: 8, spacing: 20 }
+    expect(pointSize(grid, 2)).toBe(40)
+    expect(pointSize(grid, 0.5)).toBe(10)
+    // Canvas size is independent of the dot scale — the grid still fits the pane.
+    expect(canvasSize(grid)).toEqual({ width: 160, height: 160 })
+  })
 })
 
 describe('camera — locked-2D projection', () => {

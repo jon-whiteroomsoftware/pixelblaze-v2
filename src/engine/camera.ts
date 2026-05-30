@@ -50,10 +50,12 @@ export function fitSpacing(containerWidth: number, cols: number): number {
   return Math.max(1, containerWidth / Math.max(1, cols))
 }
 
-// Dot diameter in pixels — dots just touch their neighbours (legacy radius was
-// max(0.5, spacing/2); diameter is the WebGL gl_PointSize).
-export function pointSize(grid: Locked2DGrid): number {
-  return Math.max(1, grid.spacing)
+// Dot diameter in pixels — at scale 1 dots just touch their neighbours (legacy
+// radius was max(0.5, spacing/2); diameter is the WebGL gl_PointSize). `scale`
+// is the user's Spacing knob: it grows/shrinks the dots WITHOUT resizing the
+// canvas, so the grid always fits the pane (canvasSize is scale-independent).
+export function pointSize(grid: Locked2DGrid, scale: number = 1): number {
+  return Math.max(1, grid.spacing * scale)
 }
 
 // Project a row-major grid index to WebGL clip space [-1,1]² (y axis up), or

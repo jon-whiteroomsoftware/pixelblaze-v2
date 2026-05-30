@@ -52,7 +52,7 @@ export function Preview() {
   const activePixelCount = useMapStore((s) => s.activePixelCount)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
-  const [canvasDims, setCanvasDims] = useState<{ spacing: number } | null>(null)
+  const [canvasDims, setCanvasDims] = useState<{ spacing: number; dotScale: number } | null>(null)
   // The square 3D viewport size (CSS px) when a 3D layout is active, else null.
   // Drives the diffusion blur in 3D, where there is no locked-2D `spacing`.
   const [canvas3DPx, setCanvas3DPx] = useState<number | null>(null)
@@ -68,11 +68,13 @@ export function Preview() {
     const ro = new ResizeObserver(([entry]) => {
       const { width } = entry.contentRect
       const { cols } = usePreviewStore.getState().grid
-      // Auto-fit to container, then apply the uniform spacing scale (§5) on top.
-      const spacing = Math.max(1, (width / cols) * usePreviewStore.getState().spacingScale)
-      setCanvasDims({ spacing })
+      // Auto-fit the pitch to the container so the grid always fills the pane.
+      // The Spacing knob scales the dots only (dotScale), not the canvas size.
+      const spacing = Math.max(1, width / cols)
+      const dotScale = usePreviewStore.getState().spacingScale
+      setCanvasDims({ spacing, dotScale })
       if (rendererRef.current) {
-        rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing })
+        rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing, dotScale })
         if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
       }
     })
@@ -85,7 +87,7 @@ export function Preview() {
     const el = containerRef.current
     if (!el) return
     const { width } = el.getBoundingClientRect()
-    setCanvasDims({ spacing: Math.max(1, (width / grid.cols) * spacingScale) })
+    setCanvasDims({ spacing: Math.max(1, width / grid.cols), dotScale: spacingScale })
   }, [grid.cols, spacingScale])
 
   // Rebuild the loop whenever source or spacing changes

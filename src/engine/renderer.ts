@@ -18,6 +18,8 @@ export interface RendererGridConfig {
   cols: number
   spacing: number
   diffusion?: number
+  // User Spacing knob: scales the dot diameter only, not the canvas size.
+  dotScale?: number
 }
 
 function clampGrid<T extends RendererGridConfig>(grid: T): T {
@@ -165,7 +167,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     }
     positions = new Float32Array(coords)
     drawCount = coords.length / 2
-    sizes = new Float32Array(drawCount).fill(pointSize(grid))
+    sizes = new Float32Array(drawCount).fill(pointSize(grid, grid.dotScale ?? 1))
     gl!.bindBuffer(gl!.ARRAY_BUFFER, posBuffer)
     gl!.bufferData(gl!.ARRAY_BUFFER, positions, gl!.STATIC_DRAW)
     gl!.bindBuffer(gl!.ARRAY_BUFFER, sizeBuffer)
