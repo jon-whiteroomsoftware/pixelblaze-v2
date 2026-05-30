@@ -48,6 +48,14 @@ export interface Renderer {
 // per-dot depth cueing. Exported so the UI's diffusion blur can match it.
 export const BASE_DOT_FRACTION = 0.02
 
+// 3D diffusion needs a different lever than 2D. The 2D grid is dense (dots
+// touch), so a CSS blur merges neighbours into a glow. The 3D cube lattice is
+// sparse — small dots with wide black gaps — so blurring isolated dots only
+// dilutes them (dimming, no glow). Instead we grow the dot diameter with
+// diffusion: additive, overlapping orbs bloom into a glow that reads like the
+// 2D case. Full diffusion grows the base dot by (1 + this).
+export const DIFFUSION_3D_GROWTH = 3
+
 const DIM_FACTOR = 0.15
 
 const VERT_SRC = `
@@ -184,8 +192,13 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     if (sizes.length !== cap) sizes = new Float32Array(cap)
     const bright = new Float32Array(cap)
     // Base dot diameter tracks the canvas size; depth cueing then scales it
-    // per-dot (nearer = larger).
-    const baseSize = Math.max(1, canvas.width * BASE_DOT_FRACTION)
+    // per-dot (nearer = larger). Diffusion grows the base so additive orbs
+    // overlap into a glow (the sparse-lattice analogue of the 2D blur merge).
+    const diffusion = grid.diffusion ?? 0
+    const baseSize = Math.max(
+      1,
+      canvas.width * BASE_DOT_FRACTION * (1 + diffusion * DIFFUSION_3D_GROWTH),
+    )
     for (let i = 0; i < cap; i++) {
       const { clip, depth } = projectOrbit(pos3D[i], camera)
       const cue = depthCue(depth)

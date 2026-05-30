@@ -406,7 +406,7 @@ export function Preview() {
       : canvasDims?.spacing ?? grid.spacing
   const diffusionFilter =
     grid.diffusion > 0 && diffusionPitch > 0
-      ? { filter: `blur(${(grid.diffusion * diffusionPitch * 0.7).toFixed(1)}px)` }
+      ? { filter: `blur(${(grid.diffusion * diffusionPitch * 1.05).toFixed(1)}px)` }
       : undefined
 
   return (
