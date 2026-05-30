@@ -68,6 +68,38 @@ describe('demo smoke tests', () => {
     })
   }
 
+  // Dimensionality test patterns: one render fn each, no controls. Guard that
+  // each bundles, lights pixels via its dispatch path, and exposes only the
+  // expected render fn so the 1D / 2D / 3D verify-by-eye demos stay honest.
+  const dimCases = [
+    { file: 'TestPattern1D.js', arity: 1, flag: 'hasRender' as const },
+    { file: 'TestPattern2D.js', arity: 2, flag: 'hasRender2D' as const },
+    { file: 'TestPattern3D.js', arity: 3, flag: 'hasRender3D' as const },
+  ]
+  for (const { file, arity, flag } of dimCases) {
+    it(`${file} bundles, runs, and lights pixels via its render${arity === 1 ? '' : `${arity}D`} path`, () => {
+      const src = readFileSync(join(here, file), 'utf8')
+      const { code, metadata } = bundle(src, LIBRARIES)
+      expect(metadata.renderFns[flag]).toBe(true)
+
+      const shim = createShim({ ...planeShimConfig({ rows: 16, cols: 16 }), getVirtualTime: () => 0 })
+      const handle = loadPattern(code, metadata, shim.builtins)
+      const enc = shim.encodeScalar
+
+      let anyLit = false
+      handle.beforeRender(enc(33))
+      for (let i = 0; i < 64; i++) {
+        const idx = enc(i)
+        if (arity === 1) handle.render(idx)
+        else if (arity === 2) handle.render2D(idx, enc(i / 63), enc((63 - i) / 63))
+        else handle.render3D(idx, enc(i / 63), enc((63 - i) / 63), enc(i / 63))
+        const [r, g, b] = shim.capturedPixel()
+        if (r + g + b > 0.01) anyLit = true
+      }
+      expect(anyLit).toBe(true)
+    })
+  }
+
   // Shader-library demos with fewer than 4 controls sit outside the loop above
   // (NeonSquircles has 1 slider; ShaderShowcase has 2) — still guard the ports.
   for (const file of ['NeonSquircles.js', 'ShaderShowcase.js', 'ZippyZaps.js', 'IQPalettes.js']) {

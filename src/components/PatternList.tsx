@@ -23,7 +23,15 @@ const DEMO_NAMES = Object.keys(DEMOS).sort()
 
 const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
 const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom']
-const GROUPED_DEMOS = new Set([...OPENGL_DEMOS, ...BRAND_NEW_DEMOS])
+// Minimal patterns — one per render dimensionality — for visually verifying
+// 1D / 2D / 3D preview behavior. The trailing dim tag mirrors each render fn.
+const TEST_PATTERNS = ['TestPattern1D', 'TestPattern2D', 'TestPattern3D']
+const TEST_PATTERN_DIMS: Record<string, string> = {
+  TestPattern1D: '1D',
+  TestPattern2D: '2D',
+  TestPattern3D: '3D',
+}
+const GROUPED_DEMOS = new Set([...OPENGL_DEMOS, ...BRAND_NEW_DEMOS, ...TEST_PATTERNS])
 
 // "Old Favorites" is the rest — anything not explicitly grouped, so new demos
 // land there by default until reassigned.
@@ -31,6 +39,7 @@ const DEMO_SECTIONS: { label: string; names: string[] }[] = [
   { label: 'OpenGL', names: OPENGL_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
   { label: 'Old Favorites', names: DEMO_NAMES.filter((n) => !GROUPED_DEMOS.has(n)) },
   { label: 'Brand New', names: BRAND_NEW_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
+  { label: 'Test Patterns', names: TEST_PATTERNS.filter((n) => DEMO_NAMES.includes(n)) },
 ]
 
 function SectionHeader({ label }: { label: string }) {
@@ -404,6 +413,7 @@ export function PatternList() {
                   <ListItem
                     key={name}
                     label={name}
+                    dim={TEST_PATTERN_DIMS[name]}
                     active={activeDemoName === name}
                     onClick={() => openDemo(name)}
                   />
