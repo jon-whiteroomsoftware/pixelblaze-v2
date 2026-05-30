@@ -18,20 +18,25 @@ export function WatchPanel() {
   const watchValues = usePreviewStore((s) => s.watchValues)
   const fps = usePreviewStore((s) => s.fps)
   const fidelity = usePreviewStore((s) => s.fidelity)
+  const grid = usePreviewStore((s) => s.grid)
 
   const hasPatternVars = watchedPatternVars.length > 0
-  // The built-ins area always shows the fps / renderer readout. fps and renderer
-  // hold the left column down rows 1 and 2; the watched built-ins flow into the
-  // right column, so the default reads:
+  // The built-ins area always shows the fps / size / renderer readout. fps and
+  // size hold the left column for rows 1–2 with renderer in the right column of
+  // row 2; the watched built-ins flow into the remaining cells, so the default
+  // reads:
   //   fps        elapsed
-  //   renderer   pixelCount
+  //   size       renderer
+  //   pixelCount
   // Any further watched built-ins wrap onto the rows below.
+  const sizeValue = `${grid.cols}×${grid.rows}`
   const fpsValue = fps === null ? '—' : fps.toFixed(1)
   const rendererValue = fidelity === 'fast' ? 'fast' : 'precise'
   const builtinCells: { name: string; value: string }[] = [{ name: 'fps', value: fpsValue }]
   if (watchedBuiltins[0] !== undefined) {
     builtinCells.push({ name: watchedBuiltins[0], value: formatValue(watchValues[watchedBuiltins[0]]) })
   }
+  builtinCells.push({ name: 'size', value: sizeValue })
   builtinCells.push({ name: 'renderer', value: rendererValue })
   for (let i = 1; i < watchedBuiltins.length; i++) {
     builtinCells.push({ name: watchedBuiltins[i], value: formatValue(watchValues[watchedBuiltins[i]]) })
