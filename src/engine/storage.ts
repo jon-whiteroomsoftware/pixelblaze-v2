@@ -25,8 +25,12 @@ export interface MapRecord {
   id: string
   name: string
   dim: 1 | 2 | 3
-  generator: string                // e.g. 'plane'
+  generator: string                // e.g. 'plane', or 'custom' for a baked map
   params: Record<string, number>
+  // Baked coordinate array for a custom map (`generator: 'custom'`), authored
+  // once and replayed index-aligned by resolve (ADR-0007). Absent for stock
+  // generator-based maps. Schemaless add — no DB_VERSION bump needed.
+  points?: number[][]
   updatedAt: number
 }
 

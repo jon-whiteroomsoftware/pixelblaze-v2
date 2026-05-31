@@ -22,6 +22,11 @@ export interface PixelMap {
   // DISPLAY dimensionality (not coord-arg count). Names the render fn used for
   // default selection on open.
   dim: 1 | 2 | 3
+  // For a baked custom map (ADR-0007): how many points the frozen array holds.
+  // A freshly selected custom map defaults the modeled count to this so it reads
+  // correctly out of the gate — it stays a free knob, so changing it surfaces the
+  // count/map drift. Absent for live-regenerating stock maps.
+  bakedCount?: number
   // Stock maps store their generator params (re-derivable/editable). Handed the
   // modeled pixelCount; returns one MapPoint per index, 0 .. pixelCount-1.
   resolve(pixelCount: number): MapPoint[]

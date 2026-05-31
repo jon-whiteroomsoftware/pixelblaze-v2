@@ -163,16 +163,37 @@ export function Preview() {
     } else {
       const map = resolveMap(selection.mapId ?? DEFAULT_MAP_ID, userMaps)
       if (map.dim === 3) {
-        // 3D cube lattice: the pixel count is the knob (ADR-0004), so the stock
-        // cube cubes the count up to a side³ lattice (count → nearest cube). Each
-        // point carries a [0,1]³ `pos` the orbit camera projects; the render loop
-        // dispatches render3D on the 3-arity sample.
-        const count = activePixelCount ?? defaultPixelCountForDim(3)
-        cubeSide = cubeSideForCount(count)
-        pixelCount = clampPixelCount(cubePixelCount(cubeSide))
-        mapPoints = createCubeMap({ side: cubeSide }).resolve(pixelCount)
+        if (map.builtin) {
+          // 3D cube lattice: the pixel count is the knob (ADR-0004), so the stock
+          // cube cubes the count up to a side³ lattice (count → nearest cube). Each
+          // point carries a [0,1]³ `pos` the orbit camera projects; the render loop
+          // dispatches render3D on the 3-arity sample.
+          const count = activePixelCount ?? defaultPixelCountForDim(3)
+          cubeSide = cubeSideForCount(count)
+          pixelCount = clampPixelCount(cubePixelCount(cubeSide))
+          mapPoints = createCubeMap({ side: cubeSide }).resolve(pixelCount)
+        } else {
+          // Custom 3D point cloud: replay the baked array index-aligned to the
+          // count (ADR-0007). The count is a free knob defaulting to the baked
+          // length; over-count pixels fall to the origin, surplus points go
+          // unvisited — the same drift a real device shows. `cubeSide` is only a
+          // dot-size reference here, derived from the modeled count.
+          pixelCount = clampPixelCount(activePixelCount ?? map.bakedCount ?? defaultPixelCountForDim(3))
+          cubeSide = cubeSideForCount(pixelCount)
+          mapPoints = map.resolve(pixelCount)
+        }
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
         displayDim = 3
+      } else if (!map.builtin) {
+        // Custom 2D map: irregular, non-grid positions. The 2D consume path no
+        // longer assumes a regular grid — draw each point's [0,1]² `pos` through
+        // the shape-position channel (the same seam 1D ring/helix embeddings use)
+        // rather than the locked plane. Replay is index-aligned to the count
+        // (ADR-0007 drift), defaulting to the baked length.
+        pixelCount = clampPixelCount(activePixelCount ?? map.bakedCount ?? defaultPixelCountForDim(2))
+        mapPoints = map.resolve(pixelCount)
+        shapePositions = mapPoints.map((p) => p.pos as [number, number])
+        displayDim = 2
       } else {
         // 2D stock plane: the pixel count is the knob (ADR-0004); with no aspect
         // to honour the plane squares the count up to the most-square grid that

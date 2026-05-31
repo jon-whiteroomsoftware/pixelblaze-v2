@@ -80,6 +80,37 @@ describe('mapFromRecord', () => {
     expect(map.dim).toBe(2)
     expect(map.resolve(16)[5].sample).toEqual([1 / 3, 1 / 3]) // col 1, row 1 of 4x4
   })
+
+  it('rebuilds a custom map by replaying its baked array', () => {
+    const rec: MapRecord = {
+      id: 'c1',
+      name: 'Cloud',
+      dim: 3,
+      generator: 'custom',
+      params: {},
+      points: [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+      updatedAt: 2000,
+    }
+    const map = mapFromRecord(rec)
+    expect(map.builtin).toBe(false)
+    expect(map.dim).toBe(3)
+    expect(map.bakedCount).toBe(2)
+    // Over-count replays surplus indices at the 3D origin (ADR-0007 drift).
+    expect(map.resolve(3)[2].pos).toEqual([0, 0, 0])
+  })
+})
+
+describe('loadMaps seeding (#140)', () => {
+  it('seeds the stock custom maps idempotently', async () => {
+    await useMapStore.getState().loadMaps()
+    const first = useMapStore.getState().userMaps
+    expect(first.some((m) => m.id === 'seed-ring-2d')).toBe(true)
+    expect(first.some((m) => m.generator === 'custom' && m.dim === 3)).toBe(true)
+    const countAfterFirst = first.length
+    // A second load must not duplicate the seeded rows.
+    await useMapStore.getState().loadMaps()
+    expect(useMapStore.getState().userMaps).toHaveLength(countAfterFirst)
+  })
 })
 
 describe('shape + pixel-count selection', () => {

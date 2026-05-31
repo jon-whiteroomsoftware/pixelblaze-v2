@@ -6,6 +6,7 @@ import { NEW_PATTERN_SRC } from '@/pixelblaze/newPattern'
 import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
+import { useMapStore } from '@/store/mapStore'
 import { LibraryHoverCard } from '@/components/LibraryHoverCard'
 import {
   AlertDialogRoot,
@@ -279,6 +280,12 @@ export function PatternList() {
   function cancelHide() {
     if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null }
   }
+
+  useEffect(() => {
+    // Hydrate user maps (and seed the stock custom maps, #140) so the layout
+    // selector is populated before the first pattern opens.
+    useMapStore.getState().loadMaps()
+  }, [])
 
   useEffect(() => {
     loadPatterns().then(async () => {

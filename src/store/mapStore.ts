@@ -6,7 +6,8 @@ import {
   updateMap,
   deleteMap,
 } from '@/engine/storage'
-import { createPlaneMap, createCubeMap, type PixelMap } from '@/engine/maps'
+import { createPlaneMap, createCubeMap, createCustomMap, type PixelMap } from '@/engine/maps'
+import { seedMapRecords } from '@/engine/maps/seeds'
 import { SHAPES, type ShapeId } from '@/engine/shapes'
 import type { LayoutSource } from '@/engine/layout'
 
@@ -52,6 +53,11 @@ export function buildMap(
 }
 
 export function mapFromRecord(r: MapRecord): PixelMap {
+  // A custom map replays its baked coordinate array (ADR-0007); stock generators
+  // rebuild live from params.
+  if (r.generator === 'custom') {
+    return createCustomMap(r.points ?? [], { id: r.id, name: r.name })
+  }
   return buildMap(r.id, r.name, r.generator, r.params)
 }
 
@@ -128,7 +134,14 @@ export const useMapStore = create<MapState>()((set, get) => ({
   setActivePixelCount: (count) => set({ activePixelCount: count }),
 
   loadMaps: async () => {
-    const maps = await listMaps()
+    // Seed the stock custom maps (#140) on first run via the production createMap
+    // path, so the existing loadMaps → selector flow is exercised end to end.
+    // Idempotent: only rows whose id is absent are written.
+    const existing = await listMaps()
+    const haveIds = new Set(existing.map((m) => m.id))
+    const seeds = seedMapRecords().filter((s) => !haveIds.has(s.id))
+    for (const s of seeds) await createMap(s)
+    const maps = seeds.length ? await listMaps() : existing
     set({ userMaps: maps.sort((a, b) => b.updatedAt - a.updatedAt) })
   },
 
