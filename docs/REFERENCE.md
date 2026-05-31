@@ -59,8 +59,8 @@ Each feature below is detailed in §4+. This section is the orientation layer.
   renderer is the default smooth preview. Validated against a real device.
 - **Pixel maps & dimensional preview.** The pixel map is a first-class entity. The
   preview renders 1D, 2D, and 3D patterns through one position + camera WebGL
-  renderer, with a stock plane and cube map, 1D viewport shapes (line, ring), and a
-  3D orbit camera with depth cueing.
+  renderer, with a stock plane and cube map, 1D viewport shapes (line, ring, pole), and
+  a 3D orbit camera with depth cueing that fits each model's bounding sphere.
 - **Monaco editor.** Pixelblaze language mode, live validation, autocomplete and
   signature hints from a hand-maintained built-in manifest, a debounced push to the
   preview on clean compile, and a periodic auto-save tick.
@@ -115,7 +115,7 @@ dependency resolution) be unit-tested without a DOM.
 | `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`. |
 | `mapStore` | `activeMapId`, `activeShapeId`, `activePixelCount`, `userMaps`; stock-map catalogue + resolution helpers. |
 | `controlStore` | Current pattern UI control values (transient session state). |
-| `cameraStore` | Ephemeral orbit camera angle + auto-orbit armed flag (never persisted). |
+| `cameraStore` | Ephemeral orbit camera angle, auto-orbit armed flag, and pole wrap density (`poleCols`) — never persisted. |
 
 Each store exports its `*InitialState`; tests reset with `setState(initialState)`
 (merge mode). `previewStore` persists only `brightness`, `speed`, `lightSize`,
@@ -344,10 +344,18 @@ persisted.
 ### 9.2 Viewport shapes (`src/engine/shapes.ts`)
 
 For a 1D (`render`-only) pattern, the path the strip is drawn along is a pure display
-choice (`sample` is empty), so it lives in the viewport, not the map. Shipped shapes:
-**`line`** (display dim 1) and **`ring`** (display dim 2). Each is a pure
-`embed(index, pixelCount) → [x,y]` generator producing normalized `pos`. (A 3D helix
-was scoped but is not shipped; `ShapeId` is `'line' | 'ring'`.)
+choice (`sample` is empty), so it lives in the viewport, not the map. Shipped shapes
+(`ShapeId` is `'line' | 'ring' | 'pole'`): **`line`** (display dim 1) and **`ring`**
+(display dim 2) are pure `embed(index, pixelCount) → [x,y]` generators producing
+normalized `pos`. **`pole`** (display dim 3) wraps the strip around a cylinder
+(stacked rings, x-fastest) and is drawn in 3D via the orbit camera. Its draw
+positions come from `polePositions(pixelCount, cols)` (the 3D channel), not the 2D
+`embed`. A wrap-density slider sets `cols` (pixels per wrap); the diameter is derived
+from the Cylinder pi-math so each surface cell stays square (`clampPoleCols` /
+`poleMaxCols` keep it in the taller-than-wide regime, `defaultPoleCols` a long
+~4.5:1). The pole is laid along the cube body diagonal so it reads askew. Wrap density
+lives in `cameraStore` (`poleCols`, ephemeral); changing it re-derives positions live
+without reloading the pattern.
 
 ### 9.3 The "Shape" dropdown routing (`src/engine/layout.ts`)
 
@@ -366,8 +374,13 @@ Pure, fully unit-tested, no DOM:
   shape's `pos`.
 - **Orbit camera (3D):** `OrbitCamera { azimuth, elevation, roll }`; `orbitRotate` /
   `projectOrbit` apply `Rz·Rx·Ry` and an orthographic projection; `fit3DScale` keeps
-  the worst-case rotated extent inside a margin; `depthCue` makes nearer dots larger
-  and brighter; `orbitDepthToClipZ` drives opaque depth-tested occlusion. Drag math:
+  the model's worst-case extent inside a margin. The extent is the model's actual
+  bounding-sphere radius about the rotation centre (`modelHalfExtent`) — rotation-
+  invariant, so the model fills the viewport at every angle without clipping and a
+  thinner/shorter model (e.g. a short pole) zooms in further; `HALF_DIAGONAL` (the
+  unit-cube corner) is the default when no model bound is supplied. `depthCue` makes
+  nearer dots larger and brighter; `orbitDepthToClipZ` drives opaque depth-tested
+  occlusion. Both take the same `halfExtent`. Drag math:
   `dominantAxis` + `applyTurntableDrag` (plain drag, single-axis, clamped elevation
   horizon) and `applyTrackballDrag` (Shift-drag, free tumble); `advanceAutoOrbit`
   spins the turntable.

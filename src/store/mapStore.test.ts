@@ -129,7 +129,7 @@ describe('shape + pixel-count selection', () => {
 describe('layoutSource', () => {
   it('gathers every shape plus stock and user maps', () => {
     const src = layoutSource({ userMaps: [USER_MAP] })
-    expect(src.shapes.map((s) => s.id)).toEqual(['line', 'ring'])
+    expect(src.shapes.map((s) => s.id)).toEqual(['line', 'ring', 'pole'])
     expect(src.maps.map((m) => m.id)).toContain(STOCK_MAPS[0].id)
     expect(src.maps.map((m) => m.id)).toContain('u1')
   })

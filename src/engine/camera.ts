@@ -151,18 +151,46 @@ export function orbitRotate(p: Vec3, cam: OrbitCamera): Vec3 {
 }
 
 // Half the space diagonal of the centred unit cube — the largest distance any
-// point can sit from the centre, hence the worst-case extent under any rotation.
+// point of a FULL cube can sit from the centre. The default worst-case extent
+// when no tighter model bound is supplied.
 const HALF_DIAGONAL = 0.5 * Math.sqrt(3)
 
-// Margin so the orbiting model never touches the canvas edge at any angle.
-export const FIT_3D_MARGIN = 0.9
+// Margin so the orbiting model never touches the canvas edge at any angle. The
+// fit is on the model's bounding SPHERE about the rotation centre, so its
+// silhouette is the same circle at every angle — only a thin margin is needed.
+export const FIT_3D_MARGIN = 0.95
+
+// The model's actual worst-case half-extent: the largest distance any point sits
+// from the rotation centre (the fixed [0.5,0.5,0.5] that `projectOrbit` centres
+// on). This is the radius of the bounding sphere, which is rotation-invariant —
+// so fitting it makes the model fill the frame at every orientation without ever
+// clipping, and a smaller model (e.g. a shorter pole) zooms in further. Falls
+// back to the unit-cube diagonal for an empty set.
+export function modelHalfExtent(
+  positions: readonly (readonly [number, number, number])[],
+  center: number = 0.5,
+): number {
+  let max = 0
+  for (const [x, y, z] of positions) {
+    const dx = x - center
+    const dy = y - center
+    const dz = z - center
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    if (d > max) max = d
+  }
+  return max > 0 ? max : HALF_DIAGONAL
+}
 
 // The scale taking centred [-0.5,0.5]³ coords into clip space such that the
 // model's worst-case extent maps to ±margin — i.e. it always fits, spin or not.
 // Square aspect (the 3D canvas is square); pure, no container arg needed beyond
-// the margin since clip space is already normalized.
-export function fit3DScale(margin: number = FIT_3D_MARGIN): number {
-  return margin / HALF_DIAGONAL
+// the margin since clip space is already normalized. `halfExtent` defaults to the
+// unit-cube diagonal; pass the model's own bounding-sphere radius to fit tightly.
+export function fit3DScale(
+  margin: number = FIT_3D_MARGIN,
+  halfExtent: number = HALF_DIAGONAL,
+): number {
+  return margin / halfExtent
 }
 
 // Orthographic projection of a normalized [0,1]³ position through the orbit
@@ -184,8 +212,11 @@ export function projectOrbit(
 // nearer; the depth test keeps the SMALLEST z, so nearer maps to the smaller
 // (front) clip z. Normalized by the model's worst-case half-extent so it spans
 // [-1,1] front→back, clamped so a corner point can't fall outside the frustum.
-export function orbitDepthToClipZ(depth: number): number {
-  const z = -depth / HALF_DIAGONAL
+export function orbitDepthToClipZ(
+  depth: number,
+  halfExtent: number = HALF_DIAGONAL,
+): number {
+  const z = -depth / halfExtent
   return z < -1 ? -1 : z > 1 ? 1 : z
 }
 
@@ -206,8 +237,13 @@ export function lattice3DPitchPx(
 // Drawn light-source diameter in pixels for the 3D lattice (the un-cued base,
 // before per-dot depth cueing): the lattice pitch times the preview light-size
 // fraction (ADR-0006), so "almost touching" lands at the same felt point as 2D.
-export function point3DSize(canvasPx: number, side: number, lightSize: number): number {
-  return Math.max(1, lattice3DPitchPx(canvasPx, side) * lightSize)
+export function point3DSize(
+  canvasPx: number,
+  side: number,
+  lightSize: number,
+  scale: number = fit3DScale(),
+): number {
+  return Math.max(1, lattice3DPitchPx(canvasPx, side, scale) * lightSize)
 }
 
 // Default preview light size, and the store's initial value (ADR-0006).
@@ -251,9 +287,10 @@ export interface DepthCue {
 export function depthCue(
   depth: number,
   opts: { nearBright?: number; farBright?: number; nearSize?: number; farSize?: number } = {},
+  halfExtent: number = HALF_DIAGONAL,
 ): DepthCue {
   const { nearBright = 1, farBright = 0.4, nearSize = 1, farSize = 0.55 } = opts
-  const t = clamp01((depth + HALF_DIAGONAL) / (2 * HALF_DIAGONAL))
+  const t = clamp01((depth + halfExtent) / (2 * halfExtent))
   return {
     brightnessMul: farBright + (nearBright - farBright) * t,
     sizeMul: farSize + (nearSize - farSize) * t,

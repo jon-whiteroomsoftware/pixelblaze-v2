@@ -1,7 +1,15 @@
 import { useEffect, RefObject } from 'react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { useCameraStore } from '@/store/cameraStore'
-import { applyTurntableDrag, applyTrackballDrag, dominantAxis, type DragAxis } from '@/engine/camera'
+import { useMapStore, DEFAULT_SHAPE_PIXEL_COUNT } from '@/store/mapStore'
+import {
+  applyTurntableDrag,
+  applyTrackballDrag,
+  dominantAxis,
+  clampPixelCount,
+  type DragAxis,
+} from '@/engine/camera'
+import { poleMaxCols, defaultPoleCols, clampPoleCols } from '@/engine/shapes'
 
 // 3D-display-only orbit viewport controls (#129). The component is a thin UI
 // shell over the 3D viewport: all camera math is the pure `@/engine/camera`
@@ -20,6 +28,19 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
   const autoOrbit = useCameraStore((s) => s.autoOrbit)
   const setAutoOrbit = useCameraStore((s) => s.setAutoOrbit)
   const resetView = useCameraStore((s) => s.resetView)
+
+  // Pole wrap-density slider (#146): only the Pole shape exposes it. The slider
+  // sets pixels-per-wrap; the pole's diameter and length follow (square cells),
+  // trading fat-and-short (more cols) for thin-and-tall (fewer). Range is clamped
+  // to the taller-than-wide regime for the current pixel count.
+  const poleCols = useCameraStore((s) => s.poleCols)
+  const setPoleCols = useCameraStore((s) => s.setPoleCols)
+  const activeShapeId = useMapStore((s) => s.activeShapeId)
+  const activePixelCount = useMapStore((s) => s.activePixelCount)
+  const isPole = activeShapeId === 'pole'
+  const poleCount = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
+  const poleMax = poleMaxCols(poleCount)
+  const poleValue = clampPoleCols(poleCount, poleCols ?? defaultPoleCols(poleCount))
 
   // Pointer drag → orbit. Listeners read/write the camera via getState so a drag
   // never churns React; only the play/pause flag (above) is reactive.
@@ -110,6 +131,23 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
       >
         <RotateCcw size={14} />
       </button>
+      {isPole && (
+        <label
+          title="Pole wrap density"
+          className="flex items-center h-7 px-2 rounded bg-zinc-900/70"
+        >
+          <input
+            type="range"
+            aria-label="Pole wrap density"
+            min={2}
+            max={poleMax}
+            step={1}
+            value={poleValue}
+            onChange={(e) => setPoleCols(Number(e.target.value))}
+            className="w-16 h-1 accent-amber-400 cursor-pointer"
+          />
+        </label>
+      )}
     </div>
   )
 }

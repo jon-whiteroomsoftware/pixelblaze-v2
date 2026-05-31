@@ -1,4 +1,15 @@
-import { LINE, RING, SHAPES, embedPositions, type Shape } from './shapes'
+import {
+  LINE,
+  RING,
+  POLE,
+  SHAPES,
+  embedPositions,
+  poleMaxCols,
+  defaultPoleCols,
+  clampPoleCols,
+  polePositions,
+  type Shape,
+} from './shapes'
 import type { MapPoint } from './maps'
 
 describe('shapes (viewport 1D embeddings)', () => {
@@ -40,6 +51,80 @@ describe('shapes (viewport 1D embeddings)', () => {
   it('exposes a shape registry keyed by id', () => {
     expect(SHAPES.line).toBe(LINE)
     expect(SHAPES.ring).toBe(RING)
+    expect(SHAPES.pole).toBe(POLE)
+  })
+
+  describe('pole', () => {
+    it('is a 3D-display shape (gets the orbit camera)', () => {
+      expect(POLE.displayDim).toBe(3)
+    })
+
+    it('column bounds keep the pole taller than wide', () => {
+      const n = 200
+      const max = poleMaxCols(n)
+      // At the upper bound the pole is at most square: cols < pi * (rows - 1).
+      const rows = Math.ceil(n / max)
+      const diameter = max / (Math.PI * (rows - 1))
+      expect(diameter).toBeLessThanOrEqual(1.0001)
+      // The default sits strictly inside the taller-than-wide regime.
+      const def = defaultPoleCols(n)
+      expect(def).toBeGreaterThanOrEqual(2)
+      expect(def).toBeLessThanOrEqual(max)
+      const defRows = Math.ceil(n / def)
+      const defDiameter = def / (Math.PI * (defRows - 1))
+      expect(defDiameter).toBeLessThan(1)
+    })
+
+    it('clamps a requested column count into the valid range', () => {
+      const n = 200
+      const max = poleMaxCols(n)
+      expect(clampPoleCols(n, 0)).toBe(2)
+      expect(clampPoleCols(n, 1)).toBe(2)
+      expect(clampPoleCols(n, max + 50)).toBe(max)
+      expect(clampPoleCols(n, 5)).toBe(5)
+    })
+
+    it('wraps the strip onto a centred cylinder with square cells', () => {
+      const n = 200
+      const cols = 8
+      const pos = polePositions(n, cols)
+      expect(pos).toHaveLength(n)
+      const rows = Math.ceil(n / cols)
+      const rho = cols / (2 * Math.PI * (rows - 1))
+      const dist = (a: number[], b: number[]) =>
+        Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+      // One wrap up (index cols): col 0 again, row 1 → same angle, one pitch up
+      // the pole's long axis. The 3D gap equals the vertical pitch, which equals
+      // the horizontal arc pitch (square cell).
+      const arcPitch = (2 * Math.PI * rho) / cols
+      const vPitch = 1 / (rows - 1)
+      expect(vPitch).toBeCloseTo(arcPitch)
+      expect(dist(pos[0], pos[cols])).toBeCloseTo(vPitch)
+    })
+
+    it('lies along the cube body diagonal (askew), centred in the unit cube', () => {
+      const n = 200
+      const pos = polePositions(n, 8)
+      const diag = [1 / Math.sqrt(3), 1 / Math.sqrt(3), 1 / Math.sqrt(3)]
+      // Project each point onto the diagonal (relative to the centre): the pole's
+      // length spans 1 along it, symmetric about 0 — i.e. it runs corner-to-corner.
+      const along = pos.map((p) =>
+        (p[0] - 0.5) * diag[0] + (p[1] - 0.5) * diag[1] + (p[2] - 0.5) * diag[2],
+      )
+      expect(Math.min(...along)).toBeCloseTo(-0.5)
+      expect(Math.max(...along)).toBeCloseTo(0.5)
+      // Stays inside the unit cube on every axis.
+      for (const c of pos.flat()) {
+        expect(c).toBeGreaterThanOrEqual(0)
+        expect(c).toBeLessThanOrEqual(1)
+      }
+    })
+
+    it('leaves a one-step seam gap around the wrap (no doubled pixel)', () => {
+      const pos = polePositions(64, 8)
+      // col 0 and the last col of the same row are one step short of overlapping.
+      expect(pos[0][0]).not.toBeCloseTo(pos[7][0])
+    })
   })
 
   describe('embedPositions', () => {

@@ -27,20 +27,34 @@ import {
   cubeSideForCount,
   advanceAutoOrbit,
   lattice3DPitchPx,
+  fit3DScale,
+  modelHalfExtent,
+  FIT_3D_MARGIN,
   diffusionBlurStdDev,
   DIFFUSION_BLUR_PITCH_FACTOR_2D,
   DIFFUSION_BLUR_PITCH_FACTOR_3D,
 } from '@/engine/camera'
 import { layoutSource as buildLayoutSource } from '@/store/mapStore'
 import { resolveLayoutSelection } from '@/engine/layout'
-import { SHAPES, embedPositions, type ShapeId } from '@/engine/shapes'
+import {
+  SHAPES,
+  embedPositions,
+  polePositions,
+  defaultPoleCols,
+  type ShapeId,
+} from '@/engine/shapes'
 import type { MapPoint } from '@/engine/maps'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
 
-// Square 3D viewport size (CSS px), capped so the orbiting cube fits comfortably.
-function cube3DCanvasPx(containerWidth: number): number {
-  return Math.max(200, Math.min(560, Math.floor(containerWidth)))
+// Square 3D viewport size (CSS px): fill the available pane (the smaller of its
+// two sides) leaving only a thin margin, so the orbiting model is as large as
+// possible — fidelity matters more than breathing room (#146). The bounding-
+// sphere fit (engine) guarantees it never clips at any angle.
+const VIEWPORT_3D_MARGIN_PX = 20
+function cube3DCanvasPx(containerWidth: number, containerHeight: number): number {
+  const avail = Math.min(containerWidth, containerHeight) - 2 * VIEWPORT_3D_MARGIN_PX
+  return Math.max(200, Math.floor(avail))
 }
 
 export function Preview() {
@@ -69,6 +83,9 @@ export function Preview() {
   // The active cube lattice side when a 3D layout is live; drives the diffusion
   // blur's projected-pitch calc, which must match the count-derived lattice.
   const [cube3DSide, setCube3DSide] = useState<number>(DEFAULT_CUBE_SIDE)
+  // The active 3D model's bounding-sphere radius about the rotation centre, so the
+  // diffusion blur's projected pitch tracks the same zoom the renderer fits to.
+  const [model3DHalfExtent, setModel3DHalfExtent] = useState<number | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
   // Derive spacing from container width so cols always fill the available width.
@@ -161,9 +178,21 @@ export function Preview() {
     if (selection.shapeId) {
       const shape = SHAPES[selection.shapeId as ShapeId]
       pixelCount = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
-      shapePositions = embedPositions(shape, pixelCount)
-      mapPoints = shapePositions.map((pos) => ({ sample: [], pos }))
-      displayDim = shape.displayDim
+      if (shape.displayDim === 3) {
+        // Pole: a 1D strip wrapped onto a cylinder, drawn in 3D (orbit camera).
+        // `sample` stays empty (1D dispatch); only `pos` differs from line/ring.
+        // Wrap density comes from the ephemeral camera store, clamped to the
+        // taller-than-wide range for the current count; null → the shape default.
+        const cols = useCameraStore.getState().poleCols ?? defaultPoleCols(pixelCount)
+        positions3D = polePositions(pixelCount, cols)
+        mapPoints = positions3D.map((pos) => ({ sample: [], pos }))
+        cubeSide = cubeSideForCount(pixelCount) // dot-size reference only
+        displayDim = 3
+      } else {
+        shapePositions = embedPositions(shape, pixelCount)
+        mapPoints = shapePositions.map((pos) => ({ sample: [], pos }))
+        displayDim = shape.displayDim
+      }
     } else {
       const map = resolveMap(selection.mapId ?? DEFAULT_MAP_ID, userMaps)
       if (map.id === 'cylinder') {
@@ -309,15 +338,17 @@ export function Preview() {
     // 3D layout: hand the orbit renderer the cube's [0,1]³ positions, a square
     // canvas, and a base dot size; seed the camera from the ephemeral store.
     if (positions3D) {
-      const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 400
-      const px = cube3DCanvasPx(containerWidth)
+      const rect = containerRef.current?.getBoundingClientRect()
+      const px = cube3DCanvasPx(rect?.width ?? 400, rect?.height ?? 400)
       renderer.set3DPositions(positions3D, { canvasPx: px, side: cubeSide })
       renderer.setCamera(useCameraStore.getState().camera)
       setCanvas3DPx(px)
       setCube3DSide(cubeSide)
+      setModel3DHalfExtent(modelHalfExtent(positions3D))
     } else {
       renderer.set3DPositions(null)
       setCanvas3DPx(null)
+      setModel3DHalfExtent(null)
     }
 
     // 3D paint wrapper: push the live camera angle before drawing. The angle is
@@ -452,6 +483,29 @@ export function Preview() {
     })
   }, [])
 
+  // Pole wrap density (#146): re-derive the 3D draw positions when the slider
+  // moves, WITHOUT rebuilding the loop or reloading the pattern. The pole's
+  // `sample` is empty (1D dispatch), so wrap density only changes where dots are
+  // drawn — a cheap `set3DPositions` + repaint, not a full effect re-run. Gated
+  // on the pole being the live layout (a 3D shape over the square 3D viewport).
+  const poleCols = useCameraStore((s) => s.poleCols)
+  useEffect(() => {
+    if (activeShapeId !== 'pole' || displayDim !== 3 || canvas3DPx == null) return
+    const renderer = rendererRef.current
+    if (!renderer) return
+    const count = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
+    const cols = poleCols ?? defaultPoleCols(count)
+    const positions = polePositions(count, cols)
+    renderer.set3DPositions(positions, {
+      canvasPx: canvas3DPx,
+      side: cubeSideForCount(count),
+    })
+    // A shorter pole has a smaller extent → the renderer zooms in further; keep
+    // the diffusion pitch in step with that zoom.
+    setModel3DHalfExtent(modelHalfExtent(positions))
+    if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
+  }, [poleCols, activeShapeId, displayDim, canvas3DPx, activePixelCount])
+
   // Auto-orbit drive: an independent rAF that advances the turntable whenever a
   // 3D layout is active and auto-orbit is armed — decoupled from the pattern's
   // play/pause, so the viewport keeps spinning even while the pattern is paused.
@@ -482,7 +536,11 @@ export function Preview() {
   // `spacing`; in 3D it's the projected lattice pitch — uniform across dimensions.
   const diffusionPitch =
     displayDim === 3
-      ? lattice3DPitchPx(canvas3DPx ?? 0, cube3DSide)
+      ? lattice3DPitchPx(
+          canvas3DPx ?? 0,
+          cube3DSide,
+          fit3DScale(FIT_3D_MARGIN, model3DHalfExtent ?? undefined),
+        )
       : canvasDims?.spacing ?? grid.spacing
   const diffusionFactor =
     displayDim === 3 ? DIFFUSION_BLUR_PITCH_FACTOR_3D : DIFFUSION_BLUR_PITCH_FACTOR_2D

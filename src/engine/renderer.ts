@@ -10,6 +10,9 @@ import {
   projectOrbit,
   orbitDepthToClipZ,
   depthCue,
+  fit3DScale,
+  modelHalfExtent,
+  FIT_3D_MARGIN,
   DEFAULT_ORBIT,
   type OrbitCamera,
   type Locked2DGrid,
@@ -150,6 +153,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   // Points-per-axis of the active 3D lattice, used to anchor the light-source
   // diameter to the projected lattice pitch. Set by set3DPositions.
   let lattice3DSide = 1
+  // The active model's bounding-sphere radius about the rotation centre, so the
+  // fit (and depth) zoom to the model's true extent — a thin pole fills the frame
+  // just as a full cube does. Set by set3DPositions.
+  let lattice3DHalfExtent = 0.5 * Math.sqrt(3)
 
   function rebuildPositions(): void {
     const coords: number[] = []
@@ -200,13 +207,14 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     // size (ADR-0006), the 3D analogue of the 2D pointSize; depth cueing then
     // scales it per-dot (nearer = larger). Diffusion never touches it — the blur
     // that merges sources is a CSS filter applied by the UI layer.
-    const baseSize = point3DSize(canvas.width, lattice3DSide, grid.lightSize ?? 1)
+    const scale = fit3DScale(FIT_3D_MARGIN, lattice3DHalfExtent)
+    const baseSize = point3DSize(canvas.width, lattice3DSide, grid.lightSize ?? 1, scale)
     for (let i = 0; i < cap; i++) {
-      const { clip, depth } = projectOrbit(pos3D[i], camera)
-      const cue = depthCue(depth)
+      const { clip, depth } = projectOrbit(pos3D[i], camera, scale)
+      const cue = depthCue(depth, {}, lattice3DHalfExtent)
       positions[i * 2] = clip[0]
       positions[i * 2 + 1] = clip[1]
-      depths[i] = orbitDepthToClipZ(depth)
+      depths[i] = orbitDepthToClipZ(depth, lattice3DHalfExtent)
       sizes[i] = Math.max(1, baseSize * cue.sizeMul)
       bright[i] = cue.brightnessMul
     }
@@ -312,6 +320,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
       // Anchor the orb diameter to the lattice pitch: prefer the caller's `side`,
       // else recover it as the cube root of the point count (count = side³).
       lattice3DSide = opts.side ?? Math.max(1, Math.round(Math.cbrt(p.length)))
+      lattice3DHalfExtent = modelHalfExtent(p)
       if (opts.canvasPx) {
         const px = Math.max(1, Math.round(opts.canvasPx))
         canvas.width = px

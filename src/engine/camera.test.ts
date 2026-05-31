@@ -15,6 +15,7 @@ import {
   orbitRotate,
   fit3DScale,
   FIT_3D_MARGIN,
+  modelHalfExtent,
   lattice3DPitchPx,
   point3DSize,
   diffusionBlurStdDev,
@@ -88,6 +89,40 @@ describe('camera — fit-to-container & sizing', () => {
     expect(pointSize(grid, 0.95)).toBe(19)
     // Canvas size is independent of the light size — the grid still fits the pane.
     expect(canvasSize(grid)).toEqual({ width: 160, height: 160 })
+  })
+
+  describe('modelHalfExtent (bounding-sphere fit)', () => {
+    it('measures the farthest point from the rotation centre', () => {
+      // A full cube reaches its corner: half the space diagonal.
+      const corners: [number, number, number][] = [
+        [0, 0, 0],
+        [1, 1, 1],
+        [1, 0, 1],
+      ]
+      expect(modelHalfExtent(corners)).toBeCloseTo(0.5 * Math.sqrt(3))
+    })
+
+    it('shrinks for a thinner model, so the fit zooms it in further', () => {
+      const fat: [number, number, number][] = [
+        [0.1, 0.5, 0.5],
+        [0.9, 0.5, 0.5],
+      ]
+      const thin: [number, number, number][] = [
+        [0.3, 0.5, 0.5],
+        [0.7, 0.5, 0.5],
+      ]
+      const fatExtent = modelHalfExtent(fat)
+      const thinExtent = modelHalfExtent(thin)
+      expect(thinExtent).toBeLessThan(fatExtent)
+      // Smaller extent → larger fit scale (zoomed in).
+      expect(fit3DScale(FIT_3D_MARGIN, thinExtent)).toBeGreaterThan(
+        fit3DScale(FIT_3D_MARGIN, fatExtent),
+      )
+    })
+
+    it('falls back to the unit-cube diagonal for an empty set', () => {
+      expect(modelHalfExtent([])).toBeCloseTo(0.5 * Math.sqrt(3))
+    })
   })
 })
 
