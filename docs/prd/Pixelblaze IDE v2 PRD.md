@@ -68,7 +68,7 @@ Only genuinely-unbuilt scope remains here. Items the original PRD deferred that 
 ### Captured in feature PRDs (direction, not greenlit)
 
 - **Hardware upload & a connection UI** — `Feature - Hardware Connectivity.md`. The Node comms layer and capability spike have shipped; the local bridge + in-app connection UI (Phase 3) is deferred there.
-- **Custom & device maps** — `Feature - Pixel Maps & Dimensional Preview.md`. Stock maps and the dimensional preview shipped; custom-map authoring (Phase 2) and controller map push/pull (Phase 3) are captured there.
+- **Device maps (Phase 3)** — `Feature - Pixel Maps & Dimensional Preview.md`. Stock maps and the dimensional preview shipped; **custom-map authoring (Phase 2) is now greenlit and building** — stock maps become source-backed plain-JS (single source of truth, ADR-0008), and a coder-first New Map flow loads any stock map as an editable **template**. Controller map push/pull (Phase 3) is still deferred there.
 
 ### Still open / unfiled
 
