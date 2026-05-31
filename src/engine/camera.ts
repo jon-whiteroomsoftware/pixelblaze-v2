@@ -198,20 +198,8 @@ export function point3DSize(canvasPx: number, side: number, lightSize: number): 
   return Math.max(1, lattice3DPitchPx(canvasPx, side) * lightSize)
 }
 
-// Default preview light size — the reference point for energy compensation and
-// the store's initial value (ADR-0006).
+// Default preview light size, and the store's initial value (ADR-0006).
 export const DEFAULT_LIGHT_SIZE = 0.5
-
-// Energy-conserving intensity compensation for light size (ADR-0006): a source's
-// total emitted light must stay invariant to its drawn diameter, so brightness
-// is the only control that changes brightness. Drawn area scales as lightSize²,
-// so per-pixel intensity scales as 1/lightSize². Referenced to the default size,
-// so the default view is unchanged. Under additive blending this makes the
-// integrated on-screen light exactly invariant to light size (overlaps included).
-export function lightEnergyComp(lightSize: number, refSize: number = DEFAULT_LIGHT_SIZE): number {
-  if (lightSize <= 0) return 1
-  return (refSize / lightSize) ** 2
-}
 
 // Diffusion blur radius (Gaussian std-dev, px). The blur scales with the inter-
 // dot pitch and a per-dimension factor, then is applied in linear light (SVG

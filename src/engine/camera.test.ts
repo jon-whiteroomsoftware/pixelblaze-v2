@@ -16,8 +16,6 @@ import {
   FIT_3D_MARGIN,
   lattice3DPitchPx,
   point3DSize,
-  lightEnergyComp,
-  DEFAULT_LIGHT_SIZE,
   diffusionBlurStdDev,
   DIFFUSION_BLUR_PITCH_FACTOR_2D,
   DIFFUSION_BLUR_PITCH_FACTOR_3D,
@@ -100,29 +98,6 @@ describe('camera — 3D light size (ADR-0006)', () => {
 
   it('never produces a sub-pixel diameter', () => {
     expect(point3DSize(10, 256, 0.15)).toBe(1)
-  })
-})
-
-describe('camera — light-size energy compensation (ADR-0006)', () => {
-  it('is 1 at the default light size (no change to the default view)', () => {
-    expect(lightEnergyComp(DEFAULT_LIGHT_SIZE)).toBe(1)
-  })
-
-  it('scales as 1/lightSize² so total emitted light stays constant', () => {
-    // Doubling the diameter quarters the per-pixel intensity (area ×4).
-    expect(lightEnergyComp(1, 0.5)).toBeCloseTo(0.25, 6)
-    expect(lightEnergyComp(0.25, 0.5)).toBeCloseTo(4, 6)
-  })
-
-  it('integrated light is invariant: intensity × area is constant across sizes', () => {
-    const area = (f: number) => f * f
-    const energy = (f: number) => lightEnergyComp(f) * area(f)
-    expect(energy(0.15)).toBeCloseTo(energy(0.95), 6)
-    expect(energy(0.5)).toBeCloseTo(energy(0.95), 6)
-  })
-
-  it('guards a zero/negative light size', () => {
-    expect(lightEnergyComp(0)).toBe(1)
   })
 })
 
