@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Play, Pause, Sun } from 'lucide-react'
+import { Play, Pause } from 'lucide-react'
 import { usePreviewStore, MIN_LIGHT_SIZE, MAX_LIGHT_SIZE } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useMapStore, defaultPixelCountForDim } from '@/store/mapStore'
@@ -12,9 +12,9 @@ import { Readout } from '@/components/Readout'
 import { Variables } from '@/components/Variables'
 
 // The preview control deck (#150): everything below the canvas, stacked by visual
-// prominence. Primary band = controls that map to a real pattern/controller property
-// (play/pause, brightness, pixel count, layout); secondary band = preview-only
-// affordances (light size, diffusion, renderer, speed); then the read-only Readout
+// prominence. Primary band = the pattern name, layout, and play/pause; secondary
+// band = a 3-row grid of the remaining controls (pixels + brightness, light size +
+// diffusion, renderer + speed); then the read-only Readout
 // (fps/elapsed/layout outrank author controls); then the author's pattern controls;
 // then the Variables turn-down. Replaces the over-the-canvas gear dialog.
 export function PreviewDeck() {
@@ -32,26 +32,10 @@ export function PreviewDeck() {
 function PrimaryBand() {
   const isRunning = usePreviewStore((s) => s.isRunning)
   const toggle = usePreviewStore((s) => s.toggle)
-  const brightness = usePreviewStore((s) => s.brightness)
-  const setBrightness = usePreviewStore((s) => s.setBrightness)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
 
   return (
     <div className="flex items-center gap-3 py-2 pr-3 border-b border-zinc-800">
-      <PixelCountInput />
-      <label className="flex items-center gap-1.5 shrink-0" title="Brightness">
-        <Sun size={14} className="text-zinc-500 shrink-0" aria-hidden />
-        <input
-          type="range"
-          aria-label="Brightness"
-          min={0}
-          max={1}
-          step={0.01}
-          value={brightness}
-          onChange={(e) => setBrightness(Number(e.target.value))}
-          className="w-12 accent-amber-500"
-        />
-      </label>
       <span className="flex-1 min-w-0 text-sm text-zinc-200 truncate">
         {previewPatternName || '—'}
       </span>
@@ -97,19 +81,16 @@ function PixelCountInput() {
   }
 
   return (
-    <label className="flex items-center gap-1 shrink-0" title="Pixel count">
-      <input
-        aria-label="Pixel count"
-        type="text"
-        inputMode="numeric"
-        value={draftCount}
-        onChange={(e) => setDraftCount(e.target.value.replace(/\D/g, ''))}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-        onBlur={commit}
-        className="w-12 h-6 px-0.5 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-500 focus:outline-none focus:border-amber-500"
-      />
-      <span className="text-[10px] text-zinc-500 uppercase tracking-wider">px</span>
-    </label>
+    <input
+      aria-label="Pixel count"
+      type="text"
+      inputMode="numeric"
+      value={draftCount}
+      onChange={(e) => setDraftCount(e.target.value.replace(/\D/g, ''))}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      onBlur={commit}
+      className="w-12 h-6 px-0.5 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-500 focus:outline-none focus:border-amber-500"
+    />
   )
 }
 
@@ -118,6 +99,8 @@ function PixelCountInput() {
 // columns — label on the left (zinc-400, like fps/elapsed/layout), control flush
 // right. Sliders are short; they don't need the full cell width to be usable.
 function SecondaryBand() {
+  const brightness = usePreviewStore((s) => s.brightness)
+  const setBrightness = usePreviewStore((s) => s.setBrightness)
   const lightSize = usePreviewStore((s) => s.lightSize)
   const setLightSize = usePreviewStore((s) => s.setLightSize)
   const diffusion = usePreviewStore((s) => s.diffusion)
@@ -128,6 +111,21 @@ function SecondaryBand() {
   return (
     <div className="text-xs py-2 pr-3">
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 items-center">
+        <Cell label="pixels">
+          <PixelCountInput />
+        </Cell>
+        <Cell label="brightness">
+          <input
+            type="range"
+            aria-label="Brightness"
+            min={0}
+            max={1}
+            step={0.01}
+            value={brightness}
+            onChange={(e) => setBrightness(Number(e.target.value))}
+            className="w-12 accent-amber-500"
+          />
+        </Cell>
         <Cell label="light size">
           <input
             type="range"
