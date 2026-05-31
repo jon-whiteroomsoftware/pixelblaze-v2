@@ -6,8 +6,15 @@ import {
   updateMap,
   deleteMap,
 } from '@/engine/storage'
-import { createPlaneMap, createCubeMap, createCylinderMap, createCustomMap, type PixelMap } from '@/engine/maps'
-import { SEED_STOCK_MAPS, SEED_MAP_IDS } from '@/engine/maps/seeds'
+import {
+  createCylinderMap,
+  createCustomMap,
+  createSourceMap,
+  SOURCE_STOCK_MAPS,
+  SEED_MAP_IDS,
+  stockMapSpec,
+  type PixelMap,
+} from '@/engine/maps'
 import { SHAPES, type ShapeId } from '@/engine/shapes'
 import type { LayoutSource } from '@/engine/layout'
 
@@ -35,23 +42,21 @@ export function defaultPixelCountForDim(dim: 1 | 2 | 3): number {
 }
 
 // Reconstruct a runtime PixelMap (with its resolve fn) from a serializable
-// generator descriptor. The generator registry grows as stock generators land
-// (cube in 1b); unknown generators fall back to a plane.
+// generator descriptor. Stock generators (plane/cube) are source-backed
+// (ADR-0008): rebuild them from their `.js` source so a saved stock reference and
+// the live stock map run identical code. The cylinder keeps its TS form (no
+// source — the ADR-0008 exception). Unknown generators fall back to a plane.
 export function buildMap(
   id: string,
   name: string,
   generator: string,
   params: Record<string, number>,
 ): PixelMap {
-  switch (generator) {
-    case 'cube':
-      return createCubeMap({ side: params.side ?? DEFAULT_CUBE_SIDE }, { id, name })
-    case 'cylinder':
-      return createCylinderMap({ rows: params.rows ?? 32, cols: params.cols ?? 32 }, { id, name })
-    case 'plane':
-    default:
-      return createPlaneMap({ rows: params.rows ?? 32, cols: params.cols ?? 32 }, { id, name })
+  if (generator === 'cylinder') {
+    return createCylinderMap({ rows: params.rows ?? 32, cols: params.cols ?? 32 }, { id, name })
   }
+  const spec = stockMapSpec(generator) ?? stockMapSpec('plane')!
+  return createSourceMap({ ...spec, id, name })
 }
 
 export function mapFromRecord(r: MapRecord): PixelMap {
@@ -63,16 +68,17 @@ export function mapFromRecord(r: MapRecord): PixelMap {
   return buildMap(r.id, r.name, r.generator, r.params)
 }
 
-// Built-in stock maps — generated, never persisted. The default plane uses the
-// global grid seed defaults; per-pattern params are threaded in later slices.
-export const STOCK_MAPS: PixelMap[] = [
-  createPlaneMap({ rows: 32, cols: 32 }),
-  createCylinderMap({ rows: 32, cols: 32 }),
-  createCubeMap({ side: DEFAULT_CUBE_SIDE }),
-  // The relocated #140 example clouds (helix/sphere/ring): stock by provenance,
-  // never listed in "Your Maps" (#141). Baked replay, not live regeneration.
-  ...SEED_STOCK_MAPS,
-]
+// Built-in stock maps — source-backed (ADR-0008), regenerated live, never
+// persisted. The plane and cube run their `.js` source; the cylinder keeps its
+// TS form (no source). The relocated #140 example clouds (helix/sphere/ring) are
+// now live builtin generators too — stock by provenance, never listed in "Your
+// Maps" (#141). The cylinder slots in after the plane for list ordering.
+export const STOCK_MAPS: PixelMap[] = (() => {
+  const byId = new Map(SOURCE_STOCK_MAPS.map((m) => [m.id, m]))
+  const plane = byId.get('plane')!
+  const rest = SOURCE_STOCK_MAPS.filter((m) => m.id !== 'plane')
+  return [plane, createCylinderMap({ rows: 32, cols: 32 }), ...rest]
+})()
 
 // Resolve a map id to its runtime PixelMap (stock or user). Falls back to the
 // stock plane for an unknown id, mirroring `buildMap`'s default.

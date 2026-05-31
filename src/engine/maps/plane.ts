@@ -1,5 +1,16 @@
 import type { MapPoint, PixelMap } from './types'
 
+// Plane grid math + a general rows×cols grid builder.
+//
+// The STOCK plane map is now source-backed (sources/plane.js, ADR-0008) — that
+// `.js` is the single source of truth the live preview runs. `createPlaneMap`
+// here is NOT that stock map; it is a general utility that lays out an EXPLICIT
+// rows×cols grid (the shim's default render surface, fixed-grid test fixtures).
+// It and the `.js` source agree on coordinates for a squared-up count, but the
+// builder also handles arbitrary non-square grids the count-driven source does
+// not. `squarePlaneDims` is the shared count→dims helper both the preview's
+// layout readout and the `.js` source's `cols = ceil(sqrt(n))` rely on.
+
 export interface PlaneParams {
   rows: number
   cols: number
@@ -24,9 +35,9 @@ function norm(i: number, n: number): number {
   return n > 1 ? i / (n - 1) : 0
 }
 
-// Stock 2D plane / grid — the existing preview grid re-expressed as a map.
-// Row-major index order, matching today's `row*cols + col` exactly so the 2D
-// no-regression baseline holds. `sample` and map-intrinsic `pos` coincide.
+// One pixel of an explicit rows×cols grid. Row-major index order, matching the
+// legacy `row*cols + col` exactly so the 2D no-regression baseline holds.
+// `sample` and map-intrinsic `pos` coincide.
 export function planePoint(index: number, params: PlaneParams): MapPoint {
   const { rows, cols } = params
   const col = index % cols

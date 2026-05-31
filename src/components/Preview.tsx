@@ -20,7 +20,7 @@ import { bundle } from '@/engine/bundle'
 import { createRenderer } from '@/engine/renderer'
 import { createRenderLoop, type RenderLoop } from '@/engine/renderLoop'
 import { createVirtualClock } from '@/engine/virtualClock'
-import { createPlaneMap, createCubeMap, createCylinderMap, cylinderDims, cubePixelCount, squarePlaneDims } from '@/engine/maps'
+import { createCylinderMap, cylinderDims, cubePixelCount, squarePlaneDims } from '@/engine/maps'
 import {
   clampPixelCount,
   cubeSideForCount,
@@ -209,34 +209,36 @@ export function Preview() {
         layoutLabel = `${dims.cols}×${dims.rows}`
         displayDim = 3
       } else if (map.dim === 3) {
-        if (map.builtin) {
+        if (map.id === 'cube') {
           // 3D cube lattice: the pixel count is the knob (ADR-0004), so the stock
-          // cube cubes the count up to a side³ lattice (count → nearest cube). Each
-          // point carries a [0,1]³ `pos` the orbit camera projects; the render loop
-          // dispatches render3D on the 3-arity sample.
+          // cube cubes the count up to a side³ lattice (count → nearest cube). The
+          // source-backed map (ADR-0008) regenerates the lattice live for the
+          // squared-up count; each point carries a [0,1]³ `pos` the orbit camera
+          // projects and the render loop dispatches render3D on the 3-arity sample.
           const count = activePixelCount ?? defaultPixelCountForDim(3)
           cubeSide = cubeSideForCount(count)
           pixelCount = clampPixelCount(cubePixelCount(cubeSide))
-          mapPoints = createCubeMap({ side: cubeSide }).resolve(pixelCount)
+          mapPoints = map.resolve(pixelCount)
           layoutLabel = `${cubeSide}×${cubeSide}×${cubeSide}`
         } else {
-          // Custom 3D point cloud: replay the baked array index-aligned to the
-          // count (ADR-0007). The count is a free knob defaulting to the baked
-          // length; over-count pixels fall to the origin, surplus points go
-          // unvisited — the same drift a real device shows. `cubeSide` is only a
-          // dot-size reference here, derived from the modeled count.
+          // 3D point cloud: stock sphere/helix regenerate live for any count
+          // (ADR-0008); a custom cloud replays its baked array index-aligned to the
+          // count (ADR-0007). The count is a free knob (defaulting to a custom
+          // map's baked length); over-count pixels fall to the origin, surplus
+          // points go unvisited. `cubeSide` is only a dot-size reference here.
           pixelCount = clampPixelCount(activePixelCount ?? map.bakedCount ?? defaultPixelCountForDim(3))
           cubeSide = cubeSideForCount(pixelCount)
           mapPoints = map.resolve(pixelCount)
         }
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
         displayDim = 3
-      } else if (!map.builtin) {
-        // Custom 2D map: irregular, non-grid positions. The 2D consume path no
-        // longer assumes a regular grid — draw each point's [0,1]² `pos` through
-        // the shape-position channel (the same seam 1D ring/helix embeddings use)
-        // rather than the locked plane. Replay is index-aligned to the count
-        // (ADR-0007 drift), defaulting to the baked length.
+      } else if (map.id !== 'plane') {
+        // 2D point cloud: the stock ring regenerates live (ADR-0008); a custom 2D
+        // map replays its baked array. Irregular, non-grid positions — the 2D
+        // consume path draws each point's [0,1]² `pos` through the shape-position
+        // channel (the same seam 1D ring/helix embeddings use) rather than the
+        // locked plane. A custom replay is index-aligned to the count (ADR-0007
+        // drift), defaulting to the baked length.
         pixelCount = clampPixelCount(activePixelCount ?? map.bakedCount ?? defaultPixelCountForDim(2))
         mapPoints = map.resolve(pixelCount)
         shapePositions = mapPoints.map((p) => p.pos as [number, number])
@@ -261,7 +263,7 @@ export function Preview() {
         gridWithDims.cols = planeDims.cols
         // Keep spacing fit to the container for the (possibly new) column count.
         gridWithDims.spacing = Math.max(1, canvasDims.spacing * cur.cols / planeDims.cols)
-        mapPoints = createPlaneMap(planeDims).resolve(pixelCount)
+        mapPoints = map.resolve(pixelCount)
         layoutLabel = `${planeDims.cols}×${planeDims.rows}`
         displayDim = 2
       }
