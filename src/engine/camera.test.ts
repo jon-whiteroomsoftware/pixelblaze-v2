@@ -287,13 +287,22 @@ describe('camera — orbit depth to clip z (opaque 3D)', () => {
 })
 
 describe('camera — depth cueing', () => {
-  it('nearer dots are brighter and larger than farther ones', () => {
+  it('nearer dots are brighter than farther ones, with size left uncued (#63)', () => {
     const half = 0.5 * Math.sqrt(3)
     const near = depthCue(half)
     const far = depthCue(-half)
     expect(near.brightnessMul).toBeGreaterThan(far.brightnessMul)
-    expect(near.sizeMul).toBeGreaterThan(far.sizeMul)
+    // Size is flat by default — no depth-driven gradient (keystone/pack fix).
+    expect(near.sizeMul).toBe(1)
+    expect(far.sizeMul).toBe(1)
     expect(near.brightnessMul).toBeCloseTo(1, 10)
+  })
+
+  it('still supports an explicit size gradient when asked', () => {
+    const half = 0.5 * Math.sqrt(3)
+    const near = depthCue(half, { nearSize: 1, farSize: 0.5 })
+    const far = depthCue(-half, { nearSize: 1, farSize: 0.5 })
+    expect(near.sizeMul).toBeGreaterThan(far.sizeMul)
   })
 
   it('clamps out-of-range depth', () => {

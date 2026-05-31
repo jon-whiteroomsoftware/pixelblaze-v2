@@ -280,16 +280,23 @@ export interface DepthCue {
   sizeMul: number
 }
 
-// Depth cueing: nearer dots are larger and brighter, so the orbit reads as 3D
-// despite order-independent additive blending. `depth` is `projectOrbit`'s
-// rotated z in [-HALF_DIAGONAL, +HALF_DIAGONAL]; t=0 is the farthest point,
-// t=1 the nearest. Multipliers interpolate between the far and near ends.
+// Depth cueing: nearer dots are brighter, so the orbit reads as 3D. `depth` is
+// `projectOrbit`'s rotated z in [-HALF_DIAGONAL, +HALF_DIAGONAL]; t=0 is the
+// farthest point, t=1 the nearest. Multipliers interpolate between the far and
+// near ends.
+//
+// Size is NOT cued by default (nearSize === farSize): a depth-driven size
+// gradient shrinks receding dots, which both (a) reads as a false keystone/
+// perspective on the orthographic cube and (b) stops the lattice from packing
+// tight at max light size the way the 2D plane does (#63). Brightness alone
+// carries the depth read; size stays flat so 3D packs like 2D. Callers can still
+// opt into a size gradient via nearSize/farSize.
 export function depthCue(
   depth: number,
   opts: { nearBright?: number; farBright?: number; nearSize?: number; farSize?: number } = {},
   halfExtent: number = HALF_DIAGONAL,
 ): DepthCue {
-  const { nearBright = 1, farBright = 0.4, nearSize = 1, farSize = 0.55 } = opts
+  const { nearBright = 1, farBright = 0.4, nearSize = 1, farSize = 1 } = opts
   const t = clamp01((depth + halfExtent) / (2 * halfExtent))
   return {
     brightnessMul: farBright + (nearBright - farBright) * t,

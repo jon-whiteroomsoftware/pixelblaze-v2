@@ -211,7 +211,12 @@ export function Preview() {
         const dims = cylinderDims(pixelCount)
         mapPoints = createCylinderMap(dims).resolve(pixelCount)
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
-        cubeSide = cubeSideForCount(pixelCount) // dot-size reference only
+        // Orb-size reference: the cylinder is NOT a cubic lattice, so cbrt(count)
+        // hugely underestimates its on-screen pitch and the orbs overlap (#63).
+        // Its real pitch divisor is the row count — cylinderDims picks cols ≈ π·rows
+        // precisely so the wrapped front-face pitch matches the vertical 1/(rows-1)
+        // pitch in both axes, so `rows` sizes the orbs to the true neighbour gap.
+        cubeSide = dims.rows
         // A 2D layout (wrapped), even though it's drawn in the 3D viewport.
         layoutLabel = `${dims.cols}×${dims.rows}`
         displayDim = 3
