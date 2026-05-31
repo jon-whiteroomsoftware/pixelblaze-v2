@@ -61,8 +61,12 @@ Respond with JSON only (no markdown fences):
     | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//' \
           -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
-  ACTION=$(echo "$TEXT" | jq -r '.action // "nothing"' 2>/dev/null || echo "nothing")
-  MESSAGE=$(echo "$TEXT" | jq -r '.message // ""' 2>/dev/null || echo "")
+  # Slurp the stream and take only the first JSON value (-s '.[0]'). The model
+  # sometimes emits more than one object (e.g. an example alongside its answer);
+  # a bare `jq -r '.action'` would then print one line per object and ACTION
+  # would become e.g. "nothing\nnothing", falling through to the error branch.
+  ACTION=$(echo "$TEXT" | jq -rs '(.[0].action) // "nothing"' 2>/dev/null || echo "nothing")
+  MESSAGE=$(echo "$TEXT" | jq -rs '(.[0].message) // ""' 2>/dev/null || echo "")
 
   case "$ACTION" in
     close)
