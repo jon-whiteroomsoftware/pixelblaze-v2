@@ -55,7 +55,7 @@ export function PreviewSettings() {
   const setFidelity = usePreviewStore((s) => s.setFidelity)
   const activePixelCount = useMapStore((s) => s.activePixelCount)
   const setActivePixelCount = useMapStore((s) => s.setActivePixelCount)
-  const displayDim = useEditorStore((s) => s.displayDim)
+  const nativeDim = useEditorStore((s) => s.nativeDim)
   const watchedBuiltins = usePreviewStore((s) => s.watchedBuiltins)
   const setWatchedBuiltins = usePreviewStore((s) => s.setWatchedBuiltins)
   const watchedPatternVars = usePreviewStore((s) => s.watchedPatternVars)
@@ -63,8 +63,10 @@ export function PreviewSettings() {
   const patternVars = useEditorStore((s) => s.patternVars)
 
   // The effective count: the per-pattern value, or the dimension's default when
-  // the pattern carries none. The draft tracks edits until committed.
-  const effectiveCount = activePixelCount ?? defaultPixelCountForDim(displayDim)
+  // the pattern carries none. Keyed off the layout's coordinate dimension
+  // (`nativeDim`), NOT the viewport dimension — a 2D pattern wrapped onto a 3D
+  // cylinder still defaults to the 2D count. The draft tracks edits until committed.
+  const effectiveCount = activePixelCount ?? defaultPixelCountForDim(nativeDim)
   const [draftCount, setDraftCount] = useState(String(effectiveCount))
 
   // Reflect external count changes (pattern switch, default per dimension) into

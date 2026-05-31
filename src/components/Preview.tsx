@@ -154,6 +154,10 @@ export function Preview() {
     let shapePositions: [number, number][] | null = null
     let positions3D: [number, number, number][] | null = null
     let displayDim: 1 | 2 | 3
+    // The realized grid readout, or null when there's no regular grid (a 1D strip
+    // or an irregular custom point cloud). Reflects the actual arrangement, NOT
+    // the viewport dimension — a 2D cylinder stays a 2D layout readout.
+    let layoutLabel: string | null = null
     if (selection.shapeId) {
       const shape = SHAPES[selection.shapeId as ShapeId]
       pixelCount = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
@@ -174,6 +178,8 @@ export function Preview() {
         mapPoints = createCylinderMap(dims).resolve(pixelCount)
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
         cubeSide = cubeSideForCount(pixelCount) // dot-size reference only
+        // A 2D layout (wrapped), even though it's drawn in the 3D viewport.
+        layoutLabel = `${dims.cols}×${dims.rows}`
         displayDim = 3
       } else if (map.dim === 3) {
         if (map.builtin) {
@@ -185,6 +191,7 @@ export function Preview() {
           cubeSide = cubeSideForCount(count)
           pixelCount = clampPixelCount(cubePixelCount(cubeSide))
           mapPoints = createCubeMap({ side: cubeSide }).resolve(pixelCount)
+          layoutLabel = `${cubeSide}×${cubeSide}×${cubeSide}`
         } else {
           // Custom 3D point cloud: replay the baked array index-aligned to the
           // count (ADR-0007). The count is a free knob defaulting to the baked
@@ -228,10 +235,12 @@ export function Preview() {
         // Keep spacing fit to the container for the (possibly new) column count.
         gridWithDims.spacing = Math.max(1, canvasDims.spacing * cur.cols / planeDims.cols)
         mapPoints = createPlaneMap(planeDims).resolve(pixelCount)
+        layoutLabel = `${planeDims.cols}×${planeDims.rows}`
         displayDim = 2
       }
     }
     useEditorStore.getState().setDisplayDim(displayDim)
+    useEditorStore.getState().setLayoutLabel(layoutLabel)
 
     const clock = createVirtualClock()
     const shimConfig = {

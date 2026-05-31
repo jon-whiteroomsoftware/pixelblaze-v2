@@ -1,25 +1,5 @@
 import { usePreviewStore } from '@/store/previewStore'
-import { useMapStore, defaultPixelCountForDim } from '@/store/mapStore'
 import { useEditorStore } from '@/store/editorStore'
-import { clampPixelCount, cubeSideForCount } from '@/engine/camera'
-import { squarePlaneDims } from '@/engine/maps'
-
-// How the active count is laid out for display: 1D has no grid (null); 2D is the
-// squared-up plane (width×height); 3D is the count-derived cube lattice
-// (width×height×depth). Reflects the realized arrangement, so the 3D value is
-// side³ even when the count snapped to the nearest cube.
-function layoutFor(dim: 1 | 2 | 3, count: number): string | null {
-  const n = clampPixelCount(count)
-  if (dim === 2) {
-    const { rows, cols } = squarePlaneDims(n)
-    return `${cols}×${rows}`
-  }
-  if (dim === 3) {
-    const side = cubeSideForCount(n)
-    return `${side}×${side}×${side}`
-  }
-  return null
-}
 
 function formatValue(v: unknown): string {
   if (v === undefined || v === null) return '—'
@@ -39,8 +19,7 @@ export function WatchPanel() {
   const watchValues = usePreviewStore((s) => s.watchValues)
   const fps = usePreviewStore((s) => s.fps)
   const fidelity = usePreviewStore((s) => s.fidelity)
-  const displayDim = useEditorStore((s) => s.displayDim)
-  const activePixelCount = useMapStore((s) => s.activePixelCount)
+  const layoutLabel = useEditorStore((s) => s.layoutLabel)
 
   const hasPatternVars = watchedPatternVars.length > 0
   // The built-ins area always shows the fps + renderer readout. fps holds the
@@ -61,13 +40,12 @@ export function WatchPanel() {
   for (let i = 1; i < watchedBuiltins.length; i++) {
     builtinCells.push({ name: watchedBuiltins[i], value: formatValue(watchValues[watchedBuiltins[i]]) })
   }
-  // Read-only grid layout, shown right after pixelCount (1D has none). It maps
-  // the count to its realized arrangement so the field reads how the pixels are
-  // laid out — width×height in 2D, width×height×depth in 3D.
-  const layoutValue = layoutFor(displayDim, activePixelCount ?? defaultPixelCountForDim(displayDim))
-  if (layoutValue) {
+  // Read-only grid layout, shown right after pixelCount. Preview publishes the
+  // realized arrangement (width×height in 2D, width×height×depth in 3D), or null
+  // when there's no regular grid (a 1D strip, or an irregular custom point cloud).
+  if (layoutLabel) {
     const pixelCountIdx = builtinCells.findIndex((c) => c.name === 'pixelCount')
-    const layoutCell = { name: 'layout', value: layoutValue }
+    const layoutCell = { name: 'layout', value: layoutLabel }
     if (pixelCountIdx === -1) builtinCells.push(layoutCell)
     else builtinCells.splice(pixelCountIdx + 1, 0, layoutCell)
   }
