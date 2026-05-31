@@ -46,14 +46,13 @@ import type { MapPoint } from '@/engine/maps'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
 
-// Square 3D viewport size (CSS px): fill the available pane (the smaller of its
-// two sides) leaving only a thin margin, so the orbiting model is as large as
-// possible — fidelity matters more than breathing room (#146). The bounding-
-// sphere fit (engine) guarantees it never clips at any angle.
-const VIEWPORT_3D_MARGIN_PX = 20
+// Square 3D viewport size (CSS px): fill the available pane edge-to-edge (the
+// smaller of its two sides), so the 3D canvas is exactly as tall as a square 2D
+// canvas — no margin, which previously made 3D layouts ~40px shorter than 2D. The
+// orbiting model is as large as possible (fidelity over breathing room, #146), and
+// the bounding-sphere fit (engine) guarantees it never clips at any angle.
 function cube3DCanvasPx(containerWidth: number, containerHeight: number): number {
-  const avail = Math.min(containerWidth, containerHeight) - 2 * VIEWPORT_3D_MARGIN_PX
-  return Math.max(200, Math.floor(avail))
+  return Math.max(200, Math.floor(Math.min(containerWidth, containerHeight)))
 }
 
 export function Preview() {
