@@ -2,7 +2,7 @@
 
 **Status:** **Phase 1 shipped** (1D/2D/3D preview, map as a first-class entity, WebGL position+camera renderer, stock plane & cube maps, line/ring shapes, 3D orbit viewport). The sole Phase-1 remainder, the **helix** shape embedding, is tracked in **#139**. Phases 2–3 (custom maps, controller map push/pull) remain **deferred — captured here as direction, not greenlit.** For *how Phase 1 works as built* see **`docs/REFERENCE.md`** §9 (maps & dimensional preview), §10 (render loop), §11 (preview pane). This PRD is retained for the **why** — the conceptual model and the deferred direction.
 **Type:** Feature PRD (companion to `Pixelblaze IDE v2 PRD.md`)
-**Related:** ADR-0002 (main-thread execution — its deferred-worker analysis lives in *Threading model* below); ADR-0003 (fixed-point fidelity — the spatial layer preserves its numeric seam); **ADR-0004 (`pixelCount` modeled independently of the map)** and **ADR-0005 (display `pos` is dual-sourced: map-intrinsic geometry vs. viewport shape embedding)** — the two data-model decisions this feature rests on; `Feature - Hardware Connectivity.md` (Phase 3 map push/pull rides its local bridge)
+**Related:** ADR-0002 (main-thread execution — its deferred-worker analysis lives in *Threading model* below); ADR-0003 (fixed-point fidelity — the spatial layer preserves its numeric seam); **ADR-0004 (`pixelCount` modeled independently of the map)** and **ADR-0005 (display `pos` is dual-sourced: map-intrinsic geometry vs. viewport shape embedding)** — the two data-model decisions this feature rests on; **ADR-0007 (custom maps bake on save; pixelCount drift exposed, not hidden)** — the Phase-2 fidelity decision; `Feature - Hardware Connectivity.md` (Phase 3 map push/pull rides its local bridge)
 
 ---
 
@@ -105,15 +105,25 @@ The honest price: the engine's **synchronous, framework-free orchestration becom
 
 ---
 
-## Phase 2 — Custom maps *(deferred; captured)*
+## Phase 2 — Custom maps *(deferred; captured — design settled)*
 
-The offline-fidelity payoff: a user with a sophisticated real installation previews patterns against **their actual geometry**, not a stock approximation. Built on the exact same representation as stock maps — built-ins and customs are the *same kind of object* in the *same dropdown*; this phase adds creation, not a new system. (The `maps` IndexedDB object store and `mapStore` CRUD already exist from Phase 1; only the authoring UI is unbuilt.)
+The offline-fidelity payoff: a user with a sophisticated real installation previews patterns against **their actual geometry**, not a stock approximation. Built on the exact same representation as stock maps — built-ins and customs are the *same kind of object* in the *same dropdown*; this phase adds creation, not a new system. (The `maps` IndexedDB object store, the `mapStore` CRUD, and per-pattern association — `PatternRecord.mapId` — all already exist from Phase 1; what's unbuilt is the custom-map *representation* and the authoring UI.)
 
-- **Authoring surfaces (one or both):**
-  - **Coordinate import** — paste/upload an explicit point list (the simplest path; matches an exported real map).
-  - **Map-function editor** — a small code surface where the user writes JS returning a coordinate array (`function(pixelCount){ … }`), matching how Pixelblaze maps are actually written. Evaluated via the same `new Function` path the pattern runtime uses.
-- **Save / name / manage** — persisted in the existing `maps` object store; the `patternStore` CRUD is the template.
-- Irregular/arbitrary topology is fully supported by construction (§4).
+### The settled model
+
+- **One copy of a map, referenced by id.** A pattern stores only `mapId` (already true). The geometry lives in exactly one `MapRecord`; a thousand patterns can reference it with no duplication. The common case — no override — falls back to the stock plane/cube.
+- **"Your Maps" lists custom maps only.** Stock plane/cube stay as always-present options in the selector, never as managed rows (mirrors how saved patterns work — no "stock pattern" in the list). The **map builder** offers stock plane/cube (and any custom map) as **starting templates**, so authoring never begins from a blank slate; a template is a seed, not a stored relationship.
+- **`dim` is inferred from coordinate arity**, not declared: `[x,y]` → 2D, `[x,y,z]` → 3D, matching how firmware reports `pixelMapDimensions()`. Mixed arity is a save-time error. **There is no custom 1D map** — a 1D pattern's `sample` is empty, so its in-space arrangement is a cosmetic viewport *shape* (§5), not a map. Custom authoring is a 2D/3D concern.
+- **Bake on save; expose pixelCount drift (ADR-0007).** The authoring function/import is evaluated **once at save**, frozen into the `MapRecord` as a coordinate array, and the pattern restarts. A custom map's `resolve(pixelCount)` *replays* that frozen array index-aligned (surplus indices → origin, extra entries unvisited) rather than regenerating — so a count that disagrees with the geometry renders the same degraded result a real Pixelblaze shows after you change `pixelCount` without re-saving the Mapper. Selecting a custom map does **not** pin the count (ADR-0004 holds). Nothing applies until the user saves; this is the "evaluate the mapper once per run" model. A `MapRecord` holds the baked array (what renders) and, for function-authored maps, also the source (re-editable) — source + compiled-output, not duplicated geometry.
+
+### Build sequence (validated consume-path first, authoring UI second)
+
+1. **M1 — Consume path, no authoring UI.** Extend `MapRecord` with the baked-array representation; custom `resolve` replays it index-aligned. Seed 2–3 **genuinely irregular** 2D/3D maps as real `maps`-store rows (via the production `createMap` path, *not* a bundled constant), so they exercise `mapStore.loadMaps` → "Your Maps" → select → render → pixelCount drift end to end. These double as the eventual templates. This ships a working, fully-validated custom-map *consumption* feature before any builder exists.
+2. **M2 — Coordinate-import authoring.** Builder shell + paste/upload an explicit point list → infer `dim` from arity → bake-on-save → restart. The first real *producer* of rows; smallest tracer bullet (no code-eval surface).
+3. **M3 — Map-function editor.** Additive authoring surface: the user writes `function(pixelCount){ … }` returning a coordinate array (how Pixelblaze maps are actually written), evaluated via the same `new Function` path the pattern runtime uses. Carries the eval-sandbox / runaway-loop exposure ADR-0002 flags.
+4. **M4 — Stale-map affordance.** When the active count no longer matches a baked custom map, surface a "re-save to regenerate" cue, mirroring the hardware Mapper-save step.
+
+Irregular/arbitrary topology is fully supported by construction (§4).
 
 ---
 
