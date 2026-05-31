@@ -91,7 +91,7 @@ export function layoutSource(state: Pick<MapState, 'userMaps'>): LayoutSource {
   return {
     shapes: Object.values(SHAPES).map((s) => ({ id: s.id, name: s.name, displayDim: s.displayDim })),
     maps: [
-      ...STOCK_MAPS.map((m) => ({ id: m.id, name: m.name, dim: m.dim })),
+      ...STOCK_MAPS.map((m) => ({ id: m.id, name: m.name, dim: m.dim, displayDim: m.displayDim })),
       ...state.userMaps.map((m) => ({ id: m.id, name: m.name, dim: m.dim })),
     ],
   }

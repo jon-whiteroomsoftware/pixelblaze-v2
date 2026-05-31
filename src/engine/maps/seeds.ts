@@ -60,9 +60,9 @@ interface SeedSpec {
 }
 
 const SEED_SPECS: SeedSpec[] = [
-  { id: 'seed-helix-3d', name: 'Helix (3D cloud)', points: helixPoints(120, 5) },
-  { id: 'seed-sphere-3d', name: 'Sphere (3D cloud)', points: spherePoints(150) },
-  { id: 'seed-ring-2d', name: 'Ring (2D)', points: ringPoints(60) },
+  { id: 'seed-helix-3d', name: 'Helix (cloud)', points: helixPoints(120, 5) },
+  { id: 'seed-sphere-3d', name: 'Sphere (cloud)', points: spherePoints(150) },
+  { id: 'seed-ring-2d', name: 'Ring', points: ringPoints(60) },
 ]
 
 // The example clouds as stock PixelMaps — baked replay (ADR-0007), appended to

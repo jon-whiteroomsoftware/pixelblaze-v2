@@ -28,7 +28,12 @@ export interface ShapeMeta {
 export interface MapMeta {
   id: string
   name: string
+  // Sample arity — what the selector filters on (a `dim:2` map is offered to
+  // render2D patterns).
   dim: 1 | 2 | 3
+  // How the map is DRAWN, when it differs from `dim` (e.g. a cylinder is a
+  // `dim:2` sample drawn in 3D). Drives the dimension badge. Absent ⇒ same as `dim`.
+  displayDim?: 1 | 2 | 3
 }
 
 export interface LayoutSource {
@@ -53,7 +58,7 @@ export function layoutOptions(nativeDim: 1 | 2 | 3, source: LayoutSource): Layou
   }
   for (const m of source.maps) {
     if (m.dim === nativeDim) {
-      opts.push({ kind: 'map', id: m.id, name: m.name, displayDim: m.dim })
+      opts.push({ kind: 'map', id: m.id, name: m.name, displayDim: m.displayDim ?? m.dim })
     }
   }
   return opts

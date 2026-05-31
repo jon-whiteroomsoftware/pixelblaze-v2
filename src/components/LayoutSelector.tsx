@@ -34,7 +34,7 @@ export function LayoutSelector() {
     <DeckSelect
       ariaLabel="Layout"
       value={currentId ?? options[0].id}
-      options={options.map((o) => ({ value: o.id, label: o.name }))}
+      options={options.map((o) => ({ value: o.id, label: o.name, badge: `${o.displayDim}D` }))}
       onChange={choose}
       menuWidthClass="w-28"
     />

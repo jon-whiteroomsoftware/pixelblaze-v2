@@ -5,6 +5,9 @@ export interface DeckOption<T> {
   value: T
   label: string
   title?: string
+  // Optional small muted suffix shown after the label (e.g. a "2D" dimension
+  // tag). Decorative — marked aria-hidden so it never enters the accessible name.
+  badge?: string
 }
 
 // A lightweight bordered dropdown for the preview deck (#150): a thin-bordered
@@ -50,6 +53,11 @@ export function DeckSelect<T extends string | number>({
         className="flex items-center gap-0.5 h-6 pl-1.5 pr-0.5 shrink-0 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 hover:border-zinc-500 hover:text-amber-400/80 transition-colors"
       >
         <span className="whitespace-nowrap">{current?.label}</span>
+        {current?.badge && (
+          <span aria-hidden className="ml-1 text-zinc-500">
+            {current.badge}
+          </span>
+        )}
         <ChevronDown size={12} className="shrink-0 text-zinc-500" />
       </button>
 
@@ -74,6 +82,11 @@ export function DeckSelect<T extends string | number>({
               }`}
             >
               {opt.label}
+              {opt.badge && (
+                <span aria-hidden className="ml-1 text-zinc-500">
+                  {opt.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
