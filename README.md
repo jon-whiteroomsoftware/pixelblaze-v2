@@ -1,77 +1,74 @@
 # Pixelblaze IDE v2
 
-A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED controllers — built as an alternative to the editor built into the hardware.
+A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED controllers — write, preview, and tune patterns entirely offline, then paste the result straight onto your device.
 
 **[Open the IDE →](https://jon-whiteroomsoftware.github.io/pixelblaze-v2/)**
 
----
-
-## Why a separate editor?
-
-The built-in Pixelblaze editor works, but it has three rough edges this IDE smooths out:
-
-- **No hardware needed.** Write and preview patterns entirely offline. The IDE runs in your browser with no controller connected
-- **A modern code editor** with autocomplete and inline errors
-- **Reusable libraries.** Build your own patterns leveraging existing library code
+![Pixelblaze IDE screenshot](docs/screenshots/IDE.png)
 
 ---
 
-## IDE interface
+## Why this exists
 
-![Pixelblaze IDE screenshot](IDE_screenshot.png)
+[Pixelblaze](https://electromage.com/) is a tiny WiFi controller that drives addressable LED strips, matrices, and 3D sculptures. It ships with a built-in code editor, but that editor only works with a controller plugged in, gives you a bare text box, and has no way to share code between patterns.
 
----
+This IDE fixes all three:
 
-### Available libraries
+- **No hardware required.** Everything runs in your browser — editing, compiling, and a live animated preview. No device, no network, no backend.
+- **A real editor.** Monaco (the engine behind VS Code) with autocomplete, signature hints, and live error checking for the Pixelblaze dialect.
+- **Reusable libraries.** Pull in shared functions with `SDF.circle(...)` or `Anim.ease(...)`. The compiler tree-shakes and inlines only what you actually call, so the artifact stays small enough for the device.
 
-Hover over any library name in the left pane to see a quick summary of its functions. Click to open the full source in the editor.
+## What makes the preview interesting
 
-| Library | What it provides                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------- |
-| `SDF`   | 2D signed distance fields: circles, rects, rings, stars, polygons, smooth boolean ops, glow fills |
-| `Anim`  | Easing curves, oscillators, phase timing, looping animation primitives                            |
-| `Color` | HSV/RGB blend modes, palette interpolation, colour math                                           |
-| `Coord` | Polar coordinates, rectangular↔polar conversion, spatial transforms                               |
-| `Noise` | Value noise, Voronoi distance, organic variation                                                  |
+The preview isn't just a quick approximation — it's built to match the hardware.
 
----
+- **1D, 2D, and 3D.** Render your pattern as a strip, a ring, a pole, a flat grid, or an orbiting 3D cube you can drag and spin. The shape is a display choice; a 1D pattern can be wrapped onto any of them.
+- **Hardware-faithful math.** Pixelblaze runs 16.16 fixed-point arithmetic, not floats. Flip the preview to **Precise** mode and it emulates that exact arithmetic — overflow, precision loss, and all — validated against a real controller. So what you see in the browser is what the device will actually do. A **Fast** float64 mode is the default for smooth everyday editing.
+- **Live controls and var watching.** Export a `sliderX`, `toggleX`, or color-picker function and the IDE renders the matching widget — the same controls the hardware shows. The Var Watcher tracks every exported variable, refreshed each frame.
 
-## Demo patterns
+This makes the IDE a comfortable home for porting GPU-style shaders (ShaderToy and friends) onto LEDs, where trusting the preview really matters. There's a `Shader` library and a [porting guide](docs/guides/Porting%20ShaderToy%20shaders%20to%20Pixelblaze.md) for exactly that.
 
-The **Demos** section in the left pane has several patterns that show what the libraries can do — animated SDFs, eased sweeps, Perlin flow fields, a Kishimisu shader port, and others. They're read-only in the editor but you can copy a demo's code into a new pattern if you want to modify it.
+## Bundled libraries
 
----
+Hover any library in the left pane for a summary; click to open its source.
 
-## Pattern controls
+| Library  | What it provides |
+| -------- | ---------------- |
+| `SDF`    | 2D signed distance fields — circles, rects, rings, stars, polygons, smooth boolean ops |
+| `Anim`   | Easing curves, oscillators, phase timing, looping animation primitives |
+| `Color`  | HSV/RGB blends, palette interpolation, colour math |
+| `Coord`  | Polar coordinates, rectangular↔polar conversion, spatial transforms |
+| `Noise`  | Value noise, Voronoi distance, organic variation |
+| `Shader` | GLSL gap-fillers (`fract`, `step`, `dot`, `reflect`, palettes) for shader ports |
 
-If your pattern exports `sliderX`, `toggleX`, `hsvPickerX`, or `rgbPickerX` functions, the IDE renders interactive controls in the preview pane — sliders, toggles, and colour pickers. These match the controls the hardware uses. You can adjust them live while the pattern runs, without editing code.
+The **Demos** section has ready-to-run examples — animated SDFs, eased sweeps, noise flow fields, and several shader ports. They're read-only, but "Edit" forks any demo into your own editable copy.
 
-The **Var Watcher** below the controls shows the current values of every `export var` in your pattern, refreshed each frame — handy for checking that your variables are doing what you expect.
+## Getting patterns on and off hardware
 
----
+- **Copy Code / Download** — the editor emits a single flat `.js` file with every library function inlined and `export` keywords preserved, exactly the format the device expects. Paste it into the built-in Pixelblaze editor, or save it to upload. (Disabled while your code has a compile error.)
+- **Import** — open `.epe` files exported from the Pixelblaze hardware editor; they land as new editable patterns.
 
-## Exporting to hardware
+Direct upload to a controller over the network isn't wired into the app yet — for now, Copy Code is the bridge.
 
-The IDE doesn't upload to hardware directly yet. Instead:
+## Running locally
 
-- **Copy Code** (button in the editor header) — copies the transpiled, library-inlined artifact to your clipboard. Paste it directly into the built-in Pixelblaze editor.
-- The copy button is disabled when your pattern has a compile error.
+```bash
+npm install
+npm run dev      # Vite dev server
+npm test         # Vitest suite
+npm run build    # type-check + production build
+```
 
-The copied code is a flat `.js` file with all library functions inlined and `export` keywords preserved — exactly the format the hardware expects.
+## Good to know
 
----
+- **Patterns run on the main thread.** A genuinely infinite loop can freeze the tab — there's no watchdog.
+- **`perlin` and the random functions diverge slightly** from firmware even in Precise mode; they're different algorithms, not reverse-engineered. Pure integer math is bit-identical on both sides.
+- **Sound- and sensor-reactive patterns** load and run, but the sensor inputs are inert stubs, so they won't animate from audio here.
 
-## Importing patterns
+## Learn more
 
-**Open** (button in the left pane header) imports `.epe` files exported from the Pixelblaze hardware editor. The pattern is added to your library and opened immediately.
-
----
-
-## Limitations to know about
-
-A few things that aren't there yet:
-
-- **Hardware upload** — connecting directly to a controller over the local network is planned but not built. Use Copy Code for now.
-- **1D strip patterns** — `render(index)` without a 2D map isn't supported in the preview yet. The pattern will save and copy correctly, but you won't see output in the grid.
-- **Coordinate transforms** — `translate`, `scale`, `rotate`, and friends are recognised syntax but are no-ops in the preview. Patterns that animate by transforming the coordinate space will appear static here.
-- **Float64 vs. hardware arithmetic** — the preview runs your code as native JavaScript float64. The hardware uses a fixed-point format. Patterns that use bitwise tricks or rely on integer overflow may look different in the preview than on the device.
+- **[System Reference](docs/REFERENCE.md)** — the authoritative, detailed description of how everything actually works: transpiler, validator, fixed-point engine, maps, camera, render loop.
+- **PRDs and ADRs** under [`docs/`](docs/) — the *why* behind the design and the not-yet-built direction.
+- **[Pixelblaze docs](https://electromage.com/docs/)** — the hardware, firmware, and language itself.
+</content>
+</invoke>
