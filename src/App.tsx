@@ -5,6 +5,7 @@ import { CompileStatusBadge } from '@/components/CompileStatusBadge'
 import { PatternList } from '@/components/PatternList'
 import { Preview } from '@/components/Preview'
 import { PaneHeader } from '@/components/PaneHeader'
+import { MapModeHeader } from '@/components/MapModeHeader'
 import { usePatternStore, PatternRecord } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
 import { bundle } from '@/engine/bundle'
@@ -53,6 +54,7 @@ export default function App() {
   const setActivePattern = usePatternStore((s) => s.setActivePattern)
   const source = useEditorStore((s) => s.source)
   const compileStatus = useEditorStore((s) => s.compileStatus)
+  const editorFlavor = useEditorStore((s) => s.editorFlavor)
   const setSource = useEditorStore((s) => s.setSource)
   const setIsReadOnly = useEditorStore((s) => s.setIsReadOnly)
   const setPreviewSource = useEditorStore((s) => s.setPreviewSource)
@@ -135,6 +137,10 @@ export default function App() {
         <Splitter onDrag={handleLeftDrag} />
         <main data-testid="editor-pane" className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <PaneHeader>
+            {editorFlavor === 'map' ? (
+              <MapModeHeader />
+            ) : (
+              <>
             <span className="flex-1 min-w-0 flex items-center gap-1.5">
               <span className="truncate">{activeFileName}</span>
               {activePatternId !== null && <CompileStatusBadge />}
@@ -164,6 +170,8 @@ export default function App() {
               >
                 {copied ? 'Copied!' : 'Copy Code'}
               </Button>
+            )}
+              </>
             )}
           </PaneHeader>
           <div className="flex-1 overflow-hidden">

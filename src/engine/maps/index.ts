@@ -16,3 +16,11 @@ export {
   SEED_MAP_IDS,
   stockMapSpec,
 } from './stockCatalogue'
+export {
+  MAP_SKELETON,
+  parseMapSource,
+  isMapOpenable,
+  isPristineToBaseline,
+  mapTemplates,
+} from './mapAuthoring'
+export type { ParseError as MapParseError, MapTemplate } from './mapAuthoring'

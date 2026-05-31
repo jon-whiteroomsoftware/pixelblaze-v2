@@ -13,10 +13,14 @@ import {
   SOURCE_STOCK_MAPS,
   SEED_MAP_IDS,
   stockMapSpec,
+  MAP_SKELETON,
   type PixelMap,
 } from '@/engine/maps'
 import { SHAPES, type ShapeId } from '@/engine/shapes'
 import type { LayoutSource } from '@/engine/layout'
+import { uniquePatternName } from '@/engine/patternName'
+import { useEditorStore } from './editorStore'
+import { usePatternStore } from './patternStore'
 
 export type { MapRecord }
 
@@ -98,7 +102,13 @@ export function layoutSource(state: Pick<MapState, 'userMaps'>): LayoutSource {
     shapes: Object.values(SHAPES).map((s) => ({ id: s.id, name: s.name, displayDim: s.displayDim })),
     maps: [
       ...STOCK_MAPS.map((m) => ({ id: m.id, name: m.name, dim: m.dim, displayDim: m.displayDim })),
-      ...state.userMaps.map((m) => ({ id: m.id, name: m.name, dim: m.dim })),
+      // A custom map can only resolve as a layout once it has baked points; a
+      // freshly-created map has none until #143 bakes it, so keep it out of the
+      // layout catalogue (it would throw in createCustomMap). Non-custom user maps
+      // regenerate from params and are always selectable.
+      ...state.userMaps
+        .filter((m) => m.generator !== 'custom' || (m.points?.length ?? 0) > 0)
+        .map((m) => ({ id: m.id, name: m.name, dim: m.dim })),
     ],
   }
 }
@@ -113,20 +123,43 @@ interface MapState {
   // (the global grid's rows×cols for a map; a 1D default for a shape).
   activePixelCount: number | null
   userMaps: MapRecord[]
+  // The map open in editor "map mode" (#151), or null when the editor holds a
+  // pattern/demo/library. Every custom map is persisted on creation (like a
+  // pattern), so a map open for editing is always an `existing` record.
+  editingMap: EditingMap
+  // The last-loaded source baseline (skeleton or a "Load template" selection) the
+  // dirty-guard compares the buffer against before overwriting (#151).
+  mapBaseline: string
   setActiveMap: (id: string) => void
   setActiveShape: (id: ShapeId) => void
   setActivePixelCount: (count: number | null) => void
+  // Create a fresh custom map (skeleton source), persist it immediately as a row
+  // in "Your Maps" (no save step, mirroring New Pattern), and open it in map mode.
+  createNewMap: () => Promise<void>
+  // Open editor map mode on a saved custom map's source. No-op for a record with
+  // no source (a stock map is never openable, isMapOpenable).
+  openExistingMap: (record: MapRecord) => void
+  // Replace the editor buffer with a template's verbatim source and reset the
+  // dirty-guard baseline to it ("Load template").
+  loadMapTemplate: (source: string) => void
+  // Leave map mode (selecting a pattern/demo/library). Clears editingMap and
+  // restores the pattern editor flavor.
+  closeMapEditor: () => void
   loadMaps: () => Promise<void>
   addMap: (record: MapRecord) => Promise<void>
   renameMap: (id: string, name: string) => Promise<void>
   removeMap: (id: string) => Promise<void>
 }
 
+export type EditingMap = { kind: 'existing'; id: string } | null
+
 export const mapInitialState = {
   activeMapId: DEFAULT_MAP_ID,
   activeShapeId: DEFAULT_SHAPE_ID,
   activePixelCount: null as number | null,
   userMaps: [] as MapRecord[],
+  editingMap: null as EditingMap,
+  mapBaseline: '',
 }
 
 // Resolve the active map id against stock maps first, then user maps, falling
@@ -138,12 +171,70 @@ export function selectActiveMap(state: Pick<MapState, 'activeMapId' | 'userMaps'
   return user ? mapFromRecord(user) : STOCK_MAPS[0]
 }
 
+// Switch the editor surface into map mode on the given source: clear any active
+// pattern/demo/library, flip the editor to the JS map flavor (editable, parse-only
+// badge), and load the buffer. The compile badge re-derives from the source via
+// the Editor's parse pass; we seed 'good' so the badge doesn't flash stale.
+function enterMapMode(source: string): void {
+  usePatternStore.getState().setActivePattern(null)
+  const ed = useEditorStore.getState()
+  ed.setEditorFlavor('map')
+  ed.setIsReadOnly(false)
+  ed.setSource(source)
+  ed.setCompileStatus('good')
+}
+
 export const useMapStore = create<MapState>()((set, get) => ({
   ...mapInitialState,
 
   setActiveMap: (id) => set({ activeMapId: id }),
   setActiveShape: (id) => set({ activeShapeId: id }),
   setActivePixelCount: (count) => set({ activePixelCount: count }),
+
+  createNewMap: async () => {
+    // Mirror New Pattern: a custom map is a real row the instant you create it —
+    // no save step (#151 follow-up). The skeleton is the authoring source; dim is
+    // a 2D placeholder and there are no baked points yet (source eval/bake is
+    // #143). Persist, then open it in map mode like any existing map.
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const name = uniquePatternName('Untitled Map', get().userMaps.map((m) => m.name))
+    const record: MapRecord = {
+      id,
+      name,
+      dim: 2,
+      generator: 'custom',
+      params: {},
+      source: MAP_SKELETON,
+      updatedAt: Date.now(),
+    }
+    await get().addMap(record)
+    get().openExistingMap(record)
+  },
+
+  openExistingMap: (record) => {
+    // Stock maps carry no source and are never openable in place (#151, ADR-0008).
+    if (typeof record.source !== 'string') return
+    enterMapMode(record.source)
+    // Opening a map for editing does NOT change the active layout/preview
+    // (activeMapId): map preview is deferred (#153), and an unbaked custom map
+    // can't resolve as a layout anyway.
+    set({
+      editingMap: { kind: 'existing', id: record.id },
+      mapBaseline: record.source,
+    })
+  },
+
+  loadMapTemplate: (source) => {
+    // Verbatim source text only — not the template's name or dim (#151). The
+    // baseline resets to whatever was just loaded so the dirty-guard tracks it.
+    useEditorStore.getState().setSource(source)
+    set({ mapBaseline: source })
+  },
+
+  closeMapEditor: () => {
+    set({ editingMap: null, mapBaseline: '' })
+    useEditorStore.getState().setEditorFlavor('pattern')
+  },
 
   loadMaps: async () => {
     // "Your Maps" lists user-authored maps only (#141). The #140 example clouds
@@ -172,10 +263,12 @@ export const useMapStore = create<MapState>()((set, get) => ({
 
   removeMap: async (id) => {
     await deleteMap(id)
-    const { activeMapId, userMaps } = get()
+    const { activeMapId, userMaps, editingMap } = get()
     set({
       userMaps: userMaps.filter((m) => m.id !== id),
       activeMapId: activeMapId === id ? DEFAULT_MAP_ID : activeMapId,
     })
+    // If the deleted map was open in map mode, leave the editor cleanly.
+    if (editingMap?.kind === 'existing' && editingMap.id === id) get().closeMapEditor()
   },
 }))

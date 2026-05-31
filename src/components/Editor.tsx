@@ -5,6 +5,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore } from '@/store/patternStore'
 import { registerPixelblazeLanguage, PIXELBLAZE_LANG_ID } from './monaco/pixelblazeLanguage'
 import { validateSource } from '@/engine/validate'
+import { parseMapSource } from '@/engine/maps'
 
 const SYNC_TICK_MS = 4000
 const PREVIEW_DEBOUNCE_MS = 600
@@ -43,6 +44,7 @@ const EDITOR_OPTIONS = {
 export function Editor() {
   const source = useEditorStore((s) => s.source)
   const isReadOnly = useEditorStore((s) => s.isReadOnly)
+  const editorFlavor = useEditorStore((s) => s.editorFlavor)
   const setSource = useEditorStore((s) => s.setSource)
   const setCompileStatus = useEditorStore((s) => s.setCompileStatus)
   const setPreviewSource = useEditorStore((s) => s.setPreviewSource)
@@ -71,6 +73,16 @@ export function Editor() {
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     registerPixelblazeLanguage(monaco)
+    // Map mode uses Monaco's built-in `javascript` language for syntax coloring,
+    // but a map source is a bare `function(pixelCount){…}` expression — not a
+    // valid top-level statement/module — so Monaco's TS worker flags it with a
+    // spurious "unexpected identifier" squiggle. We feed our own parse-only markers
+    // (owner 'pixelblaze', ADR-0008), so disable the worker's diagnostics entirely.
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+      noSuggestionDiagnostics: true,
+    })
   }
 
   const handleMount: OnMount = (editor, monaco) => {
@@ -118,7 +130,9 @@ export function Editor() {
       return
     }
 
-    const errors = validateSource(source)
+    // Map mode (#151, ADR-0008) authors plain JS, so the badge is a parse-only
+    // check (no Pixelblaze dialect rules); patterns keep the dialect validator.
+    const errors = editorFlavor === 'map' ? parseMapSource(source) : validateSource(source)
     setCompileStatus(errors.length === 0 ? 'good' : 'broken')
 
     monaco.editor.setModelMarkers(
@@ -137,12 +151,12 @@ export function Editor() {
         }
       }),
     )
-  }, [source, isReadOnly, setCompileStatus])
+  }, [source, isReadOnly, editorFlavor, setCompileStatus])
 
   return (
     <MonacoEditor
       height="100%"
-      language={PIXELBLAZE_LANG_ID}
+      language={editorFlavor === 'map' ? 'javascript' : PIXELBLAZE_LANG_ID}
       theme="pixelblaze-dark"
       value={source}
       beforeMount={handleBeforeMount}

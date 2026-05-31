@@ -307,10 +307,10 @@ export function PatternList() {
   const userMaps = useMapStore((s) => s.userMaps)
   const renameMap = useMapStore((s) => s.renameMap)
   const removeMap = useMapStore((s) => s.removeMap)
-
-  // Which custom map is selected in "Your Maps". UI-local highlight for now;
-  // opening it in the editor (map mode) is wired by #151.
-  const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
+  const editingMap = useMapStore((s) => s.editingMap)
+  const createNewMap = useMapStore((s) => s.createNewMap)
+  const openExistingMap = useMapStore((s) => s.openExistingMap)
+  const closeMapEditor = useMapStore((s) => s.closeMapEditor)
 
   // Open-from-disk (.epe import) lives next to "New pattern" (#141): both create
   // a pattern, so they sit together on the "Your Patterns" header.
@@ -345,6 +345,7 @@ export function PatternList() {
       const name = uniquePatternName(parsed.name, userPatterns.map((p) => p.name))
       const record: PatternRecord = { id, name, src: parsed.src, controls: {}, updatedAt: Date.now() }
       await addPattern(record)
+      useMapStore.getState().closeMapEditor()
       setActivePattern(id)
       setSource(record.src)
       setPreviewSource(record.src)
@@ -456,12 +457,14 @@ export function PatternList() {
   }, [loadPatterns])
 
   function openLibrary(name: string) {
+    closeMapEditor()
     setActiveLibrary(name)
     setSource(LIBRARIES[name])
     setIsReadOnly(true)
   }
 
   function openDemo(name: string) {
+    closeMapEditor()
     setActiveDemo(name)
     setSource(DEMOS[name])
     setPreviewSource(DEMOS[name])
@@ -470,6 +473,7 @@ export function PatternList() {
   }
 
   function openUserPattern(pattern: PatternRecord) {
+    closeMapEditor()
     setActivePattern(pattern.id)
     setSource(pattern.src)
     setPreviewSource(pattern.src)
@@ -480,6 +484,7 @@ export function PatternList() {
   // Create a fresh "Untitled Pattern" and open it. Lives next to "Your Patterns"
   // (#141) so a new pattern is created right by its list.
   async function handleCreatePattern() {
+    closeMapEditor()
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const name = uniquePatternName('Untitled Pattern', userPatterns.map((p) => p.name))
     const record: PatternRecord = { id, name, src: NEW_PATTERN_SRC, controls: {}, updatedAt: Date.now() }
@@ -491,10 +496,10 @@ export function PatternList() {
     setIsReadOnly(false)
   }
 
-  // Selecting a custom map marks it active; opening it in the editor (map mode)
-  // is wired by #151.
+  // Open a custom map in editor map mode (#151): loads its source, flips the
+  // editor to the JS map flavor, and drives the bare-geometry preview.
   function openUserMap(map: MapRecord) {
-    setSelectedMapId(map.id)
+    openExistingMap(map)
   }
 
   const isCollapsed = (label: string) => !!collapsedSections[label]
@@ -549,7 +554,7 @@ export function PatternList() {
         label="Your Maps"
         collapsed={isCollapsed('Your Maps')}
         onToggle={() => toggleCollapsed('Your Maps')}
-        action={<HeaderAction icon={<Plus size={14} />} title="New map (coming soon)" disabled />}
+        action={<HeaderAction icon={<Plus size={14} />} title="New map" onClick={createNewMap} />}
       />
       {!isCollapsed('Your Maps') && (
         userMaps.length === 0 ? (
@@ -561,14 +566,11 @@ export function PatternList() {
                 key={map.id}
                 name={map.name}
                 noun="map"
-                active={selectedMapId === map.id}
+                active={editingMap?.kind === 'existing' && editingMap.id === map.id}
                 takenNames={userMaps.filter((m) => m.id !== map.id).map((m) => m.name)}
                 onSelect={() => openUserMap(map)}
                 onRename={(name) => renameMap(map.id, name)}
-                onDelete={() => {
-                  removeMap(map.id)
-                  if (selectedMapId === map.id) setSelectedMapId(null)
-                }}
+                onDelete={() => removeMap(map.id)}
               />
             ))}
           </ul>

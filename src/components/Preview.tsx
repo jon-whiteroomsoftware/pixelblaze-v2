@@ -121,8 +121,15 @@ export function Preview() {
   // Rebuild the loop whenever source or spacing changes
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !previewSource || !canvasDims) return
+    if (!canvas || !canvasDims) return
     setRuntimeError(null)
+
+    // Opening a map (editor map mode) must NOT touch the preview — it changes the
+    // editor surface only, leaving the running pattern rendering untouched. Map
+    // preview is deferred (#153, blocked on #143 eval/bake). Entering map mode
+    // changes no preview input (previewSource/activeMapId/…), so this loop isn't
+    // even rebuilt; nothing here special-cases map mode.
+    if (!previewSource) return
 
     const gridWithDims = { ...usePreviewStore.getState().grid, ...canvasDims }
     // The derived cube side for a 3D layout (set in the 3D branch), so the

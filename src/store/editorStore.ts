@@ -3,8 +3,15 @@ import type { PatternMetadata } from '@/engine/loadPattern'
 
 export type CompileStatus = 'good' | 'broken'
 
+// Which flavor of content the editor surface holds (#151). 'pattern' covers the
+// existing pattern/demo/library flavors (Pixelblaze dialect, dialect-validated);
+// 'map' is the custom-map authoring mode (plain JS, parse-only badge, ADR-0008).
+// The flavor selects the Monaco language and which validator feeds the badge.
+export type EditorFlavor = 'pattern' | 'map'
+
 interface EditorState {
   compileStatus: CompileStatus
+  editorFlavor: EditorFlavor
   source: string
   isReadOnly: boolean
   previewSource: string
@@ -26,6 +33,7 @@ interface EditorState {
   // than re-deriving it from the viewport dimension.
   layoutLabel: string | null
   setCompileStatus: (status: CompileStatus) => void
+  setEditorFlavor: (flavor: EditorFlavor) => void
   setSource: (source: string) => void
   setIsReadOnly: (value: boolean) => void
   setPreviewSource: (src: string) => void
@@ -39,6 +47,7 @@ interface EditorState {
 
 export const editorInitialState = {
   compileStatus: 'good' as CompileStatus,
+  editorFlavor: 'pattern' as EditorFlavor,
   source: '',
   isReadOnly: true,
   previewSource: '',
@@ -53,6 +62,7 @@ export const editorInitialState = {
 export const useEditorStore = create<EditorState>()((set) => ({
   ...editorInitialState,
   setCompileStatus: (compileStatus) => set({ compileStatus }),
+  setEditorFlavor: (editorFlavor) => set({ editorFlavor }),
   setSource: (source) => set({ source }),
   setIsReadOnly: (isReadOnly) => set({ isReadOnly }),
   setPreviewSource: (previewSource) => set({ previewSource }),

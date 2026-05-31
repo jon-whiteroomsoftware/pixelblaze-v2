@@ -10,9 +10,12 @@ import {
   DEFAULT_SHAPE_ID,
   type MapRecord,
 } from './mapStore'
+import { useEditorStore, editorInitialState } from './editorStore'
+import { MAP_SKELETON } from '@/engine/maps'
 
 beforeEach(() => {
   useMapStore.setState(mapInitialState)
+  useEditorStore.setState(editorInitialState)
 })
 
 const USER_MAP: MapRecord = {
@@ -150,5 +153,84 @@ describe('layoutSource', () => {
     expect(src.shapes.map((s) => s.id)).toEqual(['line', 'ring', 'pole'])
     expect(src.maps.map((m) => m.id)).toContain(STOCK_MAPS[0].id)
     expect(src.maps.map((m) => m.id)).toContain('u1')
+  })
+})
+
+const CUSTOM_MAP: MapRecord = {
+  id: 'cm1',
+  name: 'My Cloud',
+  dim: 2,
+  generator: 'custom',
+  params: {},
+  points: [[0, 0], [1, 1]],
+  source: 'function(pixelCount){ return [[0,0],[1,1]] }',
+  updatedAt: 2000,
+}
+
+describe('editor map mode (#151)', () => {
+  it('createNewMap persists a row, seeds the skeleton, and flips to map flavor', async () => {
+    await useMapStore.getState().createNewMap()
+    const { userMaps, editingMap, mapBaseline } = useMapStore.getState()
+    // A new map is a real row immediately (no save step), open in map mode.
+    expect(userMaps).toHaveLength(1)
+    expect(userMaps[0].source).toBe(MAP_SKELETON)
+    expect(userMaps[0].generator).toBe('custom')
+    expect(userMaps[0].name).toBe('Untitled Map')
+    expect(editingMap).toEqual({ kind: 'existing', id: userMaps[0].id })
+    expect(mapBaseline).toBe(MAP_SKELETON)
+    const ed = useEditorStore.getState()
+    expect(ed.source).toBe(MAP_SKELETON)
+    expect(ed.editorFlavor).toBe('map')
+    expect(ed.isReadOnly).toBe(false)
+  })
+
+  it('createNewMap gives each map a unique name', async () => {
+    await useMapStore.getState().createNewMap()
+    await useMapStore.getState().createNewMap()
+    const names = useMapStore.getState().userMaps.map((m) => m.name)
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('openExistingMap loads a custom map source and tracks it as the baseline', () => {
+    useMapStore.setState({ userMaps: [CUSTOM_MAP] })
+    useMapStore.getState().openExistingMap(CUSTOM_MAP)
+    expect(useMapStore.getState().editingMap).toEqual({ kind: 'existing', id: 'cm1' })
+    expect(useMapStore.getState().mapBaseline).toBe(CUSTOM_MAP.source)
+    // Opening a map for editing does not change the active layout (#153).
+    expect(useMapStore.getState().activeMapId).toBe(DEFAULT_MAP_ID)
+    expect(useEditorStore.getState().source).toBe(CUSTOM_MAP.source)
+    expect(useEditorStore.getState().editorFlavor).toBe('map')
+  })
+
+  it('openExistingMap is a no-op for a record with no source (stock maps)', () => {
+    const noSource: MapRecord = { ...CUSTOM_MAP, source: undefined }
+    useMapStore.getState().openExistingMap(noSource)
+    expect(useMapStore.getState().editingMap).toBeNull()
+    expect(useEditorStore.getState().editorFlavor).toBe('pattern')
+  })
+
+  it('loadMapTemplate replaces the buffer and resets the baseline, keeping editingMap', async () => {
+    await useMapStore.getState().createNewMap()
+    const opened = useMapStore.getState().editingMap
+    useMapStore.getState().loadMapTemplate('function(n){ return [[2,2]] }')
+    expect(useEditorStore.getState().source).toBe('function(n){ return [[2,2]] }')
+    expect(useMapStore.getState().mapBaseline).toBe('function(n){ return [[2,2]] }')
+    expect(useMapStore.getState().editingMap).toEqual(opened)
+  })
+
+  it('closeMapEditor leaves map mode and restores the pattern flavor', async () => {
+    await useMapStore.getState().createNewMap()
+    useMapStore.getState().closeMapEditor()
+    expect(useMapStore.getState().editingMap).toBeNull()
+    expect(useMapStore.getState().mapBaseline).toBe('')
+    expect(useEditorStore.getState().editorFlavor).toBe('pattern')
+  })
+
+  it('removeMap exits map mode when the deleted map was open', async () => {
+    useMapStore.setState({ userMaps: [CUSTOM_MAP] })
+    useMapStore.getState().openExistingMap(CUSTOM_MAP)
+    await useMapStore.getState().removeMap('cm1')
+    expect(useMapStore.getState().editingMap).toBeNull()
+    expect(useEditorStore.getState().editorFlavor).toBe('pattern')
   })
 })

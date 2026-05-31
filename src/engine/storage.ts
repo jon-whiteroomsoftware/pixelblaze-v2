@@ -31,6 +31,12 @@ export interface MapRecord {
   // once and replayed index-aligned by resolve (ADR-0007). Absent for stock
   // generator-based maps. Schemaless add — no DB_VERSION bump needed.
   points?: number[][]
+  // The custom map's authoring source: plain JavaScript `function(pixelCount){ …
+  // return coords }` (ADR-0008), never the Pixelblaze dialect and never run
+  // through the fixed-point shim. A custom map is source + baked output (ADR-0007);
+  // a record with no `source` (every stock map) is not openable in the editor.
+  // Schemaless add — no DB_VERSION bump needed.
+  source?: string
   updatedAt: number
 }
 
