@@ -4,6 +4,8 @@ import {
   clampPixelCount,
   MAX_PIXEL_COUNT,
   pointSize,
+  point3DSize,
+  lightEnergyComp,
   projectIndex,
   projectPos,
   projectOrbit,
@@ -17,9 +19,10 @@ export interface RendererGridConfig {
   rows: number
   cols: number
   spacing: number
-  diffusion?: number
-  // User Spacing knob: scales the dot diameter only, not the canvas size.
-  dotScale?: number
+  // Preview light size (ADR-0006): the drawn source diameter as a fraction of
+  // the inter-dot pitch. Scales the dots only, never the canvas size. Defaults
+  // to touching (1) as a backstop; the preview always supplies the real value.
+  lightSize?: number
 }
 
 function clampGrid<T extends RendererGridConfig>(grid: T): T {
@@ -37,26 +40,15 @@ export interface Renderer {
   // Switch to the 3D orbit path: draw positions come from normalized [0,1]³ `pos`
   // projected through the orbit camera each paint, with depth cueing. `null`
   // leaves 3D mode (back to the 2D grid/shape path). Sizes the canvas to a square
-  // `canvasPx`.
+  // `canvasPx`; `side` is the lattice's points-per-axis, used to anchor the
+  // light-source diameter to the lattice pitch.
   set3DPositions(
     positions: [number, number, number][] | null,
-    opts?: { canvasPx?: number },
+    opts?: { canvasPx?: number; side?: number },
   ): void
   // Update the orbit camera (auto-orbit advance, drag, reset). No-op in 2D mode.
   setCamera(camera: OrbitCamera): void
 }
-
-// Un-cued 3D dot diameter as a fraction of the square canvas edge, before
-// per-dot depth cueing. Exported so the UI's diffusion blur can match it.
-export const BASE_DOT_FRACTION = 0.02
-
-// 3D diffusion needs a different lever than 2D. The 2D grid is dense (dots
-// touch), so a CSS blur merges neighbours into a glow. The 3D cube lattice is
-// sparse — small dots with wide black gaps — so blurring isolated dots only
-// dilutes them (dimming, no glow). Instead we grow the dot diameter with
-// diffusion: additive, overlapping orbs bloom into a glow that reads like the
-// 2D case. Full diffusion grows the base dot by (1 + this).
-export const DIFFUSION_3D_GROWTH = 3
 
 const DIM_FACTOR = 0.15
 
@@ -148,6 +140,9 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   // per paint from `pos3D` + `camera`. Takes precedence over the 2D paths.
   let pos3D: [number, number, number][] | null = null
   let camera: OrbitCamera = DEFAULT_ORBIT
+  // Points-per-axis of the active 3D lattice, used to anchor the light-source
+  // diameter to the projected lattice pitch. Set by set3DPositions.
+  let lattice3DSide = 1
 
   function rebuildPositions(): void {
     const coords: number[] = []
@@ -167,7 +162,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     }
     positions = new Float32Array(coords)
     drawCount = coords.length / 2
-    sizes = new Float32Array(drawCount).fill(pointSize(grid, grid.dotScale ?? 1))
+    sizes = new Float32Array(drawCount).fill(pointSize(grid, grid.lightSize ?? 1))
     gl!.bindBuffer(gl!.ARRAY_BUFFER, posBuffer)
     gl!.bufferData(gl!.ARRAY_BUFFER, positions, gl!.STATIC_DRAW)
     gl!.bindBuffer(gl!.ARRAY_BUFFER, sizeBuffer)
@@ -193,14 +188,11 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     if (positions.length !== cap * 2) positions = new Float32Array(cap * 2)
     if (sizes.length !== cap) sizes = new Float32Array(cap)
     const bright = new Float32Array(cap)
-    // Base dot diameter tracks the canvas size; depth cueing then scales it
-    // per-dot (nearer = larger). Diffusion grows the base so additive orbs
-    // overlap into a glow (the sparse-lattice analogue of the 2D blur merge).
-    const diffusion = grid.diffusion ?? 0
-    const baseSize = Math.max(
-      1,
-      canvas.width * BASE_DOT_FRACTION * (1 + diffusion * DIFFUSION_3D_GROWTH),
-    )
+    // Base orb diameter is anchored to the projected lattice pitch via light
+    // size (ADR-0006), the 3D analogue of the 2D pointSize; depth cueing then
+    // scales it per-dot (nearer = larger). Diffusion never touches it — the blur
+    // that merges sources is a CSS filter applied by the UI layer.
+    const baseSize = point3DSize(canvas.width, lattice3DSide, grid.lightSize ?? 1)
     for (let i = 0; i < cap; i++) {
       const { clip, depth } = projectOrbit(pos3D[i], camera)
       const cue = depthCue(depth)
@@ -222,7 +214,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     if (colorData.length !== drawCount * 3) colorData = colors()
 
     const dimScale = dimmed ? DIM_FACTOR : 1
-    const scale = brightness * dimScale
+    // Energy compensation keeps total emitted light invariant to light size, so
+    // growing the sources never changes overall brightness (ADR-0006). The 3D
+    // orbs scale by light size too, so the same factor applies in both paths.
+    const scale = brightness * dimScale * lightEnergyComp(grid.lightSize ?? 1)
     for (let i = 0; i < count; i++) {
       const [r, g, b] = pixels[i]
       // Depth cueing multiplies brightness per-vertex in 3D mode (nearer = brighter).
@@ -269,10 +264,13 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function set3DPositions(
     p: [number, number, number][] | null,
-    opts: { canvasPx?: number } = {},
+    opts: { canvasPx?: number; side?: number } = {},
   ): void {
     pos3D = p
     if (p) {
+      // Anchor the orb diameter to the lattice pitch: prefer the caller's `side`,
+      // else recover it as the cube root of the point count (count = side³).
+      lattice3DSide = opts.side ?? Math.max(1, Math.round(Math.cbrt(p.length)))
       if (opts.canvasPx) {
         const px = Math.max(1, Math.round(opts.canvasPx))
         canvas.width = px

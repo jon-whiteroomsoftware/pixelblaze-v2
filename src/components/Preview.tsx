@@ -17,11 +17,18 @@ import { useCameraStore } from '@/store/cameraStore'
 import { createShim, createFxShim, type ShimContext } from '@/engine/shim'
 import { loadPattern, nativeDimension } from '@/engine/loadPattern'
 import { bundle } from '@/engine/bundle'
-import { createRenderer, BASE_DOT_FRACTION } from '@/engine/renderer'
+import { createRenderer } from '@/engine/renderer'
 import { createRenderLoop, type RenderLoop } from '@/engine/renderLoop'
 import { createVirtualClock } from '@/engine/virtualClock'
 import { createPlaneMap, cubePixelCount } from '@/engine/maps'
-import { clampPixelCount, advanceAutoOrbit } from '@/engine/camera'
+import {
+  clampPixelCount,
+  advanceAutoOrbit,
+  lattice3DPitchPx,
+  diffusionBlurStdDev,
+  DIFFUSION_BLUR_PITCH_FACTOR_2D,
+  DIFFUSION_BLUR_PITCH_FACTOR_3D,
+} from '@/engine/camera'
 import { layoutSource as buildLayoutSource } from '@/store/mapStore'
 import { resolveLayoutSelection } from '@/engine/layout'
 import { SHAPES, embedPositions, type ShapeId } from '@/engine/shapes'
@@ -41,7 +48,8 @@ export function Preview() {
   const rendererRef = useRef<ReturnType<typeof createRenderer> | null>(null)
   const isRunning = usePreviewStore((s) => s.isRunning)
   const grid = usePreviewStore((s) => s.grid)
-  const spacingScale = usePreviewStore((s) => s.spacingScale)
+  const lightSize = usePreviewStore((s) => s.lightSize)
+  const diffusion = usePreviewStore((s) => s.diffusion)
   const fidelity = usePreviewStore((s) => s.fidelity)
   const previewSource = useEditorStore((s) => s.previewSource)
   const displayDim = useEditorStore((s) => s.displayDim)
@@ -52,7 +60,7 @@ export function Preview() {
   const activePixelCount = useMapStore((s) => s.activePixelCount)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
-  const [canvasDims, setCanvasDims] = useState<{ spacing: number; dotScale: number } | null>(null)
+  const [canvasDims, setCanvasDims] = useState<{ spacing: number; lightSize: number } | null>(null)
   // The square 3D viewport size (CSS px) when a 3D layout is active, else null.
   // Drives the diffusion blur in 3D, where there is no locked-2D `spacing`.
   const [canvas3DPx, setCanvas3DPx] = useState<number | null>(null)
@@ -69,12 +77,12 @@ export function Preview() {
       const { width } = entry.contentRect
       const { cols } = usePreviewStore.getState().grid
       // Auto-fit the pitch to the container so the grid always fills the pane.
-      // The Spacing knob scales the dots only (dotScale), not the canvas size.
+      // Light size scales the drawn sources only, not the canvas size.
       const spacing = Math.max(1, width / cols)
-      const dotScale = usePreviewStore.getState().spacingScale
-      setCanvasDims({ spacing, dotScale })
+      const lightSize = usePreviewStore.getState().lightSize
+      setCanvasDims({ spacing, lightSize })
       if (rendererRef.current) {
-        rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing, dotScale })
+        rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing, lightSize })
         if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
       }
     })
@@ -82,13 +90,13 @@ export function Preview() {
     return () => ro.disconnect()
   }, [])
 
-  // Recompute spacing when cols or the spacing scale changes without a resize
+  // Recompute spacing when cols or the light size changes without a resize
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const { width } = el.getBoundingClientRect()
-    setCanvasDims({ spacing: Math.max(1, width / grid.cols), dotScale: spacingScale })
-  }, [grid.cols, spacingScale])
+    setCanvasDims({ spacing: Math.max(1, width / grid.cols), lightSize })
+  }, [grid.cols, lightSize])
 
   // Rebuild the loop whenever source or spacing changes
   useEffect(() => {
@@ -239,7 +247,7 @@ export function Preview() {
     if (positions3D) {
       const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 400
       const px = cube3DCanvasPx(containerWidth)
-      renderer.set3DPositions(positions3D, { canvasPx: px })
+      renderer.set3DPositions(positions3D, { canvasPx: px, side: DEFAULT_CUBE_SIDE })
       renderer.setCamera(useCameraStore.getState().camera)
       setCanvas3DPx(px)
     } else {
@@ -399,20 +407,44 @@ export function Preview() {
     return () => cancelAnimationFrame(raf)
   }, [displayDim])
 
-  // Diffusion blur: scaled to the dot pitch so it reads the same at any size. In
-  // 2D the pitch is the grid `spacing`; in 3D it's the camera's base dot diameter
-  // (canvas edge × BASE_DOT_FRACTION), so the slider behaves the same in 3D.
+  // Diffusion blur (ADR-0006): a Gaussian blur that merges the sources, applied
+  // via an SVG feGaussianBlur (below) which runs in LINEAR light. CSS `blur()`
+  // runs in gamma-encoded sRGB, where averaging a bright pixel with black lands
+  // below the true midpoint — so it systematically dims (the #75 regression).
+  // Linear-light blur conserves energy: peaks soften and gaps fill, but the
+  // overall level holds, and it never resizes the sources. Scaled to the inter-
+  // dot pitch so it reads the same at any size: in 2D the pitch is the grid
+  // `spacing`; in 3D it's the projected lattice pitch — uniform across dimensions.
   const diffusionPitch =
     displayDim === 3
-      ? (canvas3DPx ?? 0) * BASE_DOT_FRACTION
+      ? lattice3DPitchPx(canvas3DPx ?? 0, DEFAULT_CUBE_SIDE)
       : canvasDims?.spacing ?? grid.spacing
+  const diffusionFactor =
+    displayDim === 3 ? DIFFUSION_BLUR_PITCH_FACTOR_3D : DIFFUSION_BLUR_PITCH_FACTOR_2D
+  const diffusionStdDev = diffusionBlurStdDev(diffusion, diffusionPitch, diffusionFactor)
   const diffusionFilter =
-    grid.diffusion > 0 && diffusionPitch > 0
-      ? { filter: `blur(${(grid.diffusion * diffusionPitch * 1.05).toFixed(1)}px)` }
-      : undefined
+    diffusionStdDev > 0 ? { filter: 'url(#preview-diffusion)' } : undefined
 
   return (
     <div className="h-full bg-zinc-950 pt-3 pl-3 flex flex-col">
+      {/* Linear-light Gaussian blur for diffusion. SVG filters default to
+          color-interpolation-filters: linearRGB (set explicitly here), so the
+          blur conserves energy and does not dim, unlike CSS blur() in sRGB. The
+          generous filter region keeps a wide blur from clipping at the edges. */}
+      <svg className="absolute w-0 h-0" aria-hidden="true">
+        <defs>
+          <filter
+            id="preview-diffusion"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+            colorInterpolationFilters="linearRGB"
+          >
+            <feGaussianBlur stdDeviation={diffusionStdDev} />
+          </filter>
+        </defs>
+      </svg>
       <div ref={containerRef} className="relative w-full flex-1 min-h-0">
         <div className="flex flex-col">
           <div className="relative inline-block">

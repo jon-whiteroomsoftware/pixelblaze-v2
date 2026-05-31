@@ -40,7 +40,16 @@ describe('previewStore', () => {
     expect(grid.rows).toBe(32)
     expect(grid.cols).toBe(32)
     expect(grid.spacing).toBe(20)
-    expect(grid.diffusion).toBe(0.5)
+  })
+
+  it('defaults light size to 0.5 and diffusion to 0.5 (preview viewport prefs)', () => {
+    const s = usePreviewStore.getState()
+    expect(s.lightSize).toBe(0.5)
+    expect(s.diffusion).toBe(0.5)
+  })
+
+  it('keeps diffusion out of the grid (ADR-0006 hoist)', () => {
+    expect('diffusion' in usePreviewStore.getState().grid).toBe(false)
   })
 
   it('setGrid merges partial grid updates', () => {
@@ -86,54 +95,75 @@ describe('previewStore', () => {
 })
 
 describe('mergePersistedPreview', () => {
-  it('fills in a missing grid field from defaults (pre-rename persisted state)', () => {
+  it('preserves persisted grid dimensions and never re-adds diffusion to the grid', () => {
     const current = usePreviewStore.getState()
-    // Simulate a blob saved before `diffusion` existed (had `glowAmount` instead)
-    const persisted = { grid: { rows: 8, cols: 8, spacing: 20, glowAmount: 8 } }
+    const persisted = { grid: { rows: 8, cols: 8, spacing: 20 } }
     const merged = mergePersistedPreview(persisted, current)
-    expect(merged.grid.diffusion).toBe(previewInitialState.grid.diffusion)
     expect(merged.grid.rows).toBe(8)
     expect(merged.grid.cols).toBe(8)
+    expect('diffusion' in merged.grid).toBe(false)
   })
 
-  it('preserves a persisted diffusion value', () => {
+  it('migrates a pre-ADR-0006 blob: grid.diffusion lifts to the top level, dropped from grid', () => {
     const current = usePreviewStore.getState()
+    // Simulate a blob saved before diffusion was hoisted out of `grid`.
     const persisted = { grid: { rows: 16, cols: 16, spacing: 20, diffusion: 0.6 } }
-    expect(mergePersistedPreview(persisted, current).grid.diffusion).toBe(0.6)
+    const merged = mergePersistedPreview(persisted, current)
+    expect(merged.diffusion).toBe(0.6)
+    expect('diffusion' in merged.grid).toBe(false)
+  })
+
+  it('prefers a top-level persisted diffusion over a legacy grid.diffusion', () => {
+    const current = usePreviewStore.getState()
+    const persisted = { diffusion: 0.2, grid: { rows: 16, cols: 16, spacing: 20, diffusion: 0.6 } }
+    expect(mergePersistedPreview(persisted, current).diffusion).toBe(0.2)
   })
 
   it('clamps an oversized persisted grid to 256 on load', () => {
     const current = usePreviewStore.getState()
-    const persisted = { grid: { rows: 999999, cols: 500, spacing: 20, diffusion: 0.5 } }
+    const persisted = { grid: { rows: 999999, cols: 500, spacing: 20 } }
     const merged = mergePersistedPreview(persisted, current)
     expect(merged.grid.rows).toBe(256)
     expect(merged.grid.cols).toBe(256)
   })
 
-  it('defaults spacingScale to 1 when absent from a pre-feature blob', () => {
+  it('defaults lightSize and diffusion when absent from a pre-feature blob', () => {
     const current = usePreviewStore.getState()
-    expect(mergePersistedPreview({ grid: current.grid }, current).spacingScale).toBe(1)
+    const merged = mergePersistedPreview({ grid: current.grid }, current)
+    expect(merged.lightSize).toBe(previewInitialState.lightSize)
+    expect(merged.diffusion).toBe(previewInitialState.diffusion)
   })
 
-  it('preserves and clamps a persisted spacingScale', () => {
+  it('preserves and clamps a persisted lightSize to the 0.15–0.95 range', () => {
     const current = usePreviewStore.getState()
-    expect(mergePersistedPreview({ spacingScale: 2 }, current).spacingScale).toBe(2)
-    expect(mergePersistedPreview({ spacingScale: 99 }, current).spacingScale).toBe(4)
-    expect(mergePersistedPreview({ spacingScale: 0 }, current).spacingScale).toBe(0.25)
+    expect(mergePersistedPreview({ lightSize: 0.7 }, current).lightSize).toBe(0.7)
+    expect(mergePersistedPreview({ lightSize: 99 }, current).lightSize).toBe(0.95)
+    expect(mergePersistedPreview({ lightSize: 0 }, current).lightSize).toBe(0.15)
   })
 })
 
-describe('spacingScale', () => {
-  it('defaults to 1 (fit-to-container, no-regression)', () => {
-    expect(usePreviewStore.getState().spacingScale).toBe(1)
+describe('lightSize', () => {
+  it('defaults to 0.5', () => {
+    expect(usePreviewStore.getState().lightSize).toBe(0.5)
   })
 
-  it('setSpacingScale clamps to the comfort range', () => {
-    usePreviewStore.getState().setSpacingScale(2)
-    expect(usePreviewStore.getState().spacingScale).toBe(2)
-    usePreviewStore.getState().setSpacingScale(100)
-    expect(usePreviewStore.getState().spacingScale).toBe(4)
-    usePreviewStore.getState().setSpacingScale(-5)
-    expect(usePreviewStore.getState().spacingScale).toBe(0.25)
+  it('setLightSize clamps to the 0.15–0.95 range', () => {
+    usePreviewStore.getState().setLightSize(0.7)
+    expect(usePreviewStore.getState().lightSize).toBe(0.7)
+    usePreviewStore.getState().setLightSize(100)
+    expect(usePreviewStore.getState().lightSize).toBe(0.95)
+    usePreviewStore.getState().setLightSize(-5)
+    expect(usePreviewStore.getState().lightSize).toBe(0.15)
+  })
+})
+
+describe('diffusion', () => {
+  it('setDiffusion clamps to the 0–1 range', () => {
+    usePreviewStore.getState().setDiffusion(0.3)
+    expect(usePreviewStore.getState().diffusion).toBe(0.3)
+    usePreviewStore.getState().setDiffusion(2)
+    expect(usePreviewStore.getState().diffusion).toBe(1)
+    usePreviewStore.getState().setDiffusion(-1)
+    expect(usePreviewStore.getState().diffusion).toBe(0)
   })
 })

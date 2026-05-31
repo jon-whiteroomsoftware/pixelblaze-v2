@@ -50,12 +50,13 @@ export function fitSpacing(containerWidth: number, cols: number): number {
   return Math.max(1, containerWidth / Math.max(1, cols))
 }
 
-// Dot diameter in pixels — at scale 1 dots just touch their neighbours (legacy
-// radius was max(0.5, spacing/2); diameter is the WebGL gl_PointSize). `scale`
-// is the user's Spacing knob: it grows/shrinks the dots WITHOUT resizing the
-// canvas, so the grid always fits the pane (canvasSize is scale-independent).
-export function pointSize(grid: Locked2DGrid, scale: number = 1): number {
-  return Math.max(1, grid.spacing * scale)
+// Drawn light-source diameter in pixels (the WebGL gl_PointSize) for the 2D
+// path: the inter-dot pitch (`grid.spacing`) times the preview light-size
+// fraction (ADR-0006). At lightSize 0.95 sources almost touch; it grows them in
+// place WITHOUT resizing the canvas, so the grid always fits the pane
+// (canvasSize is lightSize-independent).
+export function pointSize(grid: Locked2DGrid, lightSize: number = 1): number {
+  return Math.max(1, grid.spacing * lightSize)
 }
 
 // Project a row-major grid index to WebGL clip space [-1,1]² (y axis up), or
@@ -162,6 +163,60 @@ export function projectOrbit(
   const centred: Vec3 = [pos[0] - 0.5, pos[1] - 0.5, pos[2] - 0.5]
   const [rx, ry, rz] = orbitRotate(centred, cam)
   return { clip: [rx * scale, ry * scale], depth: rz }
+}
+
+// Inter-dot pitch of a side×side×side lattice, projected to canvas pixels: the
+// screen-space distance between adjacent lattice points along one axis. The
+// normalized axis pitch is 1/(side-1); `projectOrbit` scales it by `scale` into
+// clip space, where the full [-1,1] span (2 units) covers `canvasPx` pixels. A
+// degenerate single-cell axis has no pitch, so we fall back to the full extent.
+export function lattice3DPitchPx(
+  canvasPx: number,
+  side: number,
+  scale: number = fit3DScale(),
+): number {
+  const clipPitch = side > 1 ? scale / (side - 1) : scale
+  return (clipPitch / 2) * canvasPx
+}
+
+// Drawn light-source diameter in pixels for the 3D lattice (the un-cued base,
+// before per-dot depth cueing): the lattice pitch times the preview light-size
+// fraction (ADR-0006), so "almost touching" lands at the same felt point as 2D.
+export function point3DSize(canvasPx: number, side: number, lightSize: number): number {
+  return Math.max(1, lattice3DPitchPx(canvasPx, side) * lightSize)
+}
+
+// Default preview light size — the reference point for energy compensation and
+// the store's initial value (ADR-0006).
+export const DEFAULT_LIGHT_SIZE = 0.5
+
+// Energy-conserving intensity compensation for light size (ADR-0006): a source's
+// total emitted light must stay invariant to its drawn diameter, so brightness
+// is the only control that changes brightness. Drawn area scales as lightSize²,
+// so per-pixel intensity scales as 1/lightSize². Referenced to the default size,
+// so the default view is unchanged. Under additive blending this makes the
+// integrated on-screen light exactly invariant to light size (overlaps included).
+export function lightEnergyComp(lightSize: number, refSize: number = DEFAULT_LIGHT_SIZE): number {
+  if (lightSize <= 0) return 1
+  return (refSize / lightSize) ** 2
+}
+
+// Diffusion blur radius (Gaussian std-dev, px). The blur scales with the inter-
+// dot pitch and a per-dimension factor, then is applied in linear light (SVG
+// feGaussianBlur, linearRGB) so it conserves energy and never dims — peaks may
+// soften and gaps fill, but the overall level holds (ADR-0006).
+//
+// The factor is eyeball-calibrated per dimension because "pitch" means different
+// things on screen (the ADR mandates uniform *feel*, not a shared code path).
+// In 2D/1D the grid pitch IS the on-screen neighbour distance, so a strong
+// factor is needed to fully merge at 100%. In 3D the lattice axis pitch badly
+// overestimates the on-screen spacing — orthographic projection stacks every
+// depth layer into the gaps — so a much smaller factor matches the same feel.
+export const DIFFUSION_BLUR_PITCH_FACTOR_2D = 2.8
+export const DIFFUSION_BLUR_PITCH_FACTOR_3D = 0.35
+export function diffusionBlurStdDev(diffusion: number, pitchPx: number, factor: number): number {
+  if (diffusion <= 0 || pitchPx <= 0) return 0
+  return diffusion * pitchPx * factor
 }
 
 export interface DepthCue {

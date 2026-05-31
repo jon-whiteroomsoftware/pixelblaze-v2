@@ -14,6 +14,13 @@ import {
   orbitRotate,
   fit3DScale,
   FIT_3D_MARGIN,
+  lattice3DPitchPx,
+  point3DSize,
+  lightEnergyComp,
+  DEFAULT_LIGHT_SIZE,
+  diffusionBlurStdDev,
+  DIFFUSION_BLUR_PITCH_FACTOR_2D,
+  DIFFUSION_BLUR_PITCH_FACTOR_3D,
   projectOrbit,
   depthCue,
   applyTurntableDrag,
@@ -62,12 +69,81 @@ describe('camera — fit-to-container & sizing', () => {
     expect(pointSize({ rows: 8, cols: 8, spacing: 0.4 })).toBe(1)
   })
 
-  it('dot scale grows/shrinks the dot without touching the canvas size', () => {
+  it('light size scales the source diameter (pitch × fraction) without touching the canvas size', () => {
     const grid = { rows: 8, cols: 8, spacing: 20 }
-    expect(pointSize(grid, 2)).toBe(40)
     expect(pointSize(grid, 0.5)).toBe(10)
-    // Canvas size is independent of the dot scale — the grid still fits the pane.
+    expect(pointSize(grid, 0.95)).toBe(19)
+    // Canvas size is independent of the light size — the grid still fits the pane.
     expect(canvasSize(grid)).toEqual({ width: 160, height: 160 })
+  })
+})
+
+describe('camera — 3D light size (ADR-0006)', () => {
+  it('lattice pitch is the projected screen-space gap between adjacent points', () => {
+    // 8-per-axis lattice, 400px square canvas. Normalized pitch 1/(side-1) is
+    // scaled into clip space and converted to px (clip span 2 ↔ canvasPx).
+    const expected = (fit3DScale() / 7 / 2) * 400
+    expect(lattice3DPitchPx(400, 8)).toBeCloseTo(expected, 6)
+  })
+
+  it('a single-cell axis has no pitch, so falls back to the full projected extent', () => {
+    expect(lattice3DPitchPx(400, 1)).toBeCloseTo((fit3DScale() / 2) * 400, 6)
+  })
+
+  it('point3DSize is the lattice pitch times the light-size fraction', () => {
+    const pitch = lattice3DPitchPx(400, 8)
+    expect(point3DSize(400, 8, 0.5)).toBeCloseTo(pitch * 0.5, 6)
+    // Larger light size → larger orb; "almost touching" near 0.95.
+    expect(point3DSize(400, 8, 0.95)).toBeGreaterThan(point3DSize(400, 8, 0.5))
+  })
+
+  it('never produces a sub-pixel diameter', () => {
+    expect(point3DSize(10, 256, 0.15)).toBe(1)
+  })
+})
+
+describe('camera — light-size energy compensation (ADR-0006)', () => {
+  it('is 1 at the default light size (no change to the default view)', () => {
+    expect(lightEnergyComp(DEFAULT_LIGHT_SIZE)).toBe(1)
+  })
+
+  it('scales as 1/lightSize² so total emitted light stays constant', () => {
+    // Doubling the diameter quarters the per-pixel intensity (area ×4).
+    expect(lightEnergyComp(1, 0.5)).toBeCloseTo(0.25, 6)
+    expect(lightEnergyComp(0.25, 0.5)).toBeCloseTo(4, 6)
+  })
+
+  it('integrated light is invariant: intensity × area is constant across sizes', () => {
+    const area = (f: number) => f * f
+    const energy = (f: number) => lightEnergyComp(f) * area(f)
+    expect(energy(0.15)).toBeCloseTo(energy(0.95), 6)
+    expect(energy(0.5)).toBeCloseTo(energy(0.95), 6)
+  })
+
+  it('guards a zero/negative light size', () => {
+    expect(lightEnergyComp(0)).toBe(1)
+  })
+})
+
+describe('camera — diffusion blur radius (ADR-0006)', () => {
+  it('scales with diffusion, the inter-dot pitch, and the per-dimension factor', () => {
+    expect(diffusionBlurStdDev(1, 20, DIFFUSION_BLUR_PITCH_FACTOR_2D)).toBeCloseTo(
+      20 * DIFFUSION_BLUR_PITCH_FACTOR_2D,
+      6,
+    )
+    expect(diffusionBlurStdDev(0.5, 20, DIFFUSION_BLUR_PITCH_FACTOR_3D)).toBeCloseTo(
+      10 * DIFFUSION_BLUR_PITCH_FACTOR_3D,
+      6,
+    )
+  })
+
+  it('blurs 3D much less per unit pitch than 2D (projection packs depth layers)', () => {
+    expect(DIFFUSION_BLUR_PITCH_FACTOR_3D).toBeLessThan(DIFFUSION_BLUR_PITCH_FACTOR_2D)
+  })
+
+  it('is zero (no filter) at zero diffusion or zero pitch', () => {
+    expect(diffusionBlurStdDev(0, 20, DIFFUSION_BLUR_PITCH_FACTOR_2D)).toBe(0)
+    expect(diffusionBlurStdDev(0.5, 0, DIFFUSION_BLUR_PITCH_FACTOR_2D)).toBe(0)
   })
 })
 

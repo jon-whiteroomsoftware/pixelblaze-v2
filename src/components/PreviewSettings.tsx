@@ -3,7 +3,7 @@ import { Settings } from 'lucide-react'
 import { usePreviewStore } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
 import { MAX_GRID_AXIS } from '@/engine/camera'
-import { MIN_SPACING_SCALE, MAX_SPACING_SCALE } from '@/store/previewStore'
+import { MIN_LIGHT_SIZE, MAX_LIGHT_SIZE } from '@/store/previewStore'
 
 const PRIMARY_BUILTIN_VARS = ['elapsed', 'pixelCount']
 
@@ -46,9 +46,10 @@ export function PreviewSettings() {
 
   const brightness = usePreviewStore((s) => s.brightness)
   const setBrightness = usePreviewStore((s) => s.setBrightness)
-  const diffusion = usePreviewStore((s) => s.grid.diffusion)
-  const spacingScale = usePreviewStore((s) => s.spacingScale)
-  const setSpacingScale = usePreviewStore((s) => s.setSpacingScale)
+  const diffusion = usePreviewStore((s) => s.diffusion)
+  const setDiffusion = usePreviewStore((s) => s.setDiffusion)
+  const lightSize = usePreviewStore((s) => s.lightSize)
+  const setLightSize = usePreviewStore((s) => s.setLightSize)
   const fidelity = usePreviewStore((s) => s.fidelity)
   const setFidelity = usePreviewStore((s) => s.setFidelity)
   const gridRows = usePreviewStore((s) => s.grid.rows)
@@ -134,14 +135,14 @@ export function PreviewSettings() {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-zinc-500">Spacing</span>
+                <span className="text-xs text-zinc-500">Light size</span>
                 <input
                   type="range"
-                  min={MIN_SPACING_SCALE}
-                  max={MAX_SPACING_SCALE}
+                  min={MIN_LIGHT_SIZE}
+                  max={MAX_LIGHT_SIZE}
                   step={0.05}
-                  value={spacingScale}
-                  onChange={(e) => setSpacingScale(Number(e.target.value))}
+                  value={lightSize}
+                  onChange={(e) => setLightSize(Number(e.target.value))}
                   className="w-full accent-amber-500"
                 />
               </label>
@@ -153,7 +154,7 @@ export function PreviewSettings() {
                   max={1}
                   step={0.01}
                   value={diffusion}
-                  onChange={(e) => setGrid({ diffusion: Number(e.target.value) })}
+                  onChange={(e) => setDiffusion(Number(e.target.value))}
                   className="w-full accent-amber-500"
                 />
               </label>

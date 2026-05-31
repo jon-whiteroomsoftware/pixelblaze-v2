@@ -69,8 +69,17 @@ describe('PreviewSettings', () => {
     render(<PreviewSettings />)
     await user.click(screen.getByRole('button', { name: /preview settings/i }))
     const slider = screen.getByRole('slider', { name: /diffusion/i })
-    fireEvent.change(slider, { target: { value: '0.5' } })
-    expect(usePreviewStore.getState().grid.diffusion).toBe(0.5)
+    fireEvent.change(slider, { target: { value: '0.3' } })
+    expect(usePreviewStore.getState().diffusion).toBe(0.3)
+  })
+
+  it('light size slider updates the store', async () => {
+    const user = userEvent.setup()
+    render(<PreviewSettings />)
+    await user.click(screen.getByRole('button', { name: /preview settings/i }))
+    const slider = screen.getByRole('slider', { name: /light size/i })
+    fireEvent.change(slider, { target: { value: '0.8' } })
+    expect(usePreviewStore.getState().lightSize).toBe(0.8)
   })
 
   it('renderer toggle shows both Fast and Precise options', async () => {

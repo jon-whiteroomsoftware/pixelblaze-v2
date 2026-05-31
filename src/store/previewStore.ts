@@ -1,12 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { clampGridDim } from '../engine/camera'
+import { clampGridDim, DEFAULT_LIGHT_SIZE } from '../engine/camera'
 
 export interface GridConfig {
   rows: number
   cols: number
   spacing: number
-  diffusion: number
 }
 
 export type FidelityMode = 'fidelity' | 'fast'
@@ -16,10 +15,16 @@ interface PreviewState {
   speed: number
   brightness: number
   grid: GridConfig
-  // Uniform camera scale (§5, ADR-0005): a display-only, pattern-invisible
-  // multiplier on the auto-fit dot spacing. 1 = today's fit-to-container layout
-  // (no-regression). Global viewport-comfort pref — persisted, not per-pattern.
-  spacingScale: number
+  // Preview light size (ADR-0006): the drawn diameter of each light source as a
+  // fraction of the inter-dot pitch (diameter = pitch × lightSize). Grows the
+  // sources in place — never moves dots or resizes the canvas. A preview-only
+  // viewing-comfort pref, persisted globally; never written to a map/controller.
+  lightSize: number
+  // Diffusion (ADR-0006): a blur that merges the light sources. A sibling
+  // viewport pref alongside lightSize — deliberately NOT inside `grid`, so no
+  // preview construct lives in anything that could serialize toward a map. Hard
+  // invariants: it never changes source size, and it never dims the field.
+  diffusion: number
   fidelity: FidelityMode
   watchedBuiltins: string[]
   watchedPatternVars: string[]
@@ -30,7 +35,8 @@ interface PreviewState {
   setFidelity: (fidelity: FidelityMode) => void
   setSpeed: (speed: number) => void
   setBrightness: (brightness: number) => void
-  setSpacingScale: (scale: number) => void
+  setLightSize: (lightSize: number) => void
+  setDiffusion: (diffusion: number) => void
   setGrid: (partial: Partial<GridConfig>) => void
   setWatchedBuiltins: (vars: string[]) => void
   setWatchedPatternVars: (vars: string[]) => void
@@ -45,9 +51,9 @@ export const previewInitialState = {
     rows: 32,
     cols: 32,
     spacing: 20,
-    diffusion: 0.5,
   },
-  spacingScale: 1,
+  lightSize: DEFAULT_LIGHT_SIZE,
+  diffusion: 0.5,
   // The Fast renderer (float64) is the default on load: it's the smoother,
   // good-enough preview. The Precise renderer (16.16 fixed-point) is an opt-in
   // for checking hardware-accurate behaviour — and even it isn't bit-exact
@@ -61,36 +67,48 @@ export const previewInitialState = {
   fps: null as number | null,
 }
 
-// Clamp a (possibly partial) grid's dimensions to the renderer's hard ceiling.
-// Guards against an absurdly large persisted value freezing the tab on load.
+// Clamp a (possibly partial) grid's dimensions to the renderer's hard ceiling,
+// projecting down to just the known fields so a legacy blob's stray keys (e.g.
+// the pre-ADR-0006 `grid.diffusion`) never leak back onto `grid`. Guards against
+// an absurdly large persisted value freezing the tab on load.
 function clampGrid(grid: GridConfig): GridConfig {
-  return { ...grid, rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols) }
+  return { rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols), spacing: grid.spacing }
 }
 
-// Spacing scale is a comfort multiplier: clamp to a sane spread so a stale or
-// fat-fingered value can neither collapse dots to a point nor balloon them off
-// the canvas. The 1× default reproduces fit-to-container exactly.
-export const MIN_SPACING_SCALE = 0.25
-export const MAX_SPACING_SCALE = 4
-function clampSpacingScale(scale: number): number {
-  if (!Number.isFinite(scale)) return 1
-  return Math.max(MIN_SPACING_SCALE, Math.min(MAX_SPACING_SCALE, scale))
+// Light size sweeps f: 0.15 (clearly separated) → 0.95 (almost touching), with
+// 0.5 the default (ADR-0006). Clamp so a stale or fat-fingered value can neither
+// collapse sources to a point nor balloon them past touching.
+export const MIN_LIGHT_SIZE = 0.15
+export const MAX_LIGHT_SIZE = 0.95
+function clampLightSize(f: number): number {
+  if (!Number.isFinite(f)) return DEFAULT_LIGHT_SIZE
+  return Math.max(MIN_LIGHT_SIZE, Math.min(MAX_LIGHT_SIZE, f))
+}
+
+// Diffusion sweeps 0 (crisp/distinct sources) → 1 (opaque merged field).
+function clampDiffusion(d: number): number {
+  if (!Number.isFinite(d)) return 0
+  return Math.max(0, Math.min(1, d))
 }
 
 // Deep-merge persisted state over the live state so a persisted `grid` that
-// predates a newly-added field (e.g. `diffusion`) falls back to its default
-// instead of arriving as `undefined`. The default shallow merge would replace
-// the whole grid object, dropping any key the saved blob never had. Dimensions
-// are clamped here so a stale oversized blob can never reach the renderer.
+// predates a newly-added field falls back to its default instead of arriving as
+// `undefined`. The default shallow merge would replace the whole grid object,
+// dropping any key the saved blob never had. Dimensions are clamped here so a
+// stale oversized blob can never reach the renderer. `diffusion` migrated out of
+// `grid` (ADR-0006), so a pre-rework blob's `grid.diffusion` is honoured as the
+// fallback for the new top-level field.
 export function mergePersistedPreview(persisted: unknown, current: PreviewState): PreviewState {
   const p = (persisted ?? {}) as Partial<
-    Pick<PreviewState, 'brightness' | 'speed' | 'grid' | 'spacingScale'>
-  >
+    Pick<PreviewState, 'brightness' | 'speed' | 'grid' | 'lightSize' | 'diffusion'>
+  > & { grid?: { diffusion?: number } }
+  const legacyDiffusion = p.grid?.diffusion
   return {
     ...current,
     ...p,
     grid: clampGrid({ ...current.grid, ...(p.grid ?? {}) }),
-    spacingScale: clampSpacingScale(p.spacingScale ?? current.spacingScale),
+    lightSize: clampLightSize(p.lightSize ?? current.lightSize),
+    diffusion: clampDiffusion(p.diffusion ?? legacyDiffusion ?? current.diffusion),
   }
 }
 
@@ -103,7 +121,8 @@ export const usePreviewStore = create<PreviewState>()(
       setFidelity: (fidelity) => set({ fidelity }),
       setSpeed: (speed) => set({ speed }),
       setBrightness: (brightness) => set({ brightness }),
-      setSpacingScale: (scale) => set({ spacingScale: clampSpacingScale(scale) }),
+      setLightSize: (lightSize) => set({ lightSize: clampLightSize(lightSize) }),
+      setDiffusion: (diffusion) => set({ diffusion: clampDiffusion(diffusion) }),
       setGrid: (partial) => set((s) => ({ grid: clampGrid({ ...s.grid, ...partial }) })),
       setWatchedBuiltins: (watchedBuiltins) => set({ watchedBuiltins }),
       setWatchedPatternVars: (watchedPatternVars) => set({ watchedPatternVars }),
@@ -115,7 +134,8 @@ export const usePreviewStore = create<PreviewState>()(
         brightness: s.brightness,
         speed: s.speed,
         grid: s.grid,
-        spacingScale: s.spacingScale,
+        lightSize: s.lightSize,
+        diffusion: s.diffusion,
       }),
       merge: mergePersistedPreview,
     }
