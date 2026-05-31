@@ -22,6 +22,7 @@ import {
   DIFFUSION_BLUR_PITCH_FACTOR_2D,
   DIFFUSION_BLUR_PITCH_FACTOR_3D,
   projectOrbit,
+  orbitDepthToClipZ,
   depthCue,
   applyTurntableDrag,
   applyTrackballDrag,
@@ -137,7 +138,7 @@ describe('camera — diffusion blur radius (ADR-0006)', () => {
     )
   })
 
-  it('blurs 3D much less per unit pitch than 2D (projection packs depth layers)', () => {
+  it('blurs 3D slightly less per unit pitch than 2D (orbit foreshortens on-screen pitch)', () => {
     expect(DIFFUSION_BLUR_PITCH_FACTOR_3D).toBeLessThan(DIFFUSION_BLUR_PITCH_FACTOR_2D)
   })
 
@@ -235,6 +236,29 @@ describe('camera — 3D fit-to-container', () => {
       expect(Math.abs(clip[0])).toBeLessThanOrEqual(FIT_3D_MARGIN + 1e-9)
       expect(Math.abs(clip[1])).toBeLessThanOrEqual(FIT_3D_MARGIN + 1e-9)
     }
+  })
+})
+
+describe('camera — orbit depth to clip z (opaque 3D)', () => {
+  const halfDiag = 0.5 * Math.sqrt(3)
+
+  it('maps the nearest point (largest depth) to the front of the frustum', () => {
+    // projectOrbit returns larger-z = nearer; the depth test keeps the smallest
+    // z, so the nearest point must land at the front clip plane (-1).
+    expect(orbitDepthToClipZ(halfDiag)).toBeCloseTo(-1, 9)
+  })
+
+  it('maps the farthest point (most negative depth) to the back of the frustum', () => {
+    expect(orbitDepthToClipZ(-halfDiag)).toBeCloseTo(1, 9)
+  })
+
+  it('puts the model centre at the mid-plane', () => {
+    expect(orbitDepthToClipZ(0)).toBeCloseTo(0, 9)
+  })
+
+  it('clamps a beyond-worst-case depth into clip space', () => {
+    expect(orbitDepthToClipZ(2 * halfDiag)).toBe(-1)
+    expect(orbitDepthToClipZ(-2 * halfDiag)).toBe(1)
   })
 })
 

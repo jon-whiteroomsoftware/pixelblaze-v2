@@ -165,6 +165,18 @@ export function projectOrbit(
   return { clip: [rx * scale, ry * scale], depth: rz }
 }
 
+// Map `projectOrbit`'s rotated depth to a WebGL clip-space z for the depth
+// buffer, so 3D orbs render OPAQUE (nearer occludes farther) instead of
+// additively blending into a translucent, washed-out field (ADR-0006: diffusion
+// 0 must read as crisp, distinct sources). `projectOrbit` returns larger-z =
+// nearer; the depth test keeps the SMALLEST z, so nearer maps to the smaller
+// (front) clip z. Normalized by the model's worst-case half-extent so it spans
+// [-1,1] front→back, clamped so a corner point can't fall outside the frustum.
+export function orbitDepthToClipZ(depth: number): number {
+  const z = -depth / HALF_DIAGONAL
+  return z < -1 ? -1 : z > 1 ? 1 : z
+}
+
 // Inter-dot pitch of a side×side×side lattice, projected to canvas pixels: the
 // screen-space distance between adjacent lattice points along one axis. The
 // normalized axis pitch is 1/(side-1); `projectOrbit` scales it by `scale` into
@@ -206,14 +218,22 @@ export function lightEnergyComp(lightSize: number, refSize: number = DEFAULT_LIG
 // feGaussianBlur, linearRGB) so it conserves energy and never dims — peaks may
 // soften and gaps fill, but the overall level holds (ADR-0006).
 //
-// The factor is eyeball-calibrated per dimension because "pitch" means different
-// things on screen (the ADR mandates uniform *feel*, not a shared code path).
-// In 2D/1D the grid pitch IS the on-screen neighbour distance, so a strong
-// factor is needed to fully merge at 100%. In 3D the lattice axis pitch badly
-// overestimates the on-screen spacing — orthographic projection stacks every
-// depth layer into the gaps — so a much smaller factor matches the same feel.
-export const DIFFUSION_BLUR_PITCH_FACTOR_2D = 2.8
-export const DIFFUSION_BLUR_PITCH_FACTOR_3D = 0.35
+// Calibrated against the std-dev/pitch ratio that merges a grid: a Gaussian
+// flattens a period-`pitch` grid by exp(-2π²(σ/pitch)²), so σ ≈ 0.5·pitch is a
+// fully-merged field (no individual source visible) and σ ≈ 0.25·pitch leaves
+// the sources clearly visible but ~half-obscured. With diffusion sweeping 0→1
+// linearly, a factor of ~0.5 puts "fully merged" at 100% and "half-obscured" at
+// 50%, with 0% perfectly crisp.
+//
+// The factor is per-dimension because "pitch" reads differently on screen (the
+// ADR mandates uniform *feel*, not a shared code path). In 2D/1D the grid pitch
+// IS the on-screen neighbour distance. In 3D the orbs now render OPAQUE (front
+// layer only — no additive depth-layer stacking), so the lattice axis pitch is
+// again a clean on-screen grid; it only needs a slightly smaller factor because
+// the orbiting cube is foreshortened, shrinking the on-screen pitch below the
+// raw lattice pitch.
+export const DIFFUSION_BLUR_PITCH_FACTOR_2D = 0.5
+export const DIFFUSION_BLUR_PITCH_FACTOR_3D = 0.4
 export function diffusionBlurStdDev(diffusion: number, pitchPx: number, factor: number): number {
   if (diffusion <= 0 || pitchPx <= 0) return 0
   return diffusion * pitchPx * factor

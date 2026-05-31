@@ -5,10 +5,10 @@ import {
   MAX_PIXEL_COUNT,
   pointSize,
   point3DSize,
-  lightEnergyComp,
   projectIndex,
   projectPos,
   projectOrbit,
+  orbitDepthToClipZ,
   depthCue,
   DEFAULT_ORBIT,
   type OrbitCamera,
@@ -56,10 +56,11 @@ const VERT_SRC = `
 attribute vec2 a_pos;
 attribute vec3 a_color;
 attribute float a_size;
+attribute float a_depth;
 varying vec3 v_color;
 void main() {
   v_color = a_color;
-  gl_Position = vec4(a_pos, 0.0, 1.0);
+  gl_Position = vec4(a_pos, a_depth, 1.0);
   gl_PointSize = a_size;
 }
 `
@@ -123,15 +124,21 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   const posBuffer = gl.createBuffer()!
   const colorBuffer = gl.createBuffer()!
   const sizeBuffer = gl.createBuffer()!
+  const depthBuffer = gl.createBuffer()!
   const aPos = gl.getAttribLocation(program, 'a_pos')
   const aColor = gl.getAttribLocation(program, 'a_color')
   const aSize = gl.getAttribLocation(program, 'a_size')
+  const aDepth = gl.getAttribLocation(program, 'a_depth')
 
   // 2D positions depend only on the grid, not the frame, so they're rebuilt on
   // grid change rather than per paint. `positions` is the clip-space (x,y) per
   // drawable index; `drawCount` is how many of those we actually draw.
   let positions = new Float32Array(0)
   let sizes = new Float32Array(0)
+  // Per-vertex clip-space z, written only in 3D mode to drive opaque depth-tested
+  // occlusion (nearer orbs hide farther ones). 2D draws at a constant z via
+  // a_depth's generic attribute, so this stays empty there.
+  let depths = new Float32Array(0)
   let drawCount = 0
   // When set, draw positions come from a viewport shape embedding (1D path)
   // rather than the locked-2D grid. Null keeps the legacy grid path.
@@ -187,6 +194,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     drawCount = cap
     if (positions.length !== cap * 2) positions = new Float32Array(cap * 2)
     if (sizes.length !== cap) sizes = new Float32Array(cap)
+    if (depths.length !== cap) depths = new Float32Array(cap)
     const bright = new Float32Array(cap)
     // Base orb diameter is anchored to the projected lattice pitch via light
     // size (ADR-0006), the 3D analogue of the 2D pointSize; depth cueing then
@@ -198,6 +206,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
       const cue = depthCue(depth)
       positions[i * 2] = clip[0]
       positions[i * 2 + 1] = clip[1]
+      depths[i] = orbitDepthToClipZ(depth)
       sizes[i] = Math.max(1, baseSize * cue.sizeMul)
       bright[i] = cue.brightnessMul
     }
@@ -205,6 +214,8 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     gl!.bufferData(gl!.ARRAY_BUFFER, positions, gl!.DYNAMIC_DRAW)
     gl!.bindBuffer(gl!.ARRAY_BUFFER, sizeBuffer)
     gl!.bufferData(gl!.ARRAY_BUFFER, sizes, gl!.DYNAMIC_DRAW)
+    gl!.bindBuffer(gl!.ARRAY_BUFFER, depthBuffer)
+    gl!.bufferData(gl!.ARRAY_BUFFER, depths, gl!.DYNAMIC_DRAW)
     return bright
   }
 
@@ -214,10 +225,16 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     if (colorData.length !== drawCount * 3) colorData = colors()
 
     const dimScale = dimmed ? DIM_FACTOR : 1
-    // Energy compensation keeps total emitted light invariant to light size, so
-    // growing the sources never changes overall brightness (ADR-0006). The 3D
-    // orbs scale by light size too, so the same factor applies in both paths.
-    const scale = brightness * dimScale * lightEnergyComp(grid.lightSize ?? 1)
+    // Faithful intensity in BOTH dimensions: each source shows at brightness×color
+    // (ADR-0006 — the priority invariant is dimension parity: switching a 2D
+    // pattern to a 3D one at identical settings must not change perceived
+    // brightness, and at diffusion 0 sources must read as crisp and distinct).
+    // No light-size energy compensation: 2D is a single non-overlapping layer
+    // that would only be dimmed by it, and 3D now renders OPAQUE (depth-tested,
+    // below) rather than additively blending — so there is no overlap to tame.
+    // Light size changes only the drawn diameter; brightness is the sole control
+    // over brightness. Depth cueing still shades the cube per-vertex for legibility.
+    const scale = brightness * dimScale
     for (let i = 0; i < count; i++) {
       const [r, g, b] = pixels[i]
       // Depth cueing multiplies brightness per-vertex in 3D mode (nearer = brighter).
@@ -229,7 +246,20 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
     const ctx = gl as WebGLRenderingContext
     ctx.viewport(0, 0, canvas.width, canvas.height)
-    ctx.clear(ctx.COLOR_BUFFER_BIT)
+    // 3D draws OPAQUE light sources: depth test on (nearer occludes farther),
+    // additive blend off — so overlapping orbs read as solid, crisp sources
+    // instead of summing into a translucent, washed-out field. 2D/1D is a single
+    // non-overlapping layer with no depth, so it keeps the order-independent
+    // additive blend and skips the depth test.
+    if (pos3D) {
+      ctx.disable(ctx.BLEND)
+      ctx.enable(ctx.DEPTH_TEST)
+      ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT)
+    } else {
+      ctx.disable(ctx.DEPTH_TEST)
+      ctx.enable(ctx.BLEND)
+      ctx.clear(ctx.COLOR_BUFFER_BIT)
+    }
     ctx.useProgram(program)
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, posBuffer)
@@ -239,6 +269,17 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     ctx.bindBuffer(ctx.ARRAY_BUFFER, sizeBuffer)
     ctx.enableVertexAttribArray(aSize)
     ctx.vertexAttribPointer(aSize, 1, ctx.FLOAT, false, 0, 0)
+
+    // Per-vertex clip-space z in 3D; a constant 0 plane in 2D (attribute array
+    // disabled, so all vertices read the generic a_depth value).
+    if (pos3D) {
+      ctx.bindBuffer(ctx.ARRAY_BUFFER, depthBuffer)
+      ctx.enableVertexAttribArray(aDepth)
+      ctx.vertexAttribPointer(aDepth, 1, ctx.FLOAT, false, 0, 0)
+    } else {
+      ctx.disableVertexAttribArray(aDepth)
+      ctx.vertexAttrib1f(aDepth, 0)
+    }
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, colorBuffer)
     ctx.bufferData(ctx.ARRAY_BUFFER, colorData, ctx.DYNAMIC_DRAW)
