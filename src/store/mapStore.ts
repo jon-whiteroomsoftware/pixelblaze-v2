@@ -32,12 +32,12 @@ export const DEFAULT_SHAPE_PIXEL_COUNT = 100
 // Points per axis for the stock cube lattice (side³ pixels = 512 at 8).
 export const DEFAULT_CUBE_SIDE = 8
 // Default modeled pixel count for a 2D plane when a pattern carries no persisted
-// count: a 32×32 square, matching the legacy default grid.
-export const DEFAULT_PLANE_PIXEL_COUNT = 1024
+// count: a 64×64 square.
+export const DEFAULT_PLANE_PIXEL_COUNT = 4096
 
 // The pixel count a freshly-opened pattern of the given display dimensionality
 // defaults to when it carries no persisted count. 1D → a short strip; 2D → a
-// 32×32 square; 3D → the stock 8³ cube. The count is the single user knob
+// 64×64 square; 3D → the stock 8³ cube. The count is the single user knob
 // (ADR-0004); each map then arranges it per its own geometry.
 export function defaultPixelCountForDim(dim: 1 | 2 | 3): number {
   if (dim === 1) return DEFAULT_SHAPE_PIXEL_COUNT
