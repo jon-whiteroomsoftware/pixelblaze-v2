@@ -65,7 +65,7 @@ export function ControlsPanel() {
     const value = typeof raw === 'number' ? raw : 0.5
     return (
       <label key={c.exportName} className="flex flex-col gap-1">
-        <span className="text-zinc-500">{c.label}</span>
+        <span className="text-zinc-400">{c.label.toLowerCase()}</span>
         <div className="flex items-center gap-2">
           <input
             type="range"
@@ -93,7 +93,7 @@ export function ControlsPanel() {
           onChange={(e) => setControlValue(c.exportName, e.target.checked ? 1 : 0)}
           className="accent-amber-500 shrink-0"
         />
-        <span className="text-zinc-500">{c.label}</span>
+        <span className="text-zinc-400">{c.label.toLowerCase()}</span>
       </label>
     )
   }
@@ -103,7 +103,7 @@ export function ControlsPanel() {
     const hex = tripletToHex(c.kind, raw ?? [1, 1, 1])
     return (
       <label key={c.exportName} className="flex items-center gap-2">
-        <span className="text-zinc-500 flex-1">{c.label}</span>
+        <span className="text-zinc-400 flex-1">{c.label.toLowerCase()}</span>
         <input
           type="color"
           value={hex}
@@ -120,19 +120,19 @@ export function ControlsPanel() {
   }
 
   return (
-    <div className="font-mono text-xs border-t border-zinc-800 mt-2 pt-2 pb-3 pr-3">
+    <div className="font-mono text-xs mt-1 pt-1.5 pb-3 pr-3">
       <h4 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
         Controls
       </h4>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
         {sliders.length > 0 && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">{sliders.map(renderSlider)}</div>
         )}
         {toggles.length > 0 && (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">{toggles.map(renderToggle)}</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">{toggles.map(renderToggle)}</div>
         )}
         {pickers.length > 0 && (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">{pickers.map(renderPicker)}</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">{pickers.map(renderPicker)}</div>
         )}
       </div>
     </div>

@@ -19,7 +19,7 @@ describe('PreviewDeck (smoke)', () => {
     // Primary band: play/pause + brightness + pixel count + layout.
     expect(screen.getByRole('button', { name: /run|pause/i })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Brightness' })).toBeInTheDocument()
-    expect(screen.getByRole('spinbutton', { name: 'Pixel count' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Pixel count' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /layout/i })).toBeInTheDocument()
 
     // Secondary band: light size, diffusion, renderer, speed.

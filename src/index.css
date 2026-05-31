@@ -126,5 +126,8 @@
     }
   html {
     @apply font-sans;
+    /* Render native UI (color picker, scrollbars, form controls) in dark mode to
+       match the IDE — the OS color-picker dialog otherwise opens in light mode. */
+    color-scheme: dark;
     }
 }

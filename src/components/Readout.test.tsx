@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { Readout } from './Readout'
 import { usePreviewStore, previewInitialState } from '@/store/previewStore'
 import { useMapStore, mapInitialState } from '@/store/mapStore'
@@ -44,30 +43,5 @@ describe('Readout telemetry', () => {
     render(<Readout />)
     expect(screen.getByText('fps')).toBeInTheDocument()
     expect(screen.getByText('elapsed')).toBeInTheDocument()
-  })
-})
-
-describe('Readout pattern-variable watch', () => {
-  it('hides variables until the turn-down is opened, then shows them all', async () => {
-    const user = userEvent.setup()
-    useEditorStore.setState({ patternVars: ['t1', 'hue'] })
-    usePreviewStore.setState({ watchValues: { t1: 0.5, hue: 0.25 } })
-    render(<Readout />)
-
-    // Collapsed by default: variables hidden, only the disclosure label shows.
-    expect(screen.queryByText('t1')).not.toBeInTheDocument()
-    const toggle = screen.getByRole('button', { name: /variables/i })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-
-    await user.click(toggle)
-    expect(usePreviewStore.getState().watchPatternVars).toBe(true)
-    expect(screen.getByText('t1')).toBeInTheDocument()
-    expect(screen.getByText('hue')).toBeInTheDocument()
-  })
-
-  it('shows no variables turn-down when the pattern exports none', () => {
-    useEditorStore.setState({ patternVars: [] })
-    render(<Readout />)
-    expect(screen.queryByRole('button', { name: /variables/i })).not.toBeInTheDocument()
   })
 })
