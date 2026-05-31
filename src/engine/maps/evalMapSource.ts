@@ -16,7 +16,7 @@ export function evalMapSource(source: string, pixelCount: number): number[][] {
     // `return (<source>)` so the function expression is the evaluated value.
     factory = new Function(`return (${source})`)() as (n: number) => unknown
   } catch (e) {
-    throw new Error(`map source failed to compile: ${(e as Error).message}`)
+    throw new Error(`map source failed to compile: ${(e as Error).message}`, { cause: e })
   }
   if (typeof factory !== 'function') {
     throw new Error('map source must be a single function(pixelCount){ … }')
@@ -25,7 +25,7 @@ export function evalMapSource(source: string, pixelCount: number): number[][] {
   try {
     raw = factory(pixelCount)
   } catch (e) {
-    throw new Error(`map source threw while generating: ${(e as Error).message}`)
+    throw new Error(`map source threw while generating: ${(e as Error).message}`, { cause: e })
   }
   if (!Array.isArray(raw)) {
     throw new Error('map source must return an array of coordinates')
