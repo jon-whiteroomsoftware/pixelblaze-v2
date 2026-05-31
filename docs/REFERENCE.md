@@ -303,7 +303,10 @@ Wraps the float shim at a per-function seam: numeric args are decoded raw→floa
 float built-in runs, and a numeric result is re-encoded float→raw. So a built-in's
 *internals* run in float64 and only its result is quantized to the 16.16 grid — making
 `sin`/`sqrt`/etc. precision-divergent but close, and `perlin`/`prng` algorithmically
-divergent (documented). Arrays, palettes (`setPalette`), `mapPixels` callbacks, and
+divergent (documented). The seam was deliberately built so a firmware-matched LUT
+could later replace an individual `fx.sin` (etc.) — but *only* for a function the
+divergence harness flags as visibly wrong. None have proven necessary, so the hook
+remains unused. Arrays, palettes (`setPalette`), `mapPixels` callbacks, and
 `transformPoint` get bespoke overrides because their elements are *already* raw and
 must not be re-encoded. `fx` itself is exposed to the evaluated pattern (the emit
 references `fx.*` directly). `encodeScalar`/`decodeScalar` become the real
@@ -536,8 +539,36 @@ force-tokenized on mount and source swap to avoid a flash of un-highlighted text
 
 Both sets are loaded from disk at build time via `import.meta.glob(..., '?raw')`.
 
-The **ShaderToy → Pixelblaze porting guide** lives at
-`docs/guides/Porting ShaderToy shaders to Pixelblaze.md`.
+### 14.1 ShaderToy porting toolkit
+
+The `Shader` library and the porting guide (`docs/guides/Porting ShaderToy shaders to
+Pixelblaze.md`) are the porting-specific layer built on top of the hardware-fidelity
+base (§8) — they are deliberately sequenced *after* fidelity, because a port is only
+worth doing if a pattern that looks right in the preview survives upload to a device.
+The toolkit reflects a few design decisions worth recording:
+
+- **No re-polyfilling of built-ins.** `mix`, `smoothstep`, and `clamp` are Pixelblaze
+  built-ins already, with GLSL-matching signatures (§6.1), so `Shader` does **not**
+  redefine them — it fills only the genuine gaps (`fract`, `step`, `sign`, `saturate`,
+  the vector helpers, `iqPalette`, the hashes).
+- **`frac` vs `fract`.** Pixelblaze's built-in `frac` truncates toward zero; GLSL's
+  `fract` floors. They diverge for negative inputs, so the floor-based GLSL version is
+  a distinct, namespaced name (`Shader.fract`), never a shadow of the built-in.
+- **Integer-only hashes.** Because the only constructs bit-identical preview↔hardware
+  are pure integer arithmetic (§8.4), `hash21`/`hash11` are built from integer ops, not
+  the GLSL `fract(sin(p·12.9898)·43758.5453)` idiom (which overflows 16.16 on the
+  device while looking perfect in float64). Validated bit-identical on a real
+  controller (#113).
+- **Documented non-portable scope.** GPU-only features (textures/`iChannel`, multipass
+  feedback buffers, `dFdx`/`fwidth`, `discard`, MRT) and GLSL→3D (`render3D`) porting
+  are out of scope; the guide's "Won't port" table lists them so a shader can be
+  recognised as a non-candidate early. Porting stays **human-driven with library
+  support** — automated GLSL→Pixelblaze rewrite is a non-goal (a research idea tracked
+  in the main PRD's Deferred section).
+- **Aspect ratio is a known limitation.** `Shader.toUV(x, y, aspect)` exists, but
+  `aspect` is currently hardcoded to `1`: the preview normalises per-axis and exposes
+  no `cols`/`rows` built-in, while firmware fits the longest axis to 0..1. This is both
+  a porting gap and a hardware divergence, tracked in **#116**.
 
 ---
 
@@ -601,8 +632,9 @@ tooling:
 ## 19. Pointers
 
 - **PRDs** (`docs/prd/`) — rationale + the not-yet-built direction:
-  `Pixelblaze IDE v2 PRD.md`, `Feature - Hardware-Fidelity Preview & ShaderToy Porting.md`,
-  `Feature - Pixel Maps & Dimensional Preview.md`, `Feature - Hardware Connectivity.md`.
+  `Pixelblaze IDE v2 PRD.md`, `Feature - Pixel Maps & Dimensional Preview.md`,
+  `Feature - Hardware Connectivity.md`. (The hardware-fidelity work shipped in full; its
+  conceptual framing now lives in §8 and §14.1 and in ADR-0003.)
 - **ADRs** (`docs/adr/`) — 0001 (float64, superseded by 0003), 0002 (main-thread exec),
   0003 (fixed-point fidelity default), 0004 (pixelCount independent of map), 0005
   (display `pos` dual-sourced), 0006 (preview light size + diffusion).

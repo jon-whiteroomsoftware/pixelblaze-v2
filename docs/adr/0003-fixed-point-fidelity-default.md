@@ -6,9 +6,9 @@ status: accepted (supersedes ADR-0001)
 
 ADR-0001 chose to run the preview as native float64 with no fixed-point emulation, accepting the resulting hardware divergence. We are reversing that: the preview will **default to faithful 16.16 fixed-point emulation** so that what the preview shows matches what a physical Pixelblaze does, with a per-pattern **fast-preview** toggle that drops back to float64 for heavy patterns whose fidelity render is too slow to edit against.
 
-The reversal is driven by the ShaderToy/GLSL porting work (see `docs/prd/Feature - Hardware-Fidelity Preview & ShaderToy Porting.md`): porting is only valuable if a pattern that looks right in the preview actually runs on hardware, and the most common GLSL idioms (large-constant hashes such as `fract(sin(p·12.9898)·43758.5453)`) silently overflow 16.16 on hardware while looking perfect in float64. A float64-only preview cannot reveal that class of bug, which defeats the porting goal.
+The reversal is driven by the ShaderToy/GLSL porting work (see `docs/REFERENCE.md` §8 and §14.1): porting is only valuable if a pattern that looks right in the preview actually runs on hardware, and the most common GLSL idioms (large-constant hashes such as `fract(sin(p·12.9898)·43758.5453)`) silently overflow 16.16 on hardware while looking perfect in float64. A float64-only preview cannot reveal that class of bug, which defeats the porting goal.
 
-## How (summary; full design in the feature PRD)
+## How (summary; full as-built detail in `docs/REFERENCE.md` §8)
 
 - Every pattern number is represented as its **raw int32** (value × 65536). Add/sub/compare/bitwise use native ops with `| 0` for int32-wrap; multiply uses a `Math.imul`-based exact 64-bit product shifted right 16; divide uses a sub-2⁵³ float intermediate. This is bit-faithful for arithmetic and overflow.
 - **Transcendentals** (`sin`, `cos`, `sqrt`, `pow`, …) are computed in float64 and quantized to 16.16 behind an `fx.*` seam — a small, documented precision divergence, upgradable to firmware-matched LUTs only if a hardware divergence harness shows a visible difference.

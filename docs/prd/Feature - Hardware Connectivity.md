@@ -3,7 +3,7 @@
 **Status:** **Phases 1–2 shipped** — the isomorphic comms layer + manual divergence harness (#106/#107) and the Phase 2 capability spike, including the undocumented binary pattern-push path (#108/#112), are in. The **UI arc (Phase 3) remains deferred and undesigned.** For *how the shipped layer works* see **`docs/REFERENCE.md`** §16. This PRD is retained for the **why** — the hard browser→device constraint that shapes the whole feature — and the Phase 3 vision + open questions.
 **Type:** Feature PRD (companion to `Pixelblaze IDE v2 PRD.md`)
 **Supersedes:** the main PRD's deferred "Hardware upload" bullet
-**Related:** `Feature - Hardware-Fidelity Preview & ShaderToy Porting.md` (this feature unblocked its divergence harness); ADR-0002 (main-thread execution); **ADR-0004 (local bridge for hardware connectivity — to be written when Phase 3 is greenlit)**
+**Related:** ADR-0003 + `docs/REFERENCE.md` §8 (the hardware-fidelity engine — this feature unblocked its divergence harness); ADR-0002 (main-thread execution); **ADR-0004 (local bridge for hardware connectivity — to be written when Phase 3 is greenlit)**
 
 ---
 
