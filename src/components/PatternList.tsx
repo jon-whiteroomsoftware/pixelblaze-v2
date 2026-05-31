@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { DEMOS } from '@/pixelblaze/demos'
 import { nameConflicts, uniquePatternName } from '@/engine/patternName'
@@ -43,10 +44,34 @@ const DEMO_SECTIONS: { label: string; names: string[] }[] = [
   { label: 'Test Patterns', names: TEST_PATTERNS.filter((n) => DEMO_NAMES.includes(n)) },
 ]
 
-function SectionHeader({ label }: { label: string }) {
+// A turn-down chevron, sized to read as a clear interactive affordance. Points down
+// when open, rotates to point right when collapsed. Inherits the header's text color
+// so it brightens with the label on hover.
+function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="mt-1 px-3 py-1.5 text-[10px] font-mono font-semibold text-amber-500/60 uppercase tracking-wider border-t border-zinc-800 bg-zinc-950/60">
-      {label}
+    <ChevronDown
+      size={15}
+      className={`shrink-0 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+    />
+  )
+}
+
+function SectionHeader({
+  label,
+  collapsed,
+  onToggle,
+}: {
+  label: string
+  collapsed: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div
+      onClick={onToggle}
+      className="mt-1 px-3 py-1.5 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-amber-500/60 uppercase tracking-wider border-t border-zinc-800 bg-zinc-950/60 hover:text-amber-500/90"
+    >
+      <span className="truncate">{label}</span>
+      <CollapseChevron collapsed={collapsed} />
     </div>
   )
 }
@@ -63,12 +88,10 @@ function SubsectionHeader({
   return (
     <div
       onClick={onToggle}
-      className="pl-2 pr-3 py-1 flex items-center gap-1 cursor-pointer select-none text-[10px] font-mono text-amber-500/60 uppercase tracking-wider hover:text-amber-500/90"
+      className="pl-6 pr-3 py-1 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono text-amber-500/60 uppercase tracking-wider hover:text-amber-500/90"
     >
-      <span className={`w-3 text-center text-[8px] transition-transform ${collapsed ? '-rotate-90' : ''}`}>
-        ▾
-      </span>
-      {label}
+      <span className="truncate">{label}</span>
+      <CollapseChevron collapsed={collapsed} />
     </div>
   )
 }
@@ -94,13 +117,13 @@ function ListItem({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={[
-        'pl-6 pr-3 py-1.5 cursor-pointer truncate select-none flex items-center gap-1.5',
+        'pl-6 pr-3 py-1 cursor-pointer truncate select-none flex items-center gap-1.5',
         'hover:text-zinc-300 hover:bg-zinc-800/60',
-        active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-500',
+        active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-400',
       ].join(' ')}
     >
       {label}
-      {dim && <span className="text-zinc-600 text-xs shrink-0">{dim}</span>}
+      {dim && <span className="text-zinc-400 text-xs shrink-0">{dim}</span>}
     </li>
   )
 }
@@ -164,9 +187,9 @@ function UserPatternItem({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={[
-          'pl-6 pr-3 py-1.5 cursor-pointer select-none flex items-center gap-1',
+          'pl-6 pr-3 py-1 cursor-pointer select-none flex items-center gap-1',
           'hover:text-zinc-300 hover:bg-zinc-800/60',
-          active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-500',
+          active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-400',
         ].join(' ')}
       >
         {editing ? (
@@ -363,73 +386,91 @@ export function PatternList() {
     setIsReadOnly(false)
   }
 
+  const isCollapsed = (label: string) => !!collapsedSections[label]
+  const toggleCollapsed = (label: string) =>
+    setCollapsedSections((c) => ({ ...c, [label]: !c[label] }))
+
   return (
     <div className="flex flex-col h-full text-xs font-mono">
-      <SectionHeader label="Your Patterns" />
-
-      <ul>
-        {userPatterns.map((pattern) => (
-          <UserPatternItem
-            key={pattern.id}
-            pattern={pattern}
-            active={activePatternId === pattern.id}
-            takenNames={userPatterns.filter((p) => p.id !== pattern.id).map((p) => p.name)}
-            onSelect={() => openUserPattern(pattern)}
-            onRename={(name) => renamePattern(pattern.id, name)}
-            onDelete={() => removePattern(pattern.id)}
-          />
-        ))}
-      </ul>
-
-      <SectionHeader label="Libraries" />
-      <ul>
-        <li
-          onMouseEnter={(e) => startShow('PixelBlaze', e.currentTarget)}
-          onMouseLeave={startHide}
-          className="pl-6 pr-3 py-1.5 select-none flex items-center gap-1.5 cursor-default hover:text-zinc-300 hover:bg-zinc-800/60 text-zinc-500"
-        >
-          PixelBlaze
-        </li>
-        {LIBRARY_NAMES.map((name) => (
-          <ListItem
-            key={name}
-            label={name}
-            active={activeLibraryName === name}
-            onClick={() => openLibrary(name)}
-            onMouseEnter={(e) => startShow(name, e.currentTarget)}
-            onMouseLeave={startHide}
-          />
-        ))}
-      </ul>
-
-      <SectionHeader label="Demos" />
-      {DEMO_SECTIONS.map((section) => {
-        const collapsed = !!collapsedSections[section.label]
-        return (
-          <div key={section.label}>
-            <SubsectionHeader
-              label={section.label}
-              collapsed={collapsed}
-              onToggle={() =>
-                setCollapsedSections((c) => ({ ...c, [section.label]: !c[section.label] }))
-              }
+      <SectionHeader
+        label="Your Patterns"
+        collapsed={isCollapsed('Your Patterns')}
+        onToggle={() => toggleCollapsed('Your Patterns')}
+      />
+      {!isCollapsed('Your Patterns') && (
+        <ul>
+          {userPatterns.map((pattern) => (
+            <UserPatternItem
+              key={pattern.id}
+              pattern={pattern}
+              active={activePatternId === pattern.id}
+              takenNames={userPatterns.filter((p) => p.id !== pattern.id).map((p) => p.name)}
+              onSelect={() => openUserPattern(pattern)}
+              onRename={(name) => renamePattern(pattern.id, name)}
+              onDelete={() => removePattern(pattern.id)}
             />
-            {!collapsed && (
-              <ul>
-                {section.names.map((name) => (
-                  <ListItem
-                    key={name}
-                    label={name}
-                    dim={TEST_PATTERN_DIMS[name]}
-                    active={activeDemoName === name}
-                    onClick={() => openDemo(name)}
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
-        )
-      })}
+          ))}
+        </ul>
+      )}
+
+      <SectionHeader
+        label="Libraries"
+        collapsed={isCollapsed('Libraries')}
+        onToggle={() => toggleCollapsed('Libraries')}
+      />
+      {!isCollapsed('Libraries') && (
+        <ul>
+          <li
+            onMouseEnter={(e) => startShow('PixelBlaze', e.currentTarget)}
+            onMouseLeave={startHide}
+            className="pl-6 pr-3 py-1 select-none flex items-center gap-1.5 cursor-default hover:text-zinc-300 hover:bg-zinc-800/60 text-zinc-400"
+          >
+            PixelBlaze
+          </li>
+          {LIBRARY_NAMES.map((name) => (
+            <ListItem
+              key={name}
+              label={name}
+              active={activeLibraryName === name}
+              onClick={() => openLibrary(name)}
+              onMouseEnter={(e) => startShow(name, e.currentTarget)}
+              onMouseLeave={startHide}
+            />
+          ))}
+        </ul>
+      )}
+
+      <SectionHeader
+        label="Demos"
+        collapsed={isCollapsed('Demos')}
+        onToggle={() => toggleCollapsed('Demos')}
+      />
+      {!isCollapsed('Demos') &&
+        DEMO_SECTIONS.map((section) => {
+          const collapsed = isCollapsed(section.label)
+          return (
+            <div key={section.label}>
+              <SubsectionHeader
+                label={section.label}
+                collapsed={collapsed}
+                onToggle={() => toggleCollapsed(section.label)}
+              />
+              {!collapsed && (
+                <ul>
+                  {section.names.map((name) => (
+                    <ListItem
+                      key={name}
+                      label={name}
+                      dim={TEST_PATTERN_DIMS[name]}
+                      active={activeDemoName === name}
+                      onClick={() => openDemo(name)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })}
 
       {hoveredLib && anchorRect && (
         <LibraryHoverCard

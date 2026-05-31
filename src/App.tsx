@@ -224,7 +224,7 @@ export default function App() {
               <span className="truncate">{activeFileName}</span>
               {activePatternId !== null && <CompileStatusBadge />}
               {(activeLibraryName !== null || activeDemoName !== null) && (
-                <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-500 border border-zinc-700 leading-none">
+                <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-400 border border-zinc-700 leading-none">
                   read-only
                 </span>
               )}

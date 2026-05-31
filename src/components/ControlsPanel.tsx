@@ -121,7 +121,7 @@ export function ControlsPanel() {
 
   return (
     <div className="font-mono text-xs mt-1 pt-1.5 pb-3 pr-3">
-      <h4 className="text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
+      <h4 className="text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
         Controls
       </h4>
       <div className="flex flex-col gap-2">

@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import { usePreviewStore } from '@/store/previewStore'
 import { useEditorStore } from '@/store/editorStore'
 
@@ -30,10 +31,13 @@ export function Variables() {
       <button
         aria-expanded={watchPatternVars}
         onClick={() => setWatchPatternVars(!watchPatternVars)}
-        className="flex items-center gap-1 text-[10px] font-semibold text-amber-500/60 uppercase tracking-wider hover:text-amber-400 transition-colors"
+        className="w-full flex items-center justify-between gap-1 text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider hover:text-amber-400 transition-colors"
       >
-        <span>{watchPatternVars ? '▾' : '▸'}</span>
         <span>Variables</span>
+        <ChevronDown
+          size={15}
+          className={`shrink-0 transition-transform ${watchPatternVars ? '' : '-rotate-90'}`}
+        />
       </button>
       {watchPatternVars && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-1">
