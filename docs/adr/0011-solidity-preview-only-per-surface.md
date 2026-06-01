@@ -1,6 +1,6 @@
 # Solidity is a preview-only per-surface display property
 
-**Status:** accepted — generalizes the viewport-cosmetic stance of [ADR-0006](0006-preview-light-size-and-diffusion.md) and rides on the embedding model of [ADR-0010](0010-surfaces-are-2d-viewport-embeddings.md) / [ADR-0005](0005-display-position-dual-sourced.md).
+**Status:** accepted — generalizes the viewport-cosmetic stance of [ADR-0006](0006-preview-light-size-and-diffusion.md) and rides on the embedding model of [ADR-0010](0010-surfaces-are-2d-viewport-embeddings.md) / [ADR-0005](0005-display-position-dual-sourced.md). **Generalized by [ADR-0012](0012-three-embedding-mechanisms-shell-vs-volume.md): solid-eligibility is the presence of a normal on *any* embedding OR 3D shell map, not "surfaces only." The surface-cube exemplar named throughout is retired; its faceted-normal role passes to the Cube (shell) 3D map. The mechanism (terminator fade) is unchanged.**
 
 When a layout is drawn on a curved surface — a sphere, a cylinder, a helical pole, a surface-cube — the preview today draws *every* point at full brightness, so the **back** of the object shines through the gaps between the **front** points. A real LED installation built on a solid object is opaque: you cannot see the back. But the same points could equally hang on a transparent shell, a wire mesh, or in free space, where you *do* want to see all the way through. The preview needs to represent both, and nothing in the codebase has taken a position on it.
 
