@@ -13,6 +13,7 @@ describe('stock catalogue', () => {
       'plane',
       'wide',
       'cube',
+      'cube-shell',
       'star',
       'seed-helix-3d',
       'seed-sphere-3d',
@@ -39,10 +40,12 @@ describe('stock catalogue', () => {
     expect(mapById('seed-sphere-3d').dim).toBe(3)
   })
 
-  it('flags only the convex Sphere shell solid-eligible (ADR-0011)', () => {
-    // The Sphere vouches a centroid normal is honest; the Helix (not a shell) and
-    // every other stock map carry no flag and stay see-through.
+  it('flags the convex Sphere shell and the faceted Cube shell solid-eligible (ADR-0011/0012)', () => {
+    // The Sphere vouches a centroid normal is honest; the Cube shell carries per-
+    // face normals. The Helix (not a shell), the volume Cube and every other stock
+    // map carry no flag and stay see-through.
     expect(mapById('seed-sphere-3d').solidEligible).toBe(true)
+    expect(mapById('cube-shell').solidEligible).toBe(true)
     expect(mapById('seed-helix-3d').solidEligible).toBeUndefined()
     expect(mapById('cube').solidEligible).toBeUndefined()
     expect(mapById('plane').solidEligible).toBeUndefined()
@@ -164,5 +167,48 @@ describe('cube lattice', () => {
   it('collapses a degenerate single-cell lattice to the origin (shared normalize)', () => {
     const cube = mapById('cube')
     expect(cube.resolve(1)[0].pos).toEqual([0, 0, 0])
+  })
+})
+
+describe('cube shell (faceted 3D shell, ADR-0012)', () => {
+  const onAFace = (c: number) => Math.abs(c) < 1e-9 || Math.abs(c - 1) < 1e-9
+
+  it('is a distinct 3D map from the volume cube', () => {
+    expect(mapById('cube-shell').dim).toBe(3)
+    expect(mapById('cube-shell').id).not.toBe(mapById('cube').id)
+  })
+
+  it('places every point ON a cube face (one axis pinned to 0 or 1, others interior)', () => {
+    for (const { pos } of mapById('cube-shell').resolve(120)) {
+      const pinned = pos!.filter(onAFace)
+      // at least one axis sits on a face; the others stay strictly inside
+      expect(pinned.length).toBeGreaterThanOrEqual(1)
+      for (const c of pos!) {
+        expect(c).toBeGreaterThanOrEqual(0)
+        expect(c).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it('covers all six faces for a count that fills them', () => {
+    const faces = new Set<string>()
+    for (const { pos } of mapById('cube-shell').resolve(120)) {
+      pos!.forEach((c, axis) => {
+        if (Math.abs(c) < 1e-9) faces.add(`-${axis}`)
+        if (Math.abs(c - 1) < 1e-9) faces.add(`+${axis}`)
+      })
+    }
+    expect(faces.size).toBe(6)
+  })
+
+  it('keeps in-face offsets strictly inside (cell centres, never on an edge)', () => {
+    // exactly one coordinate pinned to a face; the other two strictly between 0,1
+    for (const { pos } of mapById('cube-shell').resolve(96)) {
+      const interior = pos!.filter((c) => !onAFace(c))
+      for (const c of interior) {
+        expect(c).toBeGreaterThan(0)
+        expect(c).toBeLessThan(1)
+      }
+    }
   })
 })

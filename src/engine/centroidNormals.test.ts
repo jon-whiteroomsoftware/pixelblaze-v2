@@ -1,4 +1,4 @@
-import { centroid, centroidNormals, type Vec3 } from './centroidNormals'
+import { centroid, centroidNormals, faceNormals, type Vec3 } from './centroidNormals'
 
 describe('centroid', () => {
   it('is the origin for an empty cloud', () => {
@@ -49,6 +49,45 @@ describe('centroidNormals', () => {
   it('falls back to facing the camera for a point at the centroid', () => {
     // Two coincident points → centroid sits on them → no radial direction.
     expect(centroidNormals([[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]])).toEqual([
+      [0, 0, 1],
+      [0, 0, 1],
+    ])
+  })
+})
+
+describe('faceNormals', () => {
+  // A cube shell centred at (0.5,0.5,0.5): a point on a face is pinned to 0 or 1
+  // on its face axis (offset ±0.5) and interior on the other two, so the dominant
+  // axis is always the face axis — yielding the exact ±x/±y/±z face normal.
+  it('returns the axis-aligned outward face normal (dominant axis of pos − centre)', () => {
+    const positions: Vec3[] = [
+      [1, 0.3, 0.7], // +x face
+      [0, 0.3, 0.7], // -x face
+      [0.3, 1, 0.7], // +y face
+      [0.3, 0, 0.7], // -y face
+      [0.3, 0.7, 1], // +z face
+      [0.3, 0.7, 0], // -z face
+    ]
+    expect(faceNormals(positions)).toEqual([
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ])
+  })
+
+  it('emits axis-aligned unit normals (exactly one ±1 component)', () => {
+    for (const n of faceNormals([[1, 0.2, 0.8], [0.1, 1, 0.4], [0.6, 0.6, 0]])) {
+      const nonZero = n.filter((c) => c !== 0)
+      expect(nonZero).toHaveLength(1)
+      expect(Math.abs(nonZero[0])).toBe(1)
+    }
+  })
+
+  it('falls back to facing the camera for a point at the centroid', () => {
+    expect(faceNormals([[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]])).toEqual([
       [0, 0, 1],
       [0, 0, 1],
     ])

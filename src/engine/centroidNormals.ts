@@ -43,3 +43,31 @@ export function centroidNormals(positions: Vec3[]): Vec3[] {
     return [dx / len, dy / len, dz / len]
   })
 }
+
+// Per-FACE outward normals for a faceted shell (the Cube shell, ADR-0012): the
+// axis-aligned unit vector along the DOMINANT axis of `pos − centroid`. A point
+// on a cube face is pinned to the centre's extreme on one axis (offset ±half the
+// span) while its in-face offsets stay strictly smaller, so the dominant axis is
+// always the face's own axis — yielding the exact ±x/±y/±z face normal, with no
+// rounding of the centroid-radial direction. A point sitting at the centroid has
+// no dominant axis, so it falls back to facing the camera (+z) and never fades.
+// Preview-only (ADR-0011) — never written to a map record nor sent to hardware.
+export function faceNormals(positions: Vec3[]): Vec3[] {
+  const c = centroid(positions)
+  return positions.map(([x, y, z]) => {
+    const d = [x - c[0], y - c[1], z - c[2]]
+    let axis = -1
+    let best = 0
+    for (let a = 0; a < 3; a++) {
+      const m = Math.abs(d[a])
+      if (m > best) {
+        best = m
+        axis = a
+      }
+    }
+    if (axis === -1) return [0, 0, 1]
+    const n: Vec3 = [0, 0, 0]
+    n[axis] = d[axis] > 0 ? 1 : -1
+    return n
+  })
+}

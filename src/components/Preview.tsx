@@ -30,7 +30,7 @@ import {
 } from '@/engine/camera'
 import { layoutSource as buildLayoutSource } from '@/store/mapStore'
 import { resolveLayoutSelection, resolveSolidity } from '@/engine/layout'
-import { centroidNormals } from '@/engine/centroidNormals'
+import { centroidNormals, faceNormals } from '@/engine/centroidNormals'
 import {
   SHAPES,
   embedPositions,
@@ -241,12 +241,15 @@ export function Preview() {
           mapPoints = map.resolve(pixelCount)
         }
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
-        // A solid-eligible stock cloud (the Sphere shell, ADR-0011) carries no
-        // baked normal, so the preview re-derives one generically as
-        // normalize(pos − centroid) — exact for a convex shell, and offered ONLY
-        // because the catalogue flags this map. The Helix / volumetric Cube set no
-        // flag and stay see-through. Preview-only: never written to the map record.
-        if (map.solidEligible) normals3D = centroidNormals(positions3D)
+        // A solid-eligible stock 3D map (ADR-0011) carries no baked normal, so the
+        // preview re-derives one, offered ONLY because the catalogue flags the map.
+        // The faceted Cube shell uses per-face normals (dominant axis of pos −
+        // centre, ADR-0012); a convex cloud shell (the Sphere) uses the generic
+        // centroid radial. The Helix / volumetric Cube set no flag and stay
+        // see-through. Preview-only: never written to the map record.
+        if (map.solidEligible) {
+          normals3D = map.id === 'cube-shell' ? faceNormals(positions3D) : centroidNormals(positions3D)
+        }
         displayDim = 3
       } else if (map.id !== 'plane') {
         // 2D point cloud: the stock ring regenerates live (ADR-0008); a custom 2D
@@ -299,8 +302,9 @@ export function Preview() {
     useEditorStore.getState().setDisplayDim(displayDim)
     useEditorStore.getState().setLayoutLabel(layoutLabel)
     // A normal array is fed exactly for a solid-eligible embedding (Pole, Cylinder,
-    // Sphere shell), so its presence IS the eligibility the deck's solidity slider
-    // keys on (ADR-0011). Volumetric cube / non-shell clouds / flat 2D carry none.
+    // Sphere shell, Cube shell), so its presence IS the eligibility the deck's
+    // solidity slider keys on (ADR-0011). Volume cube / non-shell clouds / flat 2D
+    // carry none.
     useEditorStore.getState().setSolidEligible(normals3D !== null)
 
     const clock = createVirtualClock()
