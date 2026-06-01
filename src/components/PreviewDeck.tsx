@@ -15,8 +15,8 @@ import { Variables } from '@/components/Variables'
 
 // The preview control deck (#150): everything below the canvas, stacked by visual
 // prominence. Primary band = the pattern name, layout, and play/pause; secondary
-// band = a 3-row grid of the remaining controls (pixels + brightness, light size +
-// diffusion, renderer + speed); then the read-only Readout
+// band = the remaining controls split into a Pixelblaze group (real device settings)
+// and a Preview group (renderer-only constructs) — #174; then the read-only Readout
 // (fps/elapsed/layout outrank author controls); then the author's pattern controls;
 // then the Variables turn-down. Replaces the over-the-canvas gear dialog.
 export function PreviewDeck() {
@@ -100,10 +100,14 @@ function PixelCountInput() {
   )
 }
 
-// Secondary band: preview-only affordances, laid out on the SAME label/value grid
-// as the Readout below (#150) so everything in the deck aligns on one set of
-// columns — label on the left (zinc-400, like fps/elapsed/layout), control flush
-// right. Sliders are short; they don't need the full cell width to be usable.
+// Secondary band: the viewport controls, split into two labeled groups (#174) that
+// make visible the boundary the ADRs already draw in code — real Pixelblaze device
+// settings (pixels, brightness, fill/contain) that exist on hardware and would
+// round-trip to a controller, vs preview-only constructs the IDE renderer invents
+// (light size, diffusion, renderer, speed, solidity — ADR-0006/0011, "never
+// serialize toward a controller"). Each group is its own label/value grid, aligned
+// on the SAME columns as the Readout below (#150). Sliders are short; they don't
+// need the full cell width to be usable.
 function SecondaryBand() {
   const brightness = usePreviewStore((s) => s.brightness)
   const setBrightness = usePreviewStore((s) => s.setBrightness)
@@ -113,8 +117,13 @@ function SecondaryBand() {
   const setDiffusion = usePreviewStore((s) => s.setDiffusion)
   const fidelity = usePreviewStore((s) => s.fidelity)
   const setFidelity = usePreviewStore((s) => s.setFidelity)
-  // Solidity (ADR-0011) rides here only when the active embedding is solid-
-  // eligible (it supplies a per-point normal); it appears/disappears as a unit
+  // Fill/Contain (#174): a real Mapper map-coordinate normalization setting, so it
+  // sits in the Pixelblaze group. Contain (default) preserves aspect; Fill stretches
+  // each axis to fill the unit square. Persisted per-pattern (beside solidity).
+  const normalizeMode = useMapStore((s) => s.activeNormalizeMode)
+  const setNormalizeMode = useMapStore((s) => s.setActiveNormalizeMode)
+  // Solidity (ADR-0011) rides in the Preview group only when the active embedding is
+  // solid-eligible (it supplies a per-point normal); it appears/disappears as a unit
   // with that embedding. The canonical term is `solidity`; the slider is labelled
   // by its physical spectrum, Transparent ↔ Solid.
   const solidEligible = useEditorStore((s) => s.solidEligible)
@@ -122,8 +131,8 @@ function SecondaryBand() {
   const setSolidity = useMapStore((s) => s.setActiveSolidity)
 
   return (
-    <div className="text-xs py-2 pr-3">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 items-center">
+    <div className="text-xs pr-3">
+      <Group label="Pixelblaze">
         <Cell label="pixels">
           <PixelCountInput />
         </Cell>
@@ -139,6 +148,20 @@ function SecondaryBand() {
             className="w-12 accent-amber-500"
           />
         </Cell>
+        <Cell label="fit">
+          <DeckSelect
+            ariaLabel="Map normalization (Fill / Contain)"
+            value={normalizeMode}
+            options={[
+              { value: 'contain', label: 'Contain', title: 'Contain — keep aspect ratio, fit the longest axis' },
+              { value: 'fill', label: 'Fill', title: 'Fill — stretch each axis to fill the unit square' },
+            ]}
+            onChange={setNormalizeMode}
+            menuWidthClass="w-28"
+          />
+        </Cell>
+      </Group>
+      <Group label="Preview">
         <Cell label="light size">
           <input
             type="range"
@@ -192,7 +215,22 @@ function SecondaryBand() {
             />
           </Cell>
         )}
-      </div>
+      </Group>
+    </div>
+  )
+}
+
+// A labeled group of deck cells (#174): the same amber section header the Readout /
+// Controls / Variables sections use, over the deck's shared 2-col label/value grid —
+// so the Pixelblaze-vs-Preview split reads as two sections consistent with the rest
+// of the deck, without breaking the column alignment.
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-1 pt-1.5 pb-3">
+      <h4 className="text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
+        {label}
+      </h4>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 items-center">{children}</div>
     </div>
   )
 }

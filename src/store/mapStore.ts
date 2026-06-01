@@ -17,6 +17,7 @@ import {
   bakeMapSource,
   type GridDims,
   type PixelMap,
+  type NormalizeMode,
 } from '@/engine/maps'
 import { SHAPES, type ShapeId } from '@/engine/shapes'
 import { SURFACES, type SurfaceId } from '@/engine/surfaces'
@@ -36,6 +37,10 @@ export const DEFAULT_SURFACE_ID: SurfaceId = 'flat'
 // embedding opens fully solid (1.0). A demo's recommended-solidity may override
 // this on open; a custom pattern persists whatever the user sets.
 export const DEFAULT_SOLIDITY = 1
+// Default map-coordinate normalization mode (#174): Contain (aspect-preserving,
+// longest-axis anchor — ADR-0009). Matches the Mapper's default selection, so an
+// existing pattern with no persisted mode previews exactly as before.
+export const DEFAULT_NORMALIZE_MODE: NormalizeMode = 'contain'
 
 // The stock 2D grid generators that expose a clean integer cols×rows lattice a
 // surface can wrap (ADR-0010). The Square and Wide maps qualify; the example
@@ -200,6 +205,12 @@ interface MapState {
   // it is a modifier on the chosen embedding; consumed only when that embedding
   // is solid-eligible. Never serialized toward a controller.
   activeSolidity: number
+  // The active map's normalization mode (#174): Contain (default) or Fill. A real
+  // hardware Mapper setting (unlike solidity), but modeled per-pattern here beside
+  // the other layout selections — the deck displays it in the Pixelblaze group
+  // ("blur in UI, clean abstraction underneath"). Applied live to resolved map
+  // coords (applyNormalizeMode); persisted on the PatternRecord as `normalize`.
+  activeNormalizeMode: NormalizeMode
   userMaps: MapRecord[]
   // The map open in editor "map mode" (#151), or null when the editor holds a
   // pattern/demo/library. Every custom map is persisted on creation (like a
@@ -217,6 +228,7 @@ interface MapState {
   setActiveSurface: (id: SurfaceId) => void
   setActivePixelCount: (count: number | null) => void
   setActiveSolidity: (solidity: number) => void
+  setActiveNormalizeMode: (mode: NormalizeMode) => void
   // Create a fresh custom map (skeleton source), persist it immediately as a row
   // in "Your Maps" (no save step, mirroring New Pattern), and open it in map mode.
   createNewMap: () => Promise<void>
@@ -253,6 +265,7 @@ export const mapInitialState = {
   activeSurfaceId: DEFAULT_SURFACE_ID,
   activePixelCount: null as number | null,
   activeSolidity: DEFAULT_SOLIDITY,
+  activeNormalizeMode: DEFAULT_NORMALIZE_MODE,
   userMaps: [] as MapRecord[],
   editingMap: null as EditingMap,
   mapBaseline: '',
@@ -290,6 +303,7 @@ export const useMapStore = create<MapState>()((set, get) => ({
   setActivePixelCount: (count) => set({ activePixelCount: count }),
   setActiveSolidity: (solidity) =>
     set({ activeSolidity: solidity < 0 ? 0 : solidity > 1 ? 1 : solidity }),
+  setActiveNormalizeMode: (mode) => set({ activeNormalizeMode: mode }),
 
   createNewMap: async () => {
     // Mirror New Pattern: a custom map is a real row the instant you create it —

@@ -10,6 +10,7 @@ import {
   DEFAULT_SHAPE_ID,
   DEFAULT_SURFACE_ID,
   DEFAULT_SOLIDITY,
+  DEFAULT_NORMALIZE_MODE,
   DEFAULT_SHAPE_PIXEL_COUNT,
   defaultPixelCountForDim,
   resolveMap,
@@ -22,7 +23,7 @@ import { bundle } from '@/engine/bundle'
 import { createRenderer } from '@/engine/renderer'
 import { createRenderLoop, type RenderLoop } from '@/engine/renderLoop'
 import { createVirtualClock } from '@/engine/virtualClock'
-import { cubePixelCount, squarePlaneDims } from '@/engine/maps'
+import { cubePixelCount, squarePlaneDims, applyNormalizeMode } from '@/engine/maps'
 import {
   clampPixelCount,
   cubeSideForCount,
@@ -82,6 +83,7 @@ export function Preview() {
   const activeSurfaceId = useMapStore((s) => s.activeSurfaceId)
   const activePixelCount = useMapStore((s) => s.activePixelCount)
   const activeSolidity = useMapStore((s) => s.activeSolidity)
+  const activeNormalizeMode = useMapStore((s) => s.activeNormalizeMode)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
   // The 2D viewport the renderer fits to: the container width + the live light
@@ -228,7 +230,7 @@ export function Preview() {
           const count = activePixelCount ?? recommendedPixelCount ?? defaultPixelCountForDim(3)
           const cubeSide = cubeSideForCount(count)
           pixelCount = clampPixelCount(cubePixelCount(cubeSide))
-          mapPoints = map.resolve(pixelCount)
+          mapPoints = applyNormalizeMode(map.resolve(pixelCount), activeNormalizeMode)
           layoutLabel = `${cubeSide}×${cubeSide}×${cubeSide}`
         } else {
           // 3D point cloud: stock sphere/helix regenerate live for any count
@@ -239,7 +241,7 @@ export function Preview() {
           pixelCount = clampPixelCount(
             activePixelCount ?? recommendedPixelCount ?? map.bakedCount ?? defaultPixelCountForDim(3),
           )
-          mapPoints = map.resolve(pixelCount)
+          mapPoints = applyNormalizeMode(map.resolve(pixelCount), activeNormalizeMode)
         }
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
         // A solid-eligible stock 3D map (ADR-0011) carries no baked normal, so the
@@ -268,7 +270,7 @@ export function Preview() {
         pixelCount = clampPixelCount(
           activePixelCount ?? recommendedPixelCount ?? map.bakedCount ?? defaultPixelCountForDim(2),
         )
-        mapPoints = map.resolve(pixelCount)
+        mapPoints = applyNormalizeMode(map.resolve(pixelCount), activeNormalizeMode)
         shapePositions = mapPoints.map((p) => p.pos as [number, number])
         displayDim = 2
       } else {
@@ -282,7 +284,7 @@ export function Preview() {
         // count, not rows×cols (the last grid row may be partial).
         pixelCount = clampPixelCount(activePixelCount ?? recommendedPixelCount ?? defaultPixelCountForDim(2))
         const planeDims = squarePlaneDims(pixelCount)
-        mapPoints = map.resolve(pixelCount)
+        mapPoints = applyNormalizeMode(map.resolve(pixelCount), activeNormalizeMode)
         shapePositions = mapPoints.map((p) => p.pos as [number, number])
         layoutLabel = `${planeDims.cols}×${planeDims.rows}`
         displayDim = 2
@@ -446,7 +448,7 @@ export function Preview() {
     if (usePreviewStore.getState().isRunning) loop.start()
 
     return () => loop.stop()
-  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activeSurfaceId, activePixelCount])
+  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activeSurfaceId, activePixelCount, activeNormalizeMode])
 
   // Hydrate the per-pattern layout on open (ADR-0004/0005): restore the record's
   // persisted mapId/shapeId/pixelCount, falling back to defaults when absent so a
@@ -461,6 +463,7 @@ export function Preview() {
     m.setActiveShape((rec?.shapeId as ShapeId) ?? DEFAULT_SHAPE_ID)
     m.setActiveSurface((rec?.surfaceId as SurfaceId) ?? DEFAULT_SURFACE_ID)
     m.setActivePixelCount(rec?.pixelCount ?? null)
+    m.setActiveNormalizeMode(rec?.normalize ?? DEFAULT_NORMALIZE_MODE)
   }, [activePatternId])
 
   // Resolve the on-open solidity (ADR-0011) for a pattern OR a demo: a user
@@ -492,8 +495,9 @@ export function Preview() {
       surfaceId: activeSurfaceId,
       pixelCount: activePixelCount ?? undefined,
       solidity: activeSolidity,
+      normalize: activeNormalizeMode,
     })
-  }, [activePatternId, activeMapId, activeShapeId, activeSurfaceId, activePixelCount, activeSolidity])
+  }, [activePatternId, activeMapId, activeShapeId, activeSurfaceId, activePixelCount, activeSolidity, activeNormalizeMode])
 
   // Forward control value changes to the live pattern handle
   useEffect(() => {

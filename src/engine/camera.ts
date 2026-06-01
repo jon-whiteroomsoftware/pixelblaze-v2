@@ -49,11 +49,11 @@ export function cubeSideForCount(n: number): number {
 // neighbour spacing and project each `pos` into clip space, exactly the way the
 // 3D path derives its extent from `modelHalfExtent` / `nearestNeighborSpacing`.
 //
-// Today every 2D `pos` arrives per-axis normalized to [0,1]² (the normalize pass
-// is still per-axis, #116), so a layout's bounds are the unit square and the
-// canvas draws square. When #116 flips normalization to longest-axis the bounds
-// become the true rectangle and this same machinery draws the true aspect — no
-// change needed here.
+// A 2D `pos` arrives normalized into [0,1] by the active map normalization mode
+// (#116/#174): Contain (the default) anchors the longest axis so the bounds are the
+// map's true rectangle and the canvas draws the true aspect; Fill stretches each
+// axis to the unit square. Either way this machinery measures the bounds from the
+// points themselves — there is no preview-wide grid and no change needed here.
 
 export interface Bounds2D {
   minX: number

@@ -11,6 +11,7 @@ import {
   STOCK_MAPS,
   DEFAULT_MAP_ID,
   DEFAULT_SHAPE_ID,
+  DEFAULT_NORMALIZE_MODE,
   type MapRecord,
 } from './mapStore'
 import { useEditorStore, editorInitialState } from './editorStore'
@@ -19,6 +20,20 @@ import { MAP_SKELETON } from '@/engine/maps'
 beforeEach(() => {
   useMapStore.setState(mapInitialState)
   useEditorStore.setState(editorInitialState)
+})
+
+describe('activeNormalizeMode (#174)', () => {
+  it('defaults to Contain', () => {
+    expect(useMapStore.getState().activeNormalizeMode).toBe('contain')
+    expect(DEFAULT_NORMALIZE_MODE).toBe('contain')
+  })
+
+  it('setActiveNormalizeMode flips the mode', () => {
+    useMapStore.getState().setActiveNormalizeMode('fill')
+    expect(useMapStore.getState().activeNormalizeMode).toBe('fill')
+    useMapStore.getState().setActiveNormalizeMode('contain')
+    expect(useMapStore.getState().activeNormalizeMode).toBe('contain')
+  })
 })
 
 const USER_MAP: MapRecord = {
