@@ -124,6 +124,29 @@ export function cylinderSurfacePositions(
   return out
 }
 
+// The outward unit normal at a cylinder-surface pixel: radial from the tube
+// axis, (cos a, 0, sin a) — independent of the wrap radius and height. Preview-
+// only (ADR-0011): feeds the solidity terminator, never serialized.
+export function cylinderSurfaceNormal(
+  index: number,
+  gridDims: GridDims,
+): [number, number, number] {
+  const { cols } = gridDims
+  const col = cols > 0 ? ((index % cols) + cols) % cols : 0
+  const a = cols > 0 ? (col / cols) * TAU : 0
+  return [Math.cos(a), 0, Math.sin(a)]
+}
+
+// One outward normal per index, parallel to `cylinderSurfacePositions`.
+export function cylinderSurfaceNormals(
+  pixelCount: number,
+  gridDims: GridDims,
+): [number, number, number][] {
+  const out: [number, number, number][] = []
+  for (let i = 0; i < pixelCount; i++) out.push(cylinderSurfaceNormal(i, gridDims))
+  return out
+}
+
 // --- Surface cube (ADR-0011 solid-eligible test bed) ------------------------
 //
 // LEDs arranged on the SIX FACES of a cube — a surface (a hollow shell), NOT

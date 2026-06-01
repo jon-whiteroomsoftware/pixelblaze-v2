@@ -27,6 +27,8 @@ import {
   projectOrbit,
   orbitDepthToClipZ,
   depthCue,
+  terminatorFade,
+  TERMINATOR_WIDTH,
   applyTurntableDrag,
   applyTrackballDrag,
   dominantAxis,
@@ -444,5 +446,48 @@ describe('camera — orbit interaction', () => {
     const next = advanceAutoOrbit(DEFAULT_ORBIT, 1000, 0.3)
     expect(next.azimuth).toBeCloseTo(DEFAULT_ORBIT.azimuth + 0.3, 10)
     expect(next.elevation).toBe(DEFAULT_ORBIT.elevation)
+  })
+})
+
+describe('terminatorFade (solidity back-face fade, ADR-0011)', () => {
+  it('is 1 everywhere at solidity 0 — bit-identical to the see-through draw', () => {
+    for (const facing of [-1, -0.5, -0.1, 0, 0.1, 0.5, 1]) {
+      expect(terminatorFade(facing, 0)).toBe(1)
+    }
+  })
+
+  it('never alters a front-facing point at any slider value', () => {
+    for (const solidity of [0, 0.3, 0.7, 1]) {
+      for (const facing of [0, 0.01, 0.3, 1]) {
+        expect(terminatorFade(facing, solidity)).toBe(1)
+      }
+    }
+  })
+
+  it('fades a fully back-facing point to zero at solidity 1', () => {
+    // beyond the terminator band, the back reaches the floor 1 − solidity = 0
+    expect(terminatorFade(-TERMINATOR_WIDTH, 1)).toBeCloseTo(0)
+    expect(terminatorFade(-1, 1)).toBeCloseTo(0)
+  })
+
+  it('floors the back at 1 − solidity (frosted), independent of facing depth', () => {
+    expect(terminatorFade(-TERMINATOR_WIDTH, 0.3)).toBeCloseTo(0.7)
+    expect(terminatorFade(-1, 0.3)).toBeCloseTo(0.7)
+    expect(terminatorFade(-TERMINATOR_WIDTH, 0.7)).toBeCloseTo(0.3)
+  })
+
+  it('eases smoothly across the terminator (monotone 1 → floor)', () => {
+    const a = terminatorFade(-0.1, 1)
+    const b = terminatorFade(-0.25, 1)
+    const c = terminatorFade(-0.4, 1)
+    expect(a).toBeGreaterThan(b)
+    expect(b).toBeGreaterThan(c)
+    expect(a).toBeLessThanOrEqual(1)
+    expect(c).toBeGreaterThanOrEqual(0)
+  })
+
+  it('clamps an out-of-range solidity to [0,1]', () => {
+    expect(terminatorFade(-1, 2)).toBeCloseTo(0)
+    expect(terminatorFade(-1, -1)).toBe(1)
   })
 })

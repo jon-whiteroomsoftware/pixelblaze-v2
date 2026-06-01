@@ -32,6 +32,11 @@ interface EditorState {
   // strip, or an irregular custom point cloud). Reflects the true geometry rather
   // than re-deriving it from the viewport dimension.
   layoutLabel: string | null
+  // Whether the active embedding is solid-eligible (ADR-0011): it supplies a
+  // per-point normal, so the preview deck offers the solidity slider. Published
+  // by Preview from the resolved layout (true exactly when a normal array is fed
+  // to the renderer); the slider appears/disappears as a unit with it.
+  solidEligible: boolean
   setCompileStatus: (status: CompileStatus) => void
   setEditorFlavor: (flavor: EditorFlavor) => void
   setSource: (source: string) => void
@@ -43,6 +48,7 @@ interface EditorState {
   setNativeDim: (dim: 1 | 2 | 3) => void
   setDisplayDim: (dim: 1 | 2 | 3) => void
   setLayoutLabel: (label: string | null) => void
+  setSolidEligible: (value: boolean) => void
 }
 
 export const editorInitialState = {
@@ -57,6 +63,7 @@ export const editorInitialState = {
   nativeDim: 2 as 1 | 2 | 3,
   displayDim: 2 as 1 | 2 | 3,
   layoutLabel: null as string | null,
+  solidEligible: false,
 }
 
 export const useEditorStore = create<EditorState>()((set) => ({
@@ -72,4 +79,5 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setNativeDim: (nativeDim) => set({ nativeDim }),
   setDisplayDim: (displayDim) => set({ displayDim }),
   setLayoutLabel: (layoutLabel) => set({ layoutLabel }),
+  setSolidEligible: (solidEligible) => set({ solidEligible }),
 }))

@@ -113,6 +113,13 @@ function SecondaryBand() {
   const setDiffusion = usePreviewStore((s) => s.setDiffusion)
   const fidelity = usePreviewStore((s) => s.fidelity)
   const setFidelity = usePreviewStore((s) => s.setFidelity)
+  // Solidity (ADR-0011) rides here only when the active embedding is solid-
+  // eligible (it supplies a per-point normal); it appears/disappears as a unit
+  // with that embedding. The canonical term is `solidity`; the slider is labelled
+  // by its physical spectrum, Transparent ↔ Solid.
+  const solidEligible = useEditorStore((s) => s.solidEligible)
+  const solidity = useMapStore((s) => s.activeSolidity)
+  const setSolidity = useMapStore((s) => s.setActiveSolidity)
 
   return (
     <div className="text-xs py-2 pr-3">
@@ -171,6 +178,20 @@ function SecondaryBand() {
         <Cell label="speed">
           <SpeedSelector />
         </Cell>
+        {solidEligible && (
+          <Cell label="solidity">
+            <input
+              type="range"
+              aria-label="Solidity (Transparent ↔ Solid)"
+              min={0}
+              max={1}
+              step={0.01}
+              value={solidity}
+              onChange={(e) => setSolidity(Number(e.target.value))}
+              className="w-12 accent-amber-500"
+            />
+          </Cell>
+        )}
       </div>
     </div>
   )

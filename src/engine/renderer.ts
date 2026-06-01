@@ -11,8 +11,10 @@ import {
   insetForSpacing,
   neighborPitch2DPx,
   projectOrbit,
+  orbitRotate,
   orbitDepthToClipZ,
   depthCue,
+  terminatorFade,
   fit3DScale,
   modelHalfExtent,
   FIT_3D_MARGIN,
@@ -51,10 +53,15 @@ export interface Renderer {
   // any layout — solid cube, sphere shell, helix, or wrapped pole (#63).
   set3DPositions(
     positions: [number, number, number][] | null,
-    opts?: { canvasPx?: number },
+    opts?: { canvasPx?: number; normals?: [number, number, number][] | null },
   ): void
   // Update the orbit camera (auto-orbit advance, drag, reset). No-op in 2D mode.
   setCamera(camera: OrbitCamera): void
+  // Set the solidity (0–1, ADR-0011): a back-face terminator fade folded into the
+  // 3D per-vertex brightness when the active layout supplies per-point normals
+  // (set via set3DPositions). 0 leaves the draw bit-identical to see-through; 1
+  // fades back-facing points to zero. No-op without normals or in 2D mode.
+  setSolidity(solidity: number): void
   // Set the diffusion amount (0–1). Diffusion grows a soft glow tail around each
   // light source's solid core to merge neighbours like a physical diffuser, never
   // resizing the core and never dimming (ADR-0006). Recomputes 2D quad sizes in
@@ -183,6 +190,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
       },
       set3DPositions: () => undefined,
       setCamera: () => undefined,
+      setSolidity: () => undefined,
       setDiffusion: () => undefined,
     }
   }
@@ -213,6 +221,11 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
   // When set, the renderer is in 3D orbit mode: positions/sizes are recomputed
   // per paint from `pos3D` + `camera`. Takes precedence over the 2D paths.
   let pos3D: [number, number, number][] | null = null
+  // Per-point outward unit normals for a solid-eligible 3D layout (ADR-0011),
+  // parallel to pos3D. Null for a layout with no normal (volumetric cube, cloud);
+  // the terminator fade is then skipped. `solidity` is the slider's 0–1 floor.
+  let normals3D: [number, number, number][] | null = null
+  let solidity = 0
   let camera: OrbitCamera = DEFAULT_ORBIT
   // Diffusion amount (0–1) and the kernel params it resolves to for the active
   // mode. `coreFrac`/`peak` are frame-uniform (one diffusion + one pitch per
@@ -295,6 +308,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
     const glow = diffusionGlow(diffusion, baseSize, pitch)
     coreFrac = glow.coreFrac
     peak = glow.peak
+    // Solidity terminator (ADR-0011): only when a normal is supplied AND the
+    // slider is above 0 — otherwise the multiplier is uniformly 1 and the path is
+    // bit-identical to the see-through draw.
+    const applyFade = solidity > 0 && !!normals3D && normals3D.length >= cap
     for (let i = 0; i < cap; i++) {
       const { clip, depth } = projectOrbit(pos3D[i], camera, scale)
       const cue = depthCue(depth, {}, lattice3DHalfExtent)
@@ -302,7 +319,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
       positions[i * 2 + 1] = clip[1]
       depths[i] = orbitDepthToClipZ(depth, lattice3DHalfExtent)
       sizes[i] = Math.max(1, glow.quadDiameterPx * cue.sizeMul)
-      bright[i] = cue.brightnessMul
+      // The view looks down −Z, so the rotated normal's z is the facing toward
+      // the camera; front-facing points are untouched, the back fades to floor.
+      const facing = applyFade ? orbitRotate(normals3D![i], camera)[2] : 1
+      bright[i] = cue.brightnessMul * terminatorFade(facing, applyFade ? solidity : 0)
     }
     gl!.bindBuffer(gl!.ARRAY_BUFFER, posBuffer)
     gl!.bufferData(gl!.ARRAY_BUFFER, positions, gl!.DYNAMIC_DRAW)
@@ -424,9 +444,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
 
   function set3DPositions(
     p: [number, number, number][] | null,
-    opts: { canvasPx?: number } = {},
+    opts: { canvasPx?: number; normals?: [number, number, number][] | null } = {},
   ): void {
     pos3D = p
+    normals3D = p ? (opts.normals ?? null) : null
     if (p) {
       // Anchor the orb diameter to the layout's true neighbour gap, measured from
       // the points themselves — no cube-root lattice assumption (#63).
@@ -451,6 +472,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
     camera = c
   }
 
+  function setSolidity(s: number): void {
+    solidity = s < 0 ? 0 : s > 1 ? 1 : s
+  }
+
   function setDiffusion(d: number): void {
     diffusion = d < 0 ? 0 : d > 1 ? 1 : d
     // 2D resolves the glow once here (pitch is the measured neighbour spacing); 3D
@@ -459,7 +484,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewp
     if (!pos3D) apply2DGlow()
   }
 
-  return { paint, set2DPositions, resize2D, set3DPositions, setCamera, setDiffusion }
+  return { paint, set2DPositions, resize2D, set3DPositions, setCamera, setSolidity, setDiffusion }
 }
 
 function clamp01(v: number): number {

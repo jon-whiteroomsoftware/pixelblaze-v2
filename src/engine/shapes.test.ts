@@ -8,6 +8,8 @@ import {
   defaultPoleCols,
   clampPoleCols,
   polePositions,
+  poleNormal,
+  poleNormals,
   type Shape,
 } from './shapes'
 import type { MapPoint } from './maps'
@@ -124,6 +126,44 @@ describe('shapes (viewport 1D embeddings)', () => {
       const pos = polePositions(64, 8)
       // col 0 and the last col of the same row are one step short of overlapping.
       expect(pos[0][0]).not.toBeCloseTo(pos[7][0])
+    })
+
+    it('is solid-eligible (Line and Ring are not)', () => {
+      expect(POLE.solidEligible).toBe(true)
+      expect(LINE.solidEligible).toBe(false)
+      expect(RING.solidEligible).toBe(false)
+    })
+
+    it('emits outward unit normals radial to the body-diagonal axis', () => {
+      const cols = 8
+      const n = poleNormals(64, cols)
+      const pos = polePositions(64, cols)
+      const W: [number, number, number] = [
+        1 / Math.sqrt(3),
+        1 / Math.sqrt(3),
+        1 / Math.sqrt(3),
+      ]
+      for (let i = 0; i < n.length; i++) {
+        // unit length
+        expect(Math.hypot(...n[i])).toBeCloseTo(1)
+        // perpendicular to the pole's long axis (purely radial, no axial part)
+        const axial = n[i][0] * W[0] + n[i][1] * W[1] + n[i][2] * W[2]
+        expect(axial).toBeCloseTo(0)
+        // points outward: aligned with the point's radial offset from the axis
+        const r: [number, number, number] = [pos[i][0] - 0.5, pos[i][1] - 0.5, pos[i][2] - 0.5]
+        const rAxial = r[0] * W[0] + r[1] * W[1] + r[2] * W[2]
+        const radial = [r[0] - rAxial * W[0], r[1] - rAxial * W[1], r[2] - rAxial * W[2]]
+        const rlen = Math.hypot(...radial)
+        if (rlen > 1e-9) {
+          const dot = (n[i][0] * radial[0] + n[i][1] * radial[1] + n[i][2] * radial[2]) / rlen
+          expect(dot).toBeCloseTo(1)
+        }
+      }
+    })
+
+    it('repeats the normal each wrap (depends on column, not row)', () => {
+      const cols = 8
+      expect(poleNormal(0, 64, cols)).toEqual(poleNormal(cols, 64, cols))
     })
   })
 

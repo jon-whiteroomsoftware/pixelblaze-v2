@@ -32,6 +32,10 @@ export const DEFAULT_SHAPE_ID: ShapeId = 'line'
 // Default 2D viewport surface embedding (ADR-0010): Flat (the identity — the
 // plain 2D preview). Selecting a wrappable map never surprise-wraps.
 export const DEFAULT_SURFACE_ID: SurfaceId = 'flat'
+// Default solidity (ADR-0011): solid is the common physical case, so an eligible
+// embedding opens fully solid (1.0). A demo's recommended-solidity may override
+// this on open; a custom pattern persists whatever the user sets.
+export const DEFAULT_SOLIDITY = 1
 
 // The stock 2D grid generators that expose a clean integer cols×rows lattice a
 // surface can wrap (ADR-0010). The Square and Wide maps qualify; the example
@@ -191,6 +195,11 @@ interface MapState {
   // The modeled pixel count for the active layout, or null to derive a default
   // (the global grid's rows×cols for a map; a 1D default for a shape).
   activePixelCount: number | null
+  // The active layout's solidity (0–1, ADR-0011): a preview-only, per-pattern
+  // back-face terminator floor. Lives alongside the embedding selection because
+  // it is a modifier on the chosen embedding; consumed only when that embedding
+  // is solid-eligible. Never serialized toward a controller.
+  activeSolidity: number
   userMaps: MapRecord[]
   // The map open in editor "map mode" (#151), or null when the editor holds a
   // pattern/demo/library. Every custom map is persisted on creation (like a
@@ -207,6 +216,7 @@ interface MapState {
   setActiveShape: (id: ShapeId) => void
   setActiveSurface: (id: SurfaceId) => void
   setActivePixelCount: (count: number | null) => void
+  setActiveSolidity: (solidity: number) => void
   // Create a fresh custom map (skeleton source), persist it immediately as a row
   // in "Your Maps" (no save step, mirroring New Pattern), and open it in map mode.
   createNewMap: () => Promise<void>
@@ -242,6 +252,7 @@ export const mapInitialState = {
   activeShapeId: DEFAULT_SHAPE_ID,
   activeSurfaceId: DEFAULT_SURFACE_ID,
   activePixelCount: null as number | null,
+  activeSolidity: DEFAULT_SOLIDITY,
   userMaps: [] as MapRecord[],
   editingMap: null as EditingMap,
   mapBaseline: '',
@@ -277,6 +288,8 @@ export const useMapStore = create<MapState>()((set, get) => ({
   setActiveShape: (id) => set({ activeShapeId: id }),
   setActiveSurface: (id) => set({ activeSurfaceId: id }),
   setActivePixelCount: (count) => set({ activePixelCount: count }),
+  setActiveSolidity: (solidity) =>
+    set({ activeSolidity: solidity < 0 ? 0 : solidity > 1 ? 1 : solidity }),
 
   createNewMap: async () => {
     // Mirror New Pattern: a custom map is a real row the instant you create it —

@@ -22,6 +22,10 @@ export interface Shape {
   // (§5, ADR-0005) — a 1D pattern on a ring still gets the 2D top-down camera,
   // while its dispatch stays 1D (the `sample` is always empty).
   displayDim: 1 | 2 | 3
+  // Solid-eligible iff the shape supplies a per-point outward normal (ADR-0011):
+  // the Pole has radial normals (its solidity fade can hide its far side); the
+  // flat Line and the camera-facing Ring do not and never offer the slider.
+  solidEligible: boolean
   // index -> normalized [0,1]² display position. `pixelCount` sizes the path so
   // the index sequence spans it; `sample` is never read or produced here.
   // For a `displayDim:3` shape (Pole) this 2D path is never taken — the viewport
@@ -38,6 +42,7 @@ export const LINE: Shape = {
   id: 'line',
   name: 'Line',
   displayDim: 1,
+  solidEligible: false,
   embed(index, pixelCount) {
     const x = pixelCount > 1 ? index / (pixelCount - 1) : 0.5
     return [x, 0.5]
@@ -51,6 +56,7 @@ export const RING: Shape = {
   id: 'ring',
   name: 'Ring',
   displayDim: 2,
+  solidEligible: false,
   embed(index, pixelCount) {
     const a = pixelCount > 0 ? (index / pixelCount) * TAU : 0
     return [0.5 + 0.5 * Math.cos(a), 0.5 + 0.5 * Math.sin(a)]
@@ -69,6 +75,7 @@ export const POLE: Shape = {
   id: 'pole',
   name: 'Pole',
   displayDim: 3,
+  solidEligible: true,
   embed() {
     return [0.5, 0.5]
   },
@@ -167,6 +174,38 @@ export function polePoint(
     0.5 + cu * POLE_U[1] + cv * POLE_VP[1] + h * POLE_W[1],
     0.5 + cu * POLE_U[2] + cv * POLE_VP[2] + h * POLE_W[2],
   ]
+}
+
+// The outward unit normal at a pole pixel: radial in the U/VP cross-section
+// plane (cos a·U + sin a·VP), pointing away from the body-diagonal axis. Unit
+// length since U,VP are orthonormal; independent of the wrap radius and height.
+// Preview-only (ADR-0011) — feeds the solidity terminator, never serialized.
+export function poleNormal(
+  index: number,
+  pixelCount: number,
+  cols: number,
+): [number, number, number] {
+  const n = Math.max(1, Math.floor(pixelCount) || 1)
+  const c = clampPoleCols(n, cols)
+  const a = ((index % c) / c) * TAU
+  const cu = Math.cos(a)
+  const cv = Math.sin(a)
+  return [
+    cu * POLE_U[0] + cv * POLE_VP[0],
+    cu * POLE_U[1] + cv * POLE_VP[1],
+    cu * POLE_U[2] + cv * POLE_VP[2],
+  ]
+}
+
+// One outward normal per pole index, parallel to `polePositions`.
+export function poleNormals(
+  pixelCount: number,
+  cols: number,
+): [number, number, number][] {
+  const n = Math.max(1, Math.floor(pixelCount) || 1)
+  const out: [number, number, number][] = []
+  for (let i = 0; i < n; i++) out.push(poleNormal(i, n, cols))
+  return out
 }
 
 // Resolve the whole pole: one [0,1]³ display position per index.

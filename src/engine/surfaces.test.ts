@@ -6,6 +6,8 @@ import {
   cylinderDiameter,
   cylinderSurfacePoint,
   cylinderSurfacePositions,
+  cylinderSurfaceNormal,
+  cylinderSurfaceNormals,
   surfaceCubeFaceCounts,
   surfaceCubePoints,
   surfaceCubePositions,
@@ -74,6 +76,31 @@ describe('cylinderSurfacePoint', () => {
 describe('cylinderSurfacePositions', () => {
   it('resolves one 3D position per modeled index', () => {
     expect(cylinderSurfacePositions(16, { cols: 4, rows: 4 })).toHaveLength(16)
+  })
+})
+
+describe('cylinderSurfaceNormal', () => {
+  it('points radially outward from the tube axis (unit length, no y)', () => {
+    for (let i = 0; i < 16; i++) {
+      const n = cylinderSurfaceNormal(i, { cols: 4, rows: 4 })
+      expect(Math.hypot(...n)).toBeCloseTo(1)
+      expect(n[1]).toBe(0)
+    }
+  })
+
+  it('aligns with the radial offset from the axis', () => {
+    const [x, , z] = cylinderSurfacePoint(1, { cols: 8, rows: 4 })
+    const n = cylinderSurfaceNormal(1, { cols: 8, rows: 4 })
+    // outward radial: (pos.xz − centre.xz) normalized equals the normal
+    const rx = x - 0.5
+    const rz = z - 0.5
+    const len = Math.hypot(rx, rz)
+    expect(n[0]).toBeCloseTo(rx / len)
+    expect(n[2]).toBeCloseTo(rz / len)
+  })
+
+  it('emits one normal per index', () => {
+    expect(cylinderSurfaceNormals(16, { cols: 4, rows: 4 })).toHaveLength(16)
   })
 })
 

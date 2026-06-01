@@ -514,6 +514,43 @@ export function depthCue(
   }
 }
 
+// ── Solidity terminator (ADR-0011) ───────────────────────────────────────────
+//
+// A solid object hides its own back: on a solid-eligible surface embedding the
+// preview suppresses BACK-facing points so the far side doesn't shine through
+// the gaps between the near points. This is a geometric visibility factor folded
+// into the per-vertex brightness beside `depthCue` — NOT the brightness control,
+// so ADR-0006's "brightness is the only control that changes brightness" holds.
+//
+// `facing` is the point's outward unit normal dotted with the view direction
+// (toward the camera): the rotated normal's z under `orbitRotate` (the view looks
+// down −Z, so a larger +z points at the viewer). facing > 0 → front, < 0 → back.
+//
+// FRONT-facing points are never altered at any slider value. `solidity` ∈ [0,1]
+// sets the FLOOR the back fades to: 1.0 → the back reaches 0 across a fixed-width
+// smoothstep terminator (solid); 0.3 → the back floors at 0.7 (frosted); 0.0 → 1
+// everywhere (today's see-through draw, bit-identical). The slider sets the
+// floor, not the terminator width.
+
+// Width of the smoothstep terminator band, in `facing` units past the horizon
+// (facing 0). The back reaches its floor once `−facing` exceeds this.
+export const TERMINATOR_WIDTH = 0.5
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0))
+  return t * t * (3 - 2 * t)
+}
+
+// The per-point brightness multiplier for a given facing + solidity. 1 for any
+// front-facing point and for solidity 0 (bit-identical to the see-through draw);
+// the back fades over a fixed-width terminator to a floor of `1 − solidity`.
+export function terminatorFade(facing: number, solidity: number): number {
+  const s = clamp01(solidity)
+  if (s <= 0 || facing >= 0) return 1
+  const t = smoothstep(0, TERMINATOR_WIDTH, -facing) // 0 at the horizon → 1 deep in back
+  return 1 - s * t
+}
+
 // ── Orbit interaction (pure drag math) ──────────────────────────────────────
 
 // Plain drag is constrained to a single cardinal axis (the spec): one gesture

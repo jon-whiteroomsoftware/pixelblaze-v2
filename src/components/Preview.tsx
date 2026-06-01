@@ -9,6 +9,7 @@ import {
   DEFAULT_MAP_ID,
   DEFAULT_SHAPE_ID,
   DEFAULT_SURFACE_ID,
+  DEFAULT_SOLIDITY,
   DEFAULT_SHAPE_PIXEL_COUNT,
   defaultPixelCountForDim,
   resolveMap,
@@ -33,10 +34,17 @@ import {
   SHAPES,
   embedPositions,
   polePositions,
+  poleNormals,
   defaultPoleCols,
   type ShapeId,
 } from '@/engine/shapes'
-import { cylinderSurfacePositions, surfaceCubePositions, type SurfaceId } from '@/engine/surfaces'
+import {
+  cylinderSurfacePositions,
+  cylinderSurfaceNormals,
+  surfaceCubePositions,
+  surfaceCubeNormals,
+  type SurfaceId,
+} from '@/engine/surfaces'
 import type { MapPoint } from '@/engine/maps'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
@@ -68,6 +76,7 @@ export function Preview() {
   const activeShapeId = useMapStore((s) => s.activeShapeId)
   const activeSurfaceId = useMapStore((s) => s.activeSurfaceId)
   const activePixelCount = useMapStore((s) => s.activePixelCount)
+  const activeSolidity = useMapStore((s) => s.activeSolidity)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
   // The 2D viewport the renderer fits to: the container width + the live light
@@ -175,6 +184,10 @@ export function Preview() {
     let mapPoints: MapPoint[]
     let shapePositions: [number, number][] | null = null
     let positions3D: [number, number, number][] | null = null
+    // Per-point outward normals for a solid-eligible 3D embedding (ADR-0011),
+    // parallel to positions3D. Stays null for layouts with no normal (volumetric
+    // cube, cloud, flat 2D); its presence is exactly the solidity eligibility.
+    let normals3D: [number, number, number][] | null = null
     let displayDim: 1 | 2 | 3
     // The realized grid readout, or null when there's no regular grid (a 1D strip
     // or an irregular custom point cloud). Reflects the actual arrangement, NOT
@@ -190,6 +203,7 @@ export function Preview() {
         // taller-than-wide range for the current count; null → the shape default.
         const cols = useCameraStore.getState().poleCols ?? defaultPoleCols(pixelCount)
         positions3D = polePositions(pixelCount, cols)
+        normals3D = poleNormals(pixelCount, cols)
         mapPoints = positions3D.map((pos) => ({ sample: [], pos }))
         displayDim = 3
       } else {
@@ -264,6 +278,7 @@ export function Preview() {
         const gridDims = mapGridDims(map, pixelCount)
         if (gridDims) {
           positions3D = cylinderSurfacePositions(pixelCount, gridDims)
+          normals3D = cylinderSurfaceNormals(pixelCount, gridDims)
           mapPoints = mapPoints.map((p, i) => ({ sample: p.sample, pos: positions3D![i] }))
           shapePositions = null
           layoutLabel = `${gridDims.cols}×${gridDims.rows}`
@@ -275,6 +290,7 @@ export function Preview() {
       // across the faces. The map still owns `sample`; the surface owns `pos`.
       if (selection.surfaceId === 'surface-cube' && displayDim === 2) {
         positions3D = surfaceCubePositions(pixelCount)
+        normals3D = surfaceCubeNormals(pixelCount)
         mapPoints = mapPoints.map((p, i) => ({ sample: p.sample, pos: positions3D![i] }))
         shapePositions = null
         layoutLabel = `cube · ${pixelCount}`
@@ -283,6 +299,10 @@ export function Preview() {
     }
     useEditorStore.getState().setDisplayDim(displayDim)
     useEditorStore.getState().setLayoutLabel(layoutLabel)
+    // A normal array is fed exactly for a solid-eligible embedding (Pole, Cylinder,
+    // surface cube), so its presence IS the eligibility the deck's solidity slider
+    // keys on (ADR-0011). Volumetric cube / clouds / flat 2D carry none.
+    useEditorStore.getState().setSolidEligible(normals3D !== null)
 
     const clock = createVirtualClock()
     const shimConfig = {
@@ -354,8 +374,9 @@ export function Preview() {
       const rect = containerRef.current?.getBoundingClientRect()
       const width = rect?.width ?? 400
       const px = cube3DCanvasPx(width, width)
-      renderer.set3DPositions(positions3D, { canvasPx: px })
+      renderer.set3DPositions(positions3D, { canvasPx: px, normals: normals3D })
       renderer.setCamera(useCameraStore.getState().camera)
+      renderer.setSolidity(useMapStore.getState().activeSolidity)
       setCanvas3DPx(px)
     } else {
       // Every 2D layout — stock plane, ring/cloud, or a 1D shape embedding — draws
@@ -430,6 +451,7 @@ export function Preview() {
     m.setActiveShape((rec?.shapeId as ShapeId) ?? DEFAULT_SHAPE_ID)
     m.setActiveSurface((rec?.surfaceId as SurfaceId) ?? DEFAULT_SURFACE_ID)
     m.setActivePixelCount(rec?.pixelCount ?? null)
+    m.setActiveSolidity(rec?.solidity ?? DEFAULT_SOLIDITY)
   }, [activePatternId])
 
   // Persist the active layout back onto the PatternRecord whenever it changes, so
@@ -444,8 +466,9 @@ export function Preview() {
       shapeId: activeShapeId,
       surfaceId: activeSurfaceId,
       pixelCount: activePixelCount ?? undefined,
+      solidity: activeSolidity,
     })
-  }, [activePatternId, activeMapId, activeShapeId, activeSurfaceId, activePixelCount])
+  }, [activePatternId, activeMapId, activeShapeId, activeSurfaceId, activePixelCount, activeSolidity])
 
   // Forward control value changes to the live pattern handle
   useEffect(() => {
@@ -511,10 +534,11 @@ export function Preview() {
     const count = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
     const cols = poleCols ?? defaultPoleCols(count)
     const positions = polePositions(count, cols)
-    renderer.set3DPositions(positions, { canvasPx: canvas3DPx })
+    renderer.set3DPositions(positions, { canvasPx: canvas3DPx, normals: poleNormals(count, cols) })
     // set3DPositions re-measures the layout's neighbour pitch + extent, so the orb
-    // sizing and diffusion glow track the new geometry; reassert the diffusion.
+    // sizing and diffusion glow track the new geometry; reassert diffusion + solidity.
     renderer.setDiffusion(usePreviewStore.getState().diffusion)
+    renderer.setSolidity(useMapStore.getState().activeSolidity)
     if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
   }, [poleCols, activeShapeId, displayDim, canvas3DPx, activePixelCount])
 
@@ -549,6 +573,17 @@ export function Preview() {
     renderer.setDiffusion(diffusion)
     if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
   }, [diffusion])
+
+  // Solidity (ADR-0011, back-face terminator fade): pushed into the renderer,
+  // which folds a normal·viewDir multiplier into the 3D per-vertex brightness when
+  // the layout supplies normals. A no-op in 2D / for ineligible embeddings (no
+  // normals fed). Repaint while paused so the change shows immediately.
+  useEffect(() => {
+    const renderer = rendererRef.current
+    if (!renderer) return
+    renderer.setSolidity(activeSolidity)
+    if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
+  }, [activeSolidity])
 
   return (
     <div className="h-full bg-zinc-950 flex flex-col overflow-hidden">
