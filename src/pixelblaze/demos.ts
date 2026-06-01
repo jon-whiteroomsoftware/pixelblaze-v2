@@ -43,3 +43,20 @@ export const DEMO_RECOMMENDED_PIXEL_COUNTS: Record<string, number> = {
 export function recommendedPixelCountFor(demoName: string | null | undefined): number | undefined {
   return demoName ? DEMO_RECOMMENDED_PIXEL_COUNTS[demoName] : undefined
 }
+
+// Recommended solidity (IDE-side, preview-only) — the same registry family as the
+// recommended map and count above (ADR-0011). A solid-object demo opens at this
+// value ahead of the global 1.0 default, so AuroraSphere / NebulaSphere land as
+// solid spheres that hide their own back hemisphere. A demo carries no persisted
+// solidity, so the slider stays freely editable; the value never reaches the
+// pattern source, the transpiled artifact, or a controller.
+export const DEMO_RECOMMENDED_SOLIDITIES: Record<string, number> = {
+  AuroraSphere: 1,
+  NebulaSphere: 1,
+}
+
+// The solidity a demo recommends opening at, or undefined for demos without one
+// (and for user patterns, which carry their own persisted solidity).
+export function recommendedSolidityFor(demoName: string | null | undefined): number | undefined {
+  return demoName ? DEMO_RECOMMENDED_SOLIDITIES[demoName] : undefined
+}

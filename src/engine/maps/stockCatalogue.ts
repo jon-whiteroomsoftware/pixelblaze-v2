@@ -27,7 +27,12 @@ export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   { id: 'cube', name: 'Cube', dim: 3, source: source('cube') },
   { id: 'star', name: 'Star', dim: 3, source: source('star') },
   { id: 'seed-helix-3d', name: 'Helix (cloud)', dim: 3, source: source('helix') },
-  { id: 'seed-sphere-3d', name: 'Sphere (cloud)', dim: 3, source: source('sphere') },
+  // The Sphere is a convex shell, so the catalogue vouches it solid-eligible
+  // (ADR-0011): the preview re-derives outward normals via normalize(pos −
+  // centroid) and offers the solidity slider. The Helix is NOT a shell (centroid
+  // normals would be wrong) and the volumetric Cube has no per-point normal, so
+  // neither is flagged.
+  { id: 'seed-sphere-3d', name: 'Sphere (cloud)', dim: 3, source: source('sphere'), solidEligible: true },
   { id: 'seed-ring-2d', name: 'Ring', dim: 2, source: source('ring') },
 ]
 

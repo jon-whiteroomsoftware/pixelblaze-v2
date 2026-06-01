@@ -131,6 +131,19 @@ export function selectedEmbeddingId(
   return undefined
 }
 
+// Resolve the on-open solidity for a layout (ADR-0011), the same precedence
+// family as the recommended map/count: a user pattern's PERSISTED solidity wins
+// outright; otherwise a demo's RECOMMENDED solidity is the on-open default ahead
+// of the global `fallback` (1.0). A demo persists nothing, so the recommendation
+// only sets the starting point — the slider stays freely editable afterwards.
+export function resolveSolidity(
+  persisted: number | undefined,
+  recommended: number | undefined,
+  fallback: number,
+): number {
+  return persisted ?? recommended ?? fallback
+}
+
 // Resolve the layout a pattern opens with, validating its persisted selection
 // against the pattern's native dimensionality and the live catalogue:
 //   • the MAP is the persisted `mapId` if still a valid dim-matched option, else

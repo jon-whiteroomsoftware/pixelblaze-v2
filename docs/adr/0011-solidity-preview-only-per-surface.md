@@ -1,0 +1,37 @@
+# Solidity is a preview-only per-surface display property
+
+**Status:** accepted — generalizes the viewport-cosmetic stance of [ADR-0006](0006-preview-light-size-and-diffusion.md) and rides on the embedding model of [ADR-0010](0010-surfaces-are-2d-viewport-embeddings.md) / [ADR-0005](0005-display-position-dual-sourced.md).
+
+When a layout is drawn on a curved surface — a sphere, a cylinder, a helical pole, a surface-cube — the preview today draws *every* point at full brightness, so the **back** of the object shines through the gaps between the **front** points. A real LED installation built on a solid object is opaque: you cannot see the back. But the same points could equally hang on a transparent shell, a wire mesh, or in free space, where you *do* want to see all the way through. The preview needs to represent both, and nothing in the codebase has taken a position on it.
+
+## Decision
+
+**Solidity is a preview-only, per-pattern display property of a surface embedding, expressed as a continuous slider `0 = transparent → 1 = solid`.** It suppresses back-facing points so a solid object hides its own back, while leaving the transparent (`0`) end as today's exact see-through behaviour.
+
+- **It is a property of *surfaces*, defined by the presence of a per-point outward normal.** An embedding is **solid-eligible iff it can supply a surface normal**. Curved shapes/surfaces can (Pole, Cylinder, Sphere, surface-cube / polyhedron nets); flat ones trivially face the camera and need nothing (Line, Ring, Flat); **volumes have no per-point normal and are never eligible** (the volumetric cube, a measured cloud). This is why "cube" splits into two embeddings: a **surface cube** (LEDs on six faces, face normals → eligible) and a **volumetric cube** (points filling space, no normal → not eligible, relying on the renderer's existing opaque depth-tested cores).
+
+- **The normal is preview-only and never enters the map record.** This matches the Pixelblaze hardware model: a controller knows only a **map** — an ordered list of positions — with no normals, no solidity, nothing more. Solidity lives entirely in the **Viewport**, alongside light size and diffusion, and is never serialized toward a controller. Per-pattern persistence and hardware-bound are orthogonal axes: `solidity` persists on `PatternRecord` beside `surfaceId` (also per-pattern, also never shipped).
+
+- **Eligibility is provenance-gated, not geometry-inferred.** A normal is available because the IDE *owns the generator*. Analytic embeddings (Pole, Cylinder, sphere-wrap Surface) emit the normal from their formula. The **3D Sphere stock map** arrives as a baked `xyz` array with no formula, so the preview re-derives the normal as `normalize(pos − centroid)` — but **only because the stock catalogue entry carries an explicit `solidEligible` flag** vouching that it is a shell. A user's hand-imported sphere-shaped coordinate list sets no flag and is **never** solid-able, even though the identical centroid math would run. Two visually-identical spheres differ by provenance, exactly as **Stock map** vs **Custom map** already do.
+
+- **Soft terminator fade, not a hard cull.** A point's brightness is multiplied by a factor keyed on `normal · viewDir`, folded into `project3D` beside the existing **depth cue** multiplier (same category — a geometric visibility factor, not the **brightness** *control*, so [ADR-0006](0006-preview-light-size-and-diffusion.md)'s "brightness is the only control that changes brightness" is untouched). **Front-facing points are never altered at any slider value.** The slider sets the *floor* the back fades to: at `1.0` the back reaches `0` across a fixed-width smoothstep terminator (solid); at `0.3` the back floors at `0.7` (frosted / translucent); at `0.0` the multiplier is `1` everywhere (today's behaviour, bit-identical — effectively the feature off). The slider sets the floor, not the terminator width.
+
+- **Default solid (`1.0`); demos may recommend otherwise.** Solid is the common physical case. The global default is `1.0` for every eligible embedding; a **recommended-solidity** entry (same registry family as recommended-map and recommended-count) lets a read-only **demo** open at another value (a glass-ornament demo at `0.3`). A custom pattern persists whatever the user sets.
+
+- **It rides in the preview deck's layout row.** The slider sits with the pattern name and the Map / embedding controls, appearing and disappearing **as a unit** with a solid-eligible embedding — not as a global viewport-comfort pref and not in the top nav, because it is a modifier on the chosen embedding.
+
+## Considered options
+
+- **Hard back-face cull** (drop points with `normal · viewDir > 0`). Cheapest, geometrically exact for a sphere, and back points cost nothing. Rejected as the model: a point at the terminator pops on/off as the object orbits. The soft fade is the same per-point cost and avoids the pop; the cull is just its hard limit.
+- **A binary solid/transparent toggle.** Simpler control. Rejected: a soft fade has a natural *amount*, and that amount is exactly the physical spectrum (opaque → frosted → glass → wire-mesh). One continuous slider beside diffusion (also 0–1) collapses "solid-or-not" and "how translucent" into one knob, and "transparent" becomes the `0` end of the same code path rather than a special mode.
+- **Infer the normal from cloud geometry for *any* map** (so a hand-imported sphere is solid too). Maximum reach. Rejected: centroid normals are wrong for anything non-convex (a torus, a measured tree), so it would be guessing; provenance-gating keeps the offered solidity honest.
+- **Per-shape analytic normals for the 3D Sphere map.** Most precise. Rejected as overkill: generic `normalize(pos − centroid)` is exact for a convex shell and is one shared formula instead of bespoke per-map code.
+- **Make solidity a global viewing-comfort pref** (beside light size / diffusion). Rejected: solidity is intrinsic to *what the object is* (AuroraSphere *is* a solid sphere), like its recommended map — so it belongs per-pattern, not as a global eye-comfort knob.
+
+## Consequences
+
+- A solid-eligible embedding exposes an optional **`normalAt(index) → unit vector`** (or a parallel normal array beside `pos3D`); embeddings without one don't offer the slider. The stock catalogue gains a `solidEligible` flag; the 3D Sphere entry sets it and the preview re-derives normals via `normalize(pos − centroid)`.
+- The renderer's `project3D` folds a `normal · viewDir` terminator multiplier into the per-vertex brightness beside `depthCue`. At `solidity = 0` the multiplier is uniformly `1`, so the path is bit-identical to today.
+- `PatternRecord` gains a `solidity` field beside `surfaceId` (schemaless record — no `DB_VERSION` bump). A **recommended-solidity** registry (`demoName → number`) joins recommended-map / recommended-count in the demo-loading layer; consumed only by the layout resolver as the on-open default.
+- The **Sphere** (and **surface-cube**) become first-class members of the embedding family with declared normals, per [ADR-0010](0010-surfaces-are-2d-viewport-embeddings.md)'s "sphere, torus, polyhedron nets are surfaces."
+- The glossary gains **Solidity** and a note on the preview-only **surface normal**, cross-referenced from **Surface**, **Shape**, **Viewport**, and the recommended-* registry.

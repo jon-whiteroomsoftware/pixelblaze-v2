@@ -12,6 +12,10 @@ export interface SourceMapSpec {
   displayDim?: 1 | 2 | 3
   // Raw `function(pixelCount){ … return coords }` JavaScript (Vite `?raw` text).
   source: string
+  // Provenance-gated solidity eligibility (ADR-0011): set only on a stock map the
+  // catalogue vouches is a convex shell, so the preview re-derives centroid
+  // normals and offers the solidity slider. Carried through onto the PixelMap.
+  solidEligible?: boolean
 }
 
 // Build a live, source-backed PixelMap. `resolve(pixelCount)` runs the raw source
@@ -27,6 +31,7 @@ export function createSourceMap(spec: SourceMapSpec): PixelMap {
     builtin: true,
     dim: spec.dim,
     ...(spec.displayDim !== undefined ? { displayDim: spec.displayDim } : {}),
+    ...(spec.solidEligible ? { solidEligible: true } : {}),
     resolve(pixelCount: number): MapPoint[] {
       const normalized = normalizeAspect(evalMapSource(spec.source, pixelCount))
       return normalized.map((c) => ({ sample: [...c], pos: [...c] as MapPoint['pos'] }))

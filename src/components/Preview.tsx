@@ -29,7 +29,8 @@ import {
   advanceAutoOrbit,
 } from '@/engine/camera'
 import { layoutSource as buildLayoutSource } from '@/store/mapStore'
-import { resolveLayoutSelection } from '@/engine/layout'
+import { resolveLayoutSelection, resolveSolidity } from '@/engine/layout'
+import { centroidNormals } from '@/engine/centroidNormals'
 import {
   SHAPES,
   embedPositions,
@@ -48,7 +49,11 @@ import {
 import type { MapPoint } from '@/engine/maps'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
-import { recommendedMapFor, recommendedPixelCountFor } from '@/pixelblaze/demos'
+import {
+  recommendedMapFor,
+  recommendedPixelCountFor,
+  recommendedSolidityFor,
+} from '@/pixelblaze/demos'
 
 // Square 3D viewport size (CSS px): fill the available pane edge-to-edge (the
 // smaller of its two sides), so the 3D canvas is exactly as tall as a square 2D
@@ -72,6 +77,7 @@ export function Preview() {
   const displayDim = useEditorStore((s) => s.displayDim)
   const controlValues = useControlStore((s) => s.controlValues)
   const activePatternId = usePatternStore((s) => s.activePatternId)
+  const activeDemoName = usePatternStore((s) => s.activeDemoName)
   const activeMapId = useMapStore((s) => s.activeMapId)
   const activeShapeId = useMapStore((s) => s.activeShapeId)
   const activeSurfaceId = useMapStore((s) => s.activeSurfaceId)
@@ -237,6 +243,12 @@ export function Preview() {
           mapPoints = map.resolve(pixelCount)
         }
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
+        // A solid-eligible stock cloud (the Sphere shell, ADR-0011) carries no
+        // baked normal, so the preview re-derives one generically as
+        // normalize(pos − centroid) — exact for a convex shell, and offered ONLY
+        // because the catalogue flags this map. The Helix / volumetric Cube set no
+        // flag and stay see-through. Preview-only: never written to the map record.
+        if (map.solidEligible) normals3D = centroidNormals(positions3D)
         displayDim = 3
       } else if (map.id !== 'plane') {
         // 2D point cloud: the stock ring regenerates live (ADR-0008); a custom 2D
@@ -451,8 +463,23 @@ export function Preview() {
     m.setActiveShape((rec?.shapeId as ShapeId) ?? DEFAULT_SHAPE_ID)
     m.setActiveSurface((rec?.surfaceId as SurfaceId) ?? DEFAULT_SURFACE_ID)
     m.setActivePixelCount(rec?.pixelCount ?? null)
-    m.setActiveSolidity(rec?.solidity ?? DEFAULT_SOLIDITY)
   }, [activePatternId])
+
+  // Resolve the on-open solidity (ADR-0011) for a pattern OR a demo: a user
+  // pattern restores its persisted solidity; a demo (no PatternRecord) opens at
+  // its recommended-solidity ahead of the global 1.0 default, then persists
+  // nothing so the slider stays freely editable. Kept separate from the layout
+  // hydrate above so it also fires when switching to a read-only demo.
+  useEffect(() => {
+    const rec = activePatternId
+      ? usePatternStore.getState().userPatterns.find((p) => p.id === activePatternId)
+      : undefined
+    useMapStore
+      .getState()
+      .setActiveSolidity(
+        resolveSolidity(rec?.solidity, recommendedSolidityFor(activeDemoName), DEFAULT_SOLIDITY),
+      )
+  }, [activePatternId, activeDemoName])
 
   // Persist the active layout back onto the PatternRecord whenever it changes, so
   // reopening restores the layout the pattern was authored against. The knobs and

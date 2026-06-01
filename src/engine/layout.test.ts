@@ -5,6 +5,7 @@ import {
   selectedMapId,
   selectedEmbeddingId,
   resolveLayoutSelection,
+  resolveSolidity,
   type LayoutSource,
 } from './layout'
 
@@ -172,5 +173,21 @@ describe('resolveLayoutSelection (open / restore)', () => {
       maps: [...SOURCE.maps, { id: 'sphere', name: 'Sphere', dim: 3 }],
     }
     expect(resolveLayoutSelection({ mapId: 'cube' }, 3, source, 'sphere')).toEqual({ mapId: 'cube' })
+  })
+})
+
+describe('resolveSolidity', () => {
+  it('honours a persisted solidity above all else', () => {
+    expect(resolveSolidity(0.4, 0.3, 1)).toBe(0.4)
+    // Persisted 0 wins over the recommendation (a real value, not absent).
+    expect(resolveSolidity(0, 0.3, 1)).toBe(0)
+  })
+
+  it('falls back to the recommendation when nothing is persisted', () => {
+    expect(resolveSolidity(undefined, 0.3, 1)).toBe(0.3)
+  })
+
+  it('falls back to the global default when neither is present', () => {
+    expect(resolveSolidity(undefined, undefined, 1)).toBe(1)
   })
 })

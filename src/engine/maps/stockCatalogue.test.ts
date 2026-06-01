@@ -39,6 +39,15 @@ describe('stock catalogue', () => {
     expect(mapById('seed-sphere-3d').dim).toBe(3)
   })
 
+  it('flags only the convex Sphere shell solid-eligible (ADR-0011)', () => {
+    // The Sphere vouches a centroid normal is honest; the Helix (not a shell) and
+    // every other stock map carry no flag and stay see-through.
+    expect(mapById('seed-sphere-3d').solidEligible).toBe(true)
+    expect(mapById('seed-helix-3d').solidEligible).toBeUndefined()
+    expect(mapById('cube').solidEligible).toBeUndefined()
+    expect(mapById('plane').solidEligible).toBeUndefined()
+  })
+
   it('exposes the relocated cloud ids for IDB pruning', () => {
     expect(SEED_MAP_IDS).toEqual(['seed-helix-3d', 'seed-sphere-3d', 'seed-ring-2d'])
   })

@@ -47,6 +47,13 @@ export interface PixelMap {
   // at bake (ADR-0009) so the layout readout shows `cols×rows(×depth)`. Absent
   // for irregular clouds and for stock generators (which derive dims live).
   gridDims?: GridDims
+  // Provenance-gated solidity eligibility (ADR-0011): set ONLY on a stock map the
+  // catalogue vouches is a convex shell (the 3D Sphere). The preview then derives
+  // a per-point outward normal generically as `normalize(pos − centroid)` and
+  // offers the solidity slider. A hand-imported sphere-shaped cloud sets no flag
+  // and is never solid-able, even though the identical centroid math would run.
+  // Preview-only — never written to a map record nor sent to a controller.
+  solidEligible?: boolean
   // Stock maps store their generator params (re-derivable/editable). Handed the
   // modeled pixelCount; returns one MapPoint per index, 0 .. pixelCount-1.
   resolve(pixelCount: number): MapPoint[]
