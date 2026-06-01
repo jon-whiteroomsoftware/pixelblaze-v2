@@ -1,14 +1,15 @@
 import {
-  canvasSize,
-  clampGridDim,
   clampPixelCount,
   MAX_PIXEL_COUNT,
-  pointSize,
   point3DSize,
   diffusionGlow,
   nearestNeighborSpacing,
-  projectIndex,
-  projectPos,
+  posBounds2D,
+  canvasSizeForBounds,
+  projectPosInBounds,
+  nearestNeighborSpacing2D,
+  insetForSpacing,
+  neighborPitch2DPx,
   projectOrbit,
   orbitDepthToClipZ,
   depthCue,
@@ -17,34 +18,34 @@ import {
   FIT_3D_MARGIN,
   DEFAULT_ORBIT,
   type OrbitCamera,
-  type Locked2DGrid,
+  type Bounds2D,
+  type Inset2D,
 } from './camera'
 
-export interface RendererGridConfig {
-  rows: number
-  cols: number
-  spacing: number
-  // Preview light size (ADR-0006): the drawn source diameter as a fraction of
-  // the inter-dot pitch. Scales the dots only, never the canvas size. Defaults
-  // to touching (1) as a backstop; the preview always supplies the real value.
+// The 2D viewport knobs the renderer needs from the UI: the container width it
+// fits the canvas to, and the preview light size (ADR-0006: the drawn source
+// diameter as a fraction of the measured neighbour pitch). The layout's extent
+// and aspect come from the `pos` handed to `set2DPositions`, not from here.
+export interface Viewport2D {
+  containerWidth: number
   lightSize?: number
-}
-
-function clampGrid<T extends RendererGridConfig>(grid: T): T {
-  return { ...grid, rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols) }
 }
 
 export interface Renderer {
   paint(pixels: [number, number, number][], brightness: number, dimmed: boolean): void
-  updateGrid(grid: RendererGridConfig): void
-  // Drive the draw positions from a viewport shape embedding (1D line/ring) given
-  // as normalized [0,1]² `pos` per index, or `null` to fall back to the locked-2D
-  // grid (`projectIndex`). The grid path is left untouched when null, so the
-  // reveal-2D plane is bit-for-bit unchanged.
-  setShapePositions(positions: [number, number][] | null): void
+  // Set the 2D draw layout from normalized [0,1]² `pos` (stock plane, ring,
+  // cloud, or a 1D shape embedding alike). The renderer measures the layout's
+  // bounds and nearest-neighbour spacing, sizes the canvas to the bounds' aspect
+  // (square today, since pos is per-axis normalized; the true rectangle once
+  // #116 flips normalization), and anchors the light-source pitch to the measured
+  // spacing — no global rows/cols grid (ADR-0009).
+  set2DPositions(positions: [number, number][], viewport: Viewport2D): void
+  // Re-fit the 2D canvas to a new container width / light size without remeasuring
+  // the layout (pos unchanged). Called on container resize and light-size change.
+  resize2D(viewport: Viewport2D): void
   // Switch to the 3D orbit path: draw positions come from normalized [0,1]³ `pos`
   // projected through the orbit camera each paint, with depth cueing. `null`
-  // leaves 3D mode (back to the 2D grid/shape path). Sizes the canvas to a square
+  // leaves 3D mode (back to the 2D pos path). Sizes the canvas to a square
   // `canvasPx`. The light-source diameter is anchored to the layout's MEASURED
   // nearest-neighbour spacing (computed from `positions`), so it is correct for
   // any layout — solid cube, sphere shell, helix, or wrapped pole (#63).
@@ -129,17 +130,35 @@ function createProgram(gl: WebGLRenderingContext): WebGLProgram {
   return program
 }
 
-export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererGridConfig): Renderer {
-  let grid = clampGrid(initialGrid)
+export function createRenderer(canvas: HTMLCanvasElement, initialViewport: Viewport2D): Renderer {
+  // The locked-2D layout, measured from the active layout's resolved `pos`
+  // (ADR-0009). `pos2D` is the normalized [0,1]² draw positions; `bounds2D`,
+  // `spacingNorm2D` and `inset2D` are derived once per layout. Starts empty (a
+  // 1px square canvas) until the first `set2DPositions`.
+  let pos2D: [number, number][] = []
+  let bounds2D: Bounds2D = { minX: 0, minY: 0, maxX: 1, maxY: 1 }
+  let spacingNorm2D = 0
+  let inset2D: Inset2D = { x: 0, y: 0 }
+  let containerWidth = Math.max(1, initialViewport.containerWidth)
+  let lightSize = initialViewport.lightSize ?? 1
   // Glowing LEDs are additive light, so the draw uses additive blending — which
   // is order-independent, so there is no painter's-order depth sort. The CSS
   // `diffusion` blur is applied as a filter on this canvas by the UI layer.
   const gl = canvas.getContext('webgl', { premultipliedAlpha: false, alpha: true })
 
   function applySize(): void {
-    const { width, height } = canvasSize(grid)
+    const { width, height } = canvasSizeForBounds(containerWidth, bounds2D)
     canvas.width = width
     canvas.height = height
+  }
+
+  // Re-measure the active layout's bounds + neighbour spacing (and the derived
+  // half-pitch inset). Cheap, but only needed when the positions themselves
+  // change — a resize re-fits the canvas without recomputing these.
+  function measure2D(): void {
+    bounds2D = posBounds2D(pos2D)
+    spacingNorm2D = nearestNeighborSpacing2D(pos2D)
+    inset2D = insetForSpacing(spacingNorm2D)
   }
 
   applySize()
@@ -150,8 +169,18 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   if (!gl) {
     return {
       paint: () => undefined,
-      updateGrid(newGrid) { grid = clampGrid(newGrid); applySize() },
-      setShapePositions: () => undefined,
+      set2DPositions(positions, viewport) {
+        pos2D = positions
+        containerWidth = Math.max(1, viewport.containerWidth)
+        lightSize = viewport.lightSize ?? lightSize
+        measure2D()
+        applySize()
+      },
+      resize2D(viewport) {
+        containerWidth = Math.max(1, viewport.containerWidth)
+        lightSize = viewport.lightSize ?? lightSize
+        applySize()
+      },
       set3DPositions: () => undefined,
       setCamera: () => undefined,
       setDiffusion: () => undefined,
@@ -171,9 +200,9 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   const uPeak = gl.getUniformLocation(program, 'u_peak')
   const uMode = gl.getUniformLocation(program, 'u_mode')
 
-  // 2D positions depend only on the grid, not the frame, so they're rebuilt on
-  // grid change rather than per paint. `positions` is the clip-space (x,y) per
-  // drawable index; `drawCount` is how many of those we actually draw.
+  // 2D positions depend only on the layout, not the frame, so they're rebuilt on
+  // layout/resize change rather than per paint. `positions` is the clip-space
+  // (x,y) per drawable index; `drawCount` is how many of those we actually draw.
   let positions = new Float32Array(0)
   let sizes = new Float32Array(0)
   // Per-vertex clip-space z, written only in 3D mode to drive opaque depth-tested
@@ -181,9 +210,6 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   // a_depth's generic attribute, so this stays empty there.
   let depths = new Float32Array(0)
   let drawCount = 0
-  // When set, draw positions come from a viewport shape embedding (1D path)
-  // rather than the locked-2D grid. Null keeps the legacy grid path.
-  let shapePos: [number, number][] | null = null
   // When set, the renderer is in 3D orbit mode: positions/sizes are recomputed
   // per paint from `pos3D` + `camera`. Takes precedence over the 2D paths.
   let pos3D: [number, number, number][] | null = null
@@ -206,19 +232,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function rebuildPositions(): void {
     const coords: number[] = []
-    if (shapePos) {
-      const cap = Math.min(shapePos.length, MAX_PIXEL_COUNT)
-      for (let i = 0; i < cap; i++) {
-        const [x, y] = projectPos(shapePos[i])
-        coords.push(x, y)
-      }
-    } else {
-      const cap = Math.min(grid.rows * grid.cols, MAX_PIXEL_COUNT)
-      for (let i = 0; i < cap; i++) {
-        const clip = projectIndex(i, grid)
-        if (!clip) break
-        coords.push(clip[0], clip[1])
-      }
+    const cap = Math.min(pos2D.length, MAX_PIXEL_COUNT)
+    for (let i = 0; i < cap; i++) {
+      const [x, y] = projectPosInBounds(pos2D[i], bounds2D, inset2D)
+      coords.push(x, y)
     }
     positions = new Float32Array(coords)
     drawCount = coords.length / 2
@@ -230,9 +247,13 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   // Resolve the 2D glow kernel from the current diffusion + pitch and upload the
   // (uniform) per-vertex quad size. The solid core is the light-size disc; the
   // diffusion tail grows the quad around it without moving the core (ADR-0006).
+  // The pitch is MEASURED from the layout's neighbour spacing (ADR-0009), not read
+  // from a global grid `spacing` — so it is correct for the plane, a ring, or any
+  // cloud alike.
   function apply2DGlow(): void {
-    const core = pointSize(grid, grid.lightSize ?? 1)
-    const glow = diffusionGlow(diffusion, core, grid.spacing)
+    const pitchPx = neighborPitch2DPx(canvas.width, canvas.height, bounds2D, spacingNorm2D, inset2D)
+    const core = Math.max(1, pitchPx * lightSize)
+    const glow = diffusionGlow(diffusion, core, pitchPx)
     coreFrac = glow.coreFrac
     peak = glow.peak
     sizes = new Float32Array(drawCount).fill(glow.quadDiameterPx)
@@ -265,7 +286,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     // scales it per-dot (nearer = larger). Diffusion never touches it — the blur
     // that merges sources is a CSS filter applied by the UI layer.
     const scale = fit3DScale(FIT_3D_MARGIN, lattice3DHalfExtent)
-    const ls = grid.lightSize ?? 1
+    const ls = lightSize
     const baseSize = point3DSize(canvas.width, lattice3DSpacing, ls, scale)
     // Grow the orb quad to hold the diffusion glow tail (the core stays baseSize);
     // pitch = baseSize / lightSize is the measured on-screen neighbour gap. Drawn
@@ -381,16 +402,22 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     }
   }
 
-  function updateGrid(newGrid: RendererGridConfig): void {
-    grid = clampGrid(newGrid)
-    if (pos3D) return // 3D mode owns its own square canvas size
+  function set2DPositions(p: [number, number][], viewport: Viewport2D): void {
+    pos2D = p
+    containerWidth = Math.max(1, viewport.containerWidth)
+    lightSize = viewport.lightSize ?? lightSize
+    measure2D()
+    if (pos3D) return // 3D mode owns its own square canvas size; stash for restore
     applySize()
     rebuildPositions()
     colorData = colors()
   }
 
-  function setShapePositions(p: [number, number][] | null): void {
-    shapePos = p
+  function resize2D(viewport: Viewport2D): void {
+    containerWidth = Math.max(1, viewport.containerWidth)
+    lightSize = viewport.lightSize ?? lightSize
+    if (pos3D) return // 3D mode owns its own square canvas size
+    applySize()
     rebuildPositions()
     colorData = colors()
   }
@@ -426,17 +453,15 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function setDiffusion(d: number): void {
     diffusion = d < 0 ? 0 : d > 1 ? 1 : d
-    // 2D resolves the glow once here (pitch is the static grid spacing); 3D
+    // 2D resolves the glow once here (pitch is the measured neighbour spacing); 3D
     // recomputes it per paint from the live projected pitch, so this only needs
     // to refresh the 2D quad sizes.
     if (!pos3D) apply2DGlow()
   }
 
-  return { paint, updateGrid, setShapePositions, set3DPositions, setCamera, setDiffusion }
+  return { paint, set2DPositions, resize2D, set3DPositions, setCamera, setDiffusion }
 }
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v
 }
-
-export type { Locked2DGrid }

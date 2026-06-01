@@ -1,12 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { clampGridDim, DEFAULT_LIGHT_SIZE } from '../engine/camera'
-
-export interface GridConfig {
-  rows: number
-  cols: number
-  spacing: number
-}
+import { DEFAULT_LIGHT_SIZE } from '../engine/camera'
 
 export type FidelityMode = 'fidelity' | 'fast'
 
@@ -14,7 +8,6 @@ interface PreviewState {
   isRunning: boolean
   speed: number
   brightness: number
-  grid: GridConfig
   // Preview light size (ADR-0006): the drawn diameter of each light source as a
   // fraction of the inter-dot pitch (diameter = pitch × lightSize). Grows the
   // sources in place — never moves dots or resizes the canvas. A preview-only
@@ -43,7 +36,6 @@ interface PreviewState {
   setBrightness: (brightness: number) => void
   setLightSize: (lightSize: number) => void
   setDiffusion: (diffusion: number) => void
-  setGrid: (partial: Partial<GridConfig>) => void
   setWatchPatternVars: (on: boolean) => void
   setWatchValues: (values: Record<string, unknown>) => void
 }
@@ -52,11 +44,6 @@ export const previewInitialState = {
   isRunning: true,
   speed: 1,
   brightness: 1,
-  grid: {
-    rows: 32,
-    cols: 32,
-    spacing: 20,
-  },
   lightSize: DEFAULT_LIGHT_SIZE,
   diffusion: 0.5,
   // The Fast renderer (float64) is the default on load: it's the smoother,
@@ -71,14 +58,6 @@ export const previewInitialState = {
   fps: null as number | null,
   // Pattern elapsed time (ms); null while paused/not yet measured. Never persisted.
   elapsed: null as number | null,
-}
-
-// Clamp a (possibly partial) grid's dimensions to the renderer's hard ceiling,
-// projecting down to just the known fields so a legacy blob's stray keys (e.g.
-// the pre-ADR-0006 `grid.diffusion`) never leak back onto `grid`. Guards against
-// an absurdly large persisted value freezing the tab on load.
-function clampGrid(grid: GridConfig): GridConfig {
-  return { rows: clampGridDim(grid.rows), cols: clampGridDim(grid.cols), spacing: grid.spacing }
 }
 
 // Light size sweeps f: 0.15 (clearly separated) → 0.95 (almost touching), with
@@ -97,24 +76,22 @@ function clampDiffusion(d: number): number {
   return Math.max(0, Math.min(1, d))
 }
 
-// Deep-merge persisted state over the live state so a persisted `grid` that
-// predates a newly-added field falls back to its default instead of arriving as
-// `undefined`. The default shallow merge would replace the whole grid object,
-// dropping any key the saved blob never had. Dimensions are clamped here so a
-// stale oversized blob can never reach the renderer. `diffusion` migrated out of
-// `grid` (ADR-0006), so a pre-rework blob's `grid.diffusion` is honoured as the
-// fallback for the new top-level field.
+// Merge persisted state over the live state. The preview-wide `grid` is retired
+// (ADR-0009 — the active map's resolved `pos` is the single source of extent and
+// aspect), so a legacy blob's `grid` is explicitly destructured OUT and dropped:
+// it can never land back on state. `diffusion` migrated out of `grid` (ADR-0006),
+// so a pre-rework blob's `grid.diffusion` is still honoured as the fallback for
+// the top-level field before the grid is discarded.
 export function mergePersistedPreview(persisted: unknown, current: PreviewState): PreviewState {
-  const p = (persisted ?? {}) as Partial<
-    Pick<PreviewState, 'brightness' | 'speed' | 'grid' | 'lightSize' | 'diffusion'>
+  const raw = (persisted ?? {}) as Partial<
+    Pick<PreviewState, 'brightness' | 'speed' | 'lightSize' | 'diffusion'>
   > & { grid?: { diffusion?: number } }
-  const legacyDiffusion = p.grid?.diffusion
+  const { grid: legacyGrid, ...p } = raw
   return {
     ...current,
     ...p,
-    grid: clampGrid({ ...current.grid, ...(p.grid ?? {}) }),
     lightSize: clampLightSize(p.lightSize ?? current.lightSize),
-    diffusion: clampDiffusion(p.diffusion ?? legacyDiffusion ?? current.diffusion),
+    diffusion: clampDiffusion(p.diffusion ?? legacyGrid?.diffusion ?? current.diffusion),
   }
 }
 
@@ -130,16 +107,14 @@ export const usePreviewStore = create<PreviewState>()(
       setBrightness: (brightness) => set({ brightness }),
       setLightSize: (lightSize) => set({ lightSize: clampLightSize(lightSize) }),
       setDiffusion: (diffusion) => set({ diffusion: clampDiffusion(diffusion) }),
-      setGrid: (partial) => set((s) => ({ grid: clampGrid({ ...s.grid, ...partial }) })),
       setWatchPatternVars: (watchPatternVars) => set({ watchPatternVars }),
       setWatchValues: (watchValues) => set({ watchValues }),
     }),
     {
       name: 'pixelblaze-preview',
-      // `grid` is no longer persisted: rows/cols are derived from the active
-      // pixel count (ADR-0004 — the count is the knob, the map arranges it), and
-      // spacing is fit to the container each resize. Only true viewport prefs
-      // ride in localStorage.
+      // No grid is persisted: the preview's extent/aspect derive from the active
+      // map's resolved `pos` (ADR-0009) and the pitch is fit to the container each
+      // resize. Only true viewport prefs ride in localStorage.
       partialize: (s) => ({
         brightness: s.brightness,
         speed: s.speed,

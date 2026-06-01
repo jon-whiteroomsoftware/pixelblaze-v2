@@ -52,7 +52,6 @@ export function Preview() {
   const loopRef = useRef<RenderLoop | null>(null)
   const rendererRef = useRef<ReturnType<typeof createRenderer> | null>(null)
   const isRunning = usePreviewStore((s) => s.isRunning)
-  const grid = usePreviewStore((s) => s.grid)
   const lightSize = usePreviewStore((s) => s.lightSize)
   const diffusion = usePreviewStore((s) => s.diffusion)
   const fidelity = usePreviewStore((s) => s.fidelity)
@@ -65,30 +64,31 @@ export function Preview() {
   const activePixelCount = useMapStore((s) => s.activePixelCount)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
-  const [canvasDims, setCanvasDims] = useState<{ spacing: number; lightSize: number } | null>(null)
+  // The 2D viewport the renderer fits to: the container width + the live light
+  // size. The layout's extent/aspect come from the active map's `pos` (ADR-0009),
+  // measured inside the renderer — not from any stored grid.
+  const [viewport, setViewport] = useState<{ containerWidth: number; lightSize: number } | null>(null)
   // The square 3D viewport size (CSS px) when a 3D layout is active, else null.
   // Sizes the square 3D canvas; the renderer owns the diffusion glow internally
   // (it measures the projected neighbour pitch from the layout it was handed).
   const [canvas3DPx, setCanvas3DPx] = useState<number | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
-  // Derive spacing from container width so cols always fill the available width.
-  // Also directly updates the renderer on each observation to avoid waiting for
-  // the React re-render cycle, which would lag the canvas behind the container
-  // during splitter drags.
+  // Track the container width so the renderer fits the canvas to the pane. Also
+  // directly re-fits the renderer on each observation to avoid waiting for the
+  // React re-render cycle, which would lag the canvas behind the container during
+  // splitter drags. The canvas aspect comes from the active map's `pos` (ADR-0009),
+  // resolved inside the renderer; light size scales the drawn sources only.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver(([entry]) => {
       const { width } = entry.contentRect
-      const { cols } = usePreviewStore.getState().grid
-      // Auto-fit the pitch to the container so the grid always fills the pane.
-      // Light size scales the drawn sources only, not the canvas size.
-      const spacing = Math.max(1, width / cols)
+      const containerWidth = Math.max(1, width)
       const lightSize = usePreviewStore.getState().lightSize
-      setCanvasDims({ spacing, lightSize })
+      setViewport({ containerWidth, lightSize })
       if (rendererRef.current) {
-        rendererRef.current.updateGrid({ ...usePreviewStore.getState().grid, spacing, lightSize })
+        rendererRef.current.resize2D({ containerWidth, lightSize })
         if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
       }
     })
@@ -96,18 +96,18 @@ export function Preview() {
     return () => ro.disconnect()
   }, [])
 
-  // Recompute spacing when cols or the light size changes without a resize
+  // Re-fit when the light size changes without a resize.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const { width } = el.getBoundingClientRect()
-    setCanvasDims({ spacing: Math.max(1, width / grid.cols), lightSize })
-  }, [grid.cols, lightSize])
+    setViewport({ containerWidth: Math.max(1, width), lightSize })
+  }, [lightSize])
 
-  // Rebuild the loop whenever source or spacing changes
+  // Rebuild the loop whenever source or the viewport changes
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !canvasDims) return
+    if (!canvas || !viewport) return
     setRuntimeError(null)
 
     // Opening a map (editor map mode) must NOT touch the preview — it changes the
@@ -116,8 +116,6 @@ export function Preview() {
     // changes no preview input (previewSource/activeMapId/…), so this loop isn't
     // even rebuilt; nothing here special-cases map mode.
     if (!previewSource) return
-
-    const gridWithDims = { ...usePreviewStore.getState().grid, ...canvasDims }
 
     // Bundle first so the pattern's native dimensionality (highest render fn) is
     // known before resolving its layout — the dropdown filters by it (ADR-0005).
@@ -233,24 +231,16 @@ export function Preview() {
       } else {
         // 2D stock plane: the pixel count is the knob (ADR-0004); with no aspect
         // to honour the plane squares the count up to the most-square grid that
-        // holds it. The renderer's locked-2D layout is driven by these derived
-        // dims (synced to the store below) so sampled coords and drawn dots line
-        // up exactly. count is the user's count, not rows×cols (the last grid row
-        // may be partial).
+        // holds it. Its per-axis-normalized `pos` flows through the same 2D pos
+        // channel as every other layout (ADR-0009) — the renderer measures the
+        // extent and neighbour pitch from those points, so there is no preview-wide
+        // grid. `squarePlaneDims` survives only as the generator's private
+        // dims, used here purely for the layout readout. count is the user's
+        // count, not rows×cols (the last grid row may be partial).
         pixelCount = clampPixelCount(activePixelCount ?? defaultPixelCountForDim(2))
         const planeDims = squarePlaneDims(pixelCount)
-        // Sync the renderer's locked-2D grid to the derived dims so the spacing
-        // (fit-to-container) and projection machinery downstream uses them. Guard
-        // on a change so re-running this effect doesn't churn the store needlessly.
-        const cur = usePreviewStore.getState().grid
-        if (cur.rows !== planeDims.rows || cur.cols !== planeDims.cols) {
-          usePreviewStore.getState().setGrid(planeDims)
-        }
-        gridWithDims.rows = planeDims.rows
-        gridWithDims.cols = planeDims.cols
-        // Keep spacing fit to the container for the (possibly new) column count.
-        gridWithDims.spacing = Math.max(1, canvasDims.spacing * cur.cols / planeDims.cols)
         mapPoints = map.resolve(pixelCount)
+        shapePositions = mapPoints.map((p) => p.pos as [number, number])
         layoutLabel = `${planeDims.cols}×${planeDims.rows}`
         displayDim = 2
       }
@@ -317,11 +307,8 @@ export function Preview() {
       return
     }
 
-    const renderer = createRenderer(canvas, gridWithDims)
+    const renderer = createRenderer(canvas, viewport)
     rendererRef.current = renderer
-    // Drive draw positions from the 1D shape embedding when one is active; null
-    // leaves the locked-2D grid path untouched (the plane stays bit-for-bit).
-    renderer.setShapePositions(positions3D ? null : shapePositions)
     // 3D layout: hand the orbit renderer the cube's [0,1]³ positions, a square
     // canvas, and a base dot size; seed the camera from the ephemeral store.
     if (positions3D) {
@@ -335,7 +322,10 @@ export function Preview() {
       renderer.setCamera(useCameraStore.getState().camera)
       setCanvas3DPx(px)
     } else {
-      renderer.set3DPositions(null)
+      // Every 2D layout — stock plane, ring/cloud, or a 1D shape embedding — draws
+      // through the single pos channel; the renderer measures extent + neighbour
+      // pitch from these points (ADR-0009). An empty array is a valid no-op layout.
+      renderer.set2DPositions(shapePositions ?? [], viewport)
       setCanvas3DPx(null)
     }
     renderer.setDiffusion(usePreviewStore.getState().diffusion)
@@ -389,7 +379,7 @@ export function Preview() {
     if (usePreviewStore.getState().isRunning) loop.start()
 
     return () => loop.stop()
-  }, [previewSource, canvasDims, fidelity, activeMapId, activeShapeId, activePixelCount])
+  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activePixelCount])
 
   // Hydrate the per-pattern layout on open (ADR-0004/0005): restore the record's
   // persisted mapId/shapeId/pixelCount, falling back to defaults when absent so a
@@ -406,18 +396,18 @@ export function Preview() {
   }, [activePatternId])
 
   // Persist the active layout back onto the PatternRecord whenever it changes, so
-  // reopening restores the layout the pattern was authored against. Both knobs
-  // and the count ride along; the pure resolver picks the right one per native
-  // dimensionality on the next open. No-op without an active user pattern.
+  // reopening restores the layout the pattern was authored against. The knobs and
+  // the count ride along; the pure resolver picks the right one per native
+  // dimensionality on the next open. The square-plane dims are derived from the
+  // count (ADR-0009), not stored. No-op without an active user pattern.
   useEffect(() => {
     if (!activePatternId) return
     usePatternStore.getState().updatePatternLayout(activePatternId, {
       mapId: activeMapId,
       shapeId: activeShapeId,
       pixelCount: activePixelCount ?? undefined,
-      params: { rows: grid.rows, cols: grid.cols },
     })
-  }, [activePatternId, activeMapId, activeShapeId, activePixelCount, grid.rows, grid.cols])
+  }, [activePatternId, activeMapId, activeShapeId, activePixelCount])
 
   // Forward control value changes to the live pattern handle
   useEffect(() => {
@@ -435,14 +425,15 @@ export function Preview() {
     }
   }, [controlValues])
 
-  // Push grid changes to the renderer without rebuilding the loop
+  // Re-fit the 2D canvas to the viewport without rebuilding the loop (e.g. a light-
+  // size change). The layout's pos is unchanged, so this only re-fits the canvas.
   useEffect(() => {
-    if (!canvasDims) return
-    rendererRef.current?.updateGrid({ ...grid, ...canvasDims })
+    if (!viewport) return
+    rendererRef.current?.resize2D(viewport)
     if (!usePreviewStore.getState().isRunning) {
       loopRef.current?.renderPreviewFrame()
     }
-  }, [grid, canvasDims])
+  }, [viewport])
 
   // Start / stop when isRunning changes
   useEffect(() => {

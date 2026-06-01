@@ -1,0 +1,31 @@
+# Maps are authoritative; the preview honors true aspect through both sample and pos
+
+**Status:** accepted
+
+The map is the authoritative description of an installation's geometry — "whatever the map says is right." The preview obeys it: a map whose geometry is 15 wide × 10 tall is drawn 15×10, and the pattern is fed coordinates of that same true proportion. Pixel count stays an independent knob (ADR-0004); it never overrides the map's shape — the map generates against whatever count it is handed and the preview makes do.
+
+This overturns the per-axis normalization that ADR-0008's normalize pass retained as "current behaviour" (open question #116). Per-axis stretch made every axis fill `[0,1]` independently, so a 15×10, a 10×15, and a 12×12 map all collapsed to the same unit square before anything was drawn — aspect ratio was destroyed at bake, on **both** channels. That was a holdover from the era when the preview rendered only 2D on a single global square grid, where every map was square and the stretch was invisible.
+
+## Decision
+
+**Normalization is aspect-preserving, anchored to the longest axis, applied identically to `sample` and `pos`.**
+
+- The longest axis of the map's raw geometry maps to `[0,1]`; shorter axes get a proportionally smaller range (a 15×10 map → long axis `0..1`, short axis `0..0.667`). No axis ever exceeds `1.0`, so pattern authors keep a predictable upper bound.
+- This applies to **`pos`** (what the preview draws) — so the true rectangle/box is shown — **and** to **`sample`** (what the pattern reads) — so a `hypot(x-.5, y-.5)` circle pattern renders as a circle on screen, not an ellipse, matching what a real Pixelblaze does on that install.
+- The map's resolved geometry is the **single source of the preview's extent and aspect.** The old preview-wide `grid: {rows, cols}` state (`previewStore`) is retired as a global concept; `rows`/`cols` survive only as the square-plane generator's private parameters, never as preview state. The locked-2D camera derives its extent from the active layout's `pos` bounds, exactly as the 3D path already does (`modelHalfExtent` / `nearestNeighborSpacing`).
+
+## Considered options
+
+- **Keep per-axis stretch (status quo, #116).** Patterns always see a clean unit square on both axes; no data-model change. Rejected: it makes the preview lie about non-square installs (circles become ellipses), contradicts "the map is authoritative," and only ever looked harmless because every map used to be square.
+- **Aspect-preserving `pos` only; keep `sample` per-axis.** The preview would draw the true rectangle while the pattern still saw a unit square — so the drawn dots and the pattern's notion of space would disagree (a round pattern squashed onto a tall preview). Rejected: it splits the two channels' geometry, which is exactly the dishonesty we're removing, and it diverges from hardware.
+- **Anchor a fixed axis (always x → [0,1]).** Simpler rule, but a tall map's y would exceed 1.0, breaking the "coordinates stay in [0,1]" guarantee authors rely on. Rejected for the longest-axis anchor.
+
+## Consequences
+
+- **Existing patterns compute differently on non-square maps.** A pattern that assumed `x,y ∈ [0,1]²` now sees the short axis capped below 1 on a non-square map. This is intended (it matches hardware) but is a real behavioural change — hence this ADR rather than a silent tweak.
+- **`layoutOptions` gates on the set of render fns a pattern defines, not its single native dimension.** A 2D+3D pattern lists both 2D maps *and* 3D maps (its `render2D` can dispatch on a 2D map, its `render3D` on a 3D map). `src/engine/layout.ts`'s `layoutOptions(nativeDim: 1|2|3)` must become a dispatchable-dimensions set; its current `m.dim === nativeDim` filter is a single-dimension assumption that already drifted from its own "filtered by sample-arity" doc-comment.
+- **The layout readout reads true dims.** The preview's read-only "layout" cell shows a map's actual dimensions: a custom 2D map that is a regular 20×10 lattice shows `20×10`, a 3D grid shows `s×s×s`, mirroring the stock plane/cube. This requires a regular-grid custom map's `MapRecord` to **carry its intended cols×rows (×depth) through the bake**; a genuinely irregular cloud (no grid structure) shows no dims cell rather than a meaningless extent.
+- **The stock plane is "Square," not "the 2D layout."** It squares a bare count up (`cols = ceil(sqrt(n))`) precisely because a count carries no aspect; a custom map that *does* carry an aspect is a different, non-square entry. The dropdown label becomes "Square" (internal id `plane` unchanged).
+- **The drape cylinder is unaffected and stays a sibling.** It carries its own fixed UV parameterization; a custom 2D map is *not* draped onto it (they are independent dropdown entries). Composing a custom map onto a cylinder is deferred, not foreclosed — it would need the custom map to carry meaningful U-periodicity, which the model doesn't express yet. See [ADR-0008](0008-map-functions-are-plain-javascript.md) (the cylinder's no-source exception) and [ADR-0005](0005-display-position-dual-sourced.md).
+- **#116 is resolved here, not deferred.** The per-axis-vs-aspect question that ADR-0008's normalize pass parked now has a committed answer: aspect-preserving, longest-axis anchor. Whether *firmware* preserves aspect is still worth characterising against a real device (divergence harness), but the preview's stance is settled.
+- Sibling to [ADR-0004](0004-pixelcount-independent-of-map.md) and [ADR-0005](0005-display-position-dual-sourced.md): the map owns geometry (now including aspect); count stays independent; `pos` stays dual-sourced.

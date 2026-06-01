@@ -41,57 +41,143 @@ export function cubeSideForCount(n: number): number {
   return Math.max(2, Math.min(maxSide, side))
 }
 
-export interface Locked2DGrid {
-  rows: number
-  cols: number
-  spacing: number
+// ── Locked-2D camera (pos-bounds driven) ─────────────────────────────────────
+//
+// The 2D-display half of the preview camera. The active layout's resolved `pos`
+// is the single source of the preview's extent and aspect (ADR-0009) — there is
+// no global rows/cols grid. These pure helpers measure the layout's bounds and
+// neighbour spacing and project each `pos` into clip space, exactly the way the
+// 3D path derives its extent from `modelHalfExtent` / `nearestNeighborSpacing`.
+//
+// Today every 2D `pos` arrives per-axis normalized to [0,1]² (the normalize pass
+// is still per-axis, #116), so a layout's bounds are the unit square and the
+// canvas draws square. When #116 flips normalization to longest-axis the bounds
+// become the true rectangle and this same machinery draws the true aspect — no
+// change needed here.
+
+export interface Bounds2D {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
 }
 
-// Canvas size in CSS pixels: cols×rows of dots at `spacing` apart, the dots
-// filling the canvas exactly as the legacy grid did.
-export function canvasSize(grid: Locked2DGrid): { width: number; height: number } {
-  return {
-    width: Math.round(grid.cols * grid.spacing),
-    height: Math.round(grid.rows * grid.spacing),
+// A per-axis half-pitch inset (in pos units) so sources sit a half-cell from the
+// rim instead of on it — the generic form of the legacy `(col+0.5)/cols` cell
+// centring (and it keeps rings/clouds off the canvas edge too).
+export interface Inset2D {
+  x: number
+  y: number
+}
+
+// Axis-aligned bounds of a 2D pos set. An empty set falls back to the unit box.
+export function posBounds2D(
+  positions: readonly (readonly [number, number])[],
+): Bounds2D {
+  if (positions.length === 0) return { minX: 0, minY: 0, maxX: 1, maxY: 1 }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of positions) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
   }
+  return { minX, minY, maxX, maxY }
 }
 
-// Fit-to-container: the uniform spacing that makes `cols` dots span the
-// available container width (matches Preview.tsx's ResizeObserver derivation).
-export function fitSpacing(containerWidth: number, cols: number): number {
-  return Math.max(1, containerWidth / Math.max(1, cols))
+// Canvas size in CSS pixels: the container width, with the height set to the
+// bounds' aspect (rangeY / rangeX) so a square layout draws square and a true
+// rectangle (post-#116) draws to proportion. A degenerate axis (a 1D line
+// embedding with zero range on one axis) falls back to a square canvas so the
+// height never collapses to zero.
+export function canvasSizeForBounds(
+  containerWidth: number,
+  bounds: Bounds2D,
+): { width: number; height: number } {
+  const w = Math.max(1, Math.round(containerWidth))
+  const rangeX = bounds.maxX - bounds.minX
+  const rangeY = bounds.maxY - bounds.minY
+  const aspect = rangeX > 0 && rangeY > 0 ? rangeY / rangeX : 1
+  return { width: w, height: Math.max(1, Math.round(w * aspect)) }
 }
 
-// Drawn light-source diameter in pixels (the WebGL gl_PointSize) for the 2D
-// path: the inter-dot pitch (`grid.spacing`) times the preview light-size
-// fraction (ADR-0006). At lightSize 0.95 sources almost touch; it grows them in
-// place WITHOUT resizing the canvas, so the grid always fits the pane
-// (canvasSize is lightSize-independent).
-export function pointSize(grid: Locked2DGrid, lightSize: number = 1): number {
-  return Math.max(1, grid.spacing * lightSize)
+// Project a `pos` into WebGL clip space [-1,1]² (y axis up), normalizing it
+// within the layout's bounds and insetting by half the neighbour pitch so the
+// extreme dots sit a half-cell inside the frame. For the stock plane (pos
+// `col/(cols-1)`, range 1, inset `0.5/(cols-1)`) this is bit-for-bit the legacy
+// `(col+0.5)/cols` centring. A degenerate axis (zero range) maps to the centre.
+export function projectPosInBounds(
+  pos: readonly [number, number],
+  bounds: Bounds2D,
+  inset: Inset2D,
+): [number, number] {
+  const rangeX = bounds.maxX - bounds.minX
+  const rangeY = bounds.maxY - bounds.minY
+  // Effective span includes the inset margin on both sides; the dot's offset
+  // from the lower edge is (pos - min) + inset, over that span → [0,1].
+  const fx = rangeX > 0 ? (pos[0] - bounds.minX + inset.x) / (rangeX + 2 * inset.x) : 0.5
+  const fy = rangeY > 0 ? (pos[1] - bounds.minY + inset.y) / (rangeY + 2 * inset.y) : 0.5
+  return [fx * 2 - 1, 1 - fy * 2]
 }
 
-// Project a row-major grid index to WebGL clip space [-1,1]² (y axis up), or
-// null if the index falls beyond the grid's row count. Spacing-independent: it
-// cancels out of the clip mapping, so this is purely the dot centre as a
-// fraction of the grid, matching the legacy `(col+0.5)/cols` dot centres.
-export function projectIndex(index: number, grid: Locked2DGrid): [number, number] | null {
-  const { rows, cols } = grid
-  const col = index % cols
-  const row = Math.floor(index / cols)
-  if (row >= rows) return null
-  const x = ((col + 0.5) / cols) * 2 - 1
-  const y = 1 - ((row + 0.5) / rows) * 2
-  return [x, y]
+// The typical (median) nearest-neighbour distance among 2D points in normalized
+// space — the real inter-source pitch for any 2D layout, the z-free analogue of
+// `nearestNeighborSpacing`. Sampled the same way (stride-selected queries, exact
+// NN over the full set, median) so it is cheap and robust to a lone far point.
+// Returns 0 for fewer than two points.
+export function nearestNeighborSpacing2D(
+  positions: readonly (readonly [number, number])[],
+): number {
+  const n = positions.length
+  if (n < 2) return 0
+  const stride = Math.max(1, Math.floor(n / NN_SAMPLE_LIMIT))
+  const dists: number[] = []
+  for (let i = 0; i < n; i += stride) {
+    const [xi, yi] = positions[i]
+    let best = Infinity
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue
+      const dx = positions[j][0] - xi
+      const dy = positions[j][1] - yi
+      const d2 = dx * dx + dy * dy
+      if (d2 < best) best = d2
+    }
+    if (best < Infinity) dists.push(Math.sqrt(best))
+  }
+  if (dists.length === 0) return 0
+  dists.sort((a, b) => a - b)
+  return dists[dists.length >> 1]
 }
 
-// Project a normalized [0,1]² display position (a map's intrinsic `pos`, or a
-// viewport shape embedding) into WebGL clip space [-1,1]² with the y axis up.
-// The locked-2D camera's pos path, parallel to the index path above; unlike
-// `projectIndex` it draws wherever `pos` says, so it carries 1D shapes (line,
-// ring) and any non-grid layout.
-export function projectPos(pos: [number, number]): [number, number] {
-  return [pos[0] * 2 - 1, 1 - pos[1] * 2]
+// The half-pitch inset (pos units, per axis) for a measured neighbour spacing:
+// half the spacing on each axis. Both axes share the isotropic spacing measure,
+// so the inset is symmetric — for the stock plane this is `0.5/(cols-1)`.
+export function insetForSpacing(spacingNorm: number): Inset2D {
+  const half = spacingNorm > 0 ? spacingNorm / 2 : 0
+  return { x: half, y: half }
+}
+
+// On-screen pixel pitch of a normalized neighbour spacing under the locked-2D
+// projection: the spacing as a fraction of the inset-expanded span, scaled to
+// the canvas axis. Uses the SMALLER of the two axis pitches so sources stay
+// round and never overlap on the denser axis. Replaces the old grid `spacing` /
+// `pointSize` pair; it is measured per layout, not read from a global grid.
+export function neighborPitch2DPx(
+  canvasWidthPx: number,
+  canvasHeightPx: number,
+  bounds: Bounds2D,
+  spacingNorm: number,
+  inset: Inset2D,
+): number {
+  if (spacingNorm <= 0) return Math.max(1, Math.min(canvasWidthPx, canvasHeightPx))
+  const rangeX = bounds.maxX - bounds.minX
+  const rangeY = bounds.maxY - bounds.minY
+  const spanX = rangeX > 0 ? rangeX + 2 * inset.x : 0
+  const spanY = rangeY > 0 ? rangeY + 2 * inset.y : 0
+  const pitchX = spanX > 0 ? (spacingNorm / spanX) * canvasWidthPx : Infinity
+  const pitchY = spanY > 0 ? (spacingNorm / spanY) * canvasHeightPx : Infinity
+  const pitch = Math.min(pitchX, pitchY)
+  return Number.isFinite(pitch) ? Math.max(1, pitch) : Math.max(1, Math.min(canvasWidthPx, canvasHeightPx))
 }
 
 // ── Orbit camera (3D) ───────────────────────────────────────────────────────

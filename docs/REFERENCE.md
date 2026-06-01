@@ -110,7 +110,7 @@ dependency resolution) be unit-tested without a DOM.
 
 | Store | Holds |
 |---|---|
-| `previewStore` | `isRunning`, `speed`, `brightness`, `grid` (rows/cols/spacing — derived from the active pixel count for 2D, not user-edited), `lightSize`, `diffusion`, `fidelity` mode, watch config + values, `fps`. Persisted (subset) to `localStorage` via `persist`. |
+| `previewStore` | `isRunning`, `speed`, `brightness`, `lightSize`, `diffusion`, `fidelity` mode, watch config + values, `fps`. No preview-wide grid — the active map's resolved `pos` is the single source of the preview's extent/aspect (ADR-0009). Persisted (subset) to `localStorage` via `persist`. |
 | `patternStore` | `activePatternId` / `activeLibraryName` / `activeDemoName` (mutually exclusive selection), `userPatterns` list, CRUD + layout-persist actions. |
 | `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`. |
 | `mapStore` | `activeMapId`, `activeShapeId`, `activePixelCount`, `userMaps`; stock-map catalogue + resolution helpers. |
@@ -119,9 +119,11 @@ dependency resolution) be unit-tested without a DOM.
 
 Each store exports its `*InitialState`; tests reset with `setState(initialState)`
 (merge mode). `previewStore` persists only `brightness`, `speed`, `lightSize`,
-`diffusion` (grid dims are derived from the count, not persisted) and deep-merges them
-on load (`mergePersistedPreview`) so a stale blob
-missing newer fields falls back to defaults rather than `undefined`. Notably,
+`diffusion` (there is no grid to persist; extent/aspect derive from the active map's
+`pos`) and merges them on load (`mergePersistedPreview`) so a stale blob
+missing newer fields falls back to defaults rather than `undefined`; a legacy persisted
+`grid` is explicitly dropped (its old `grid.diffusion` is still honoured as the
+`diffusion` migration fallback). Notably,
 **`fidelity` is transient** (defaults to `fast` each load) — per-pattern persistence
 of the renderer choice is not yet wired.
 
@@ -342,7 +344,9 @@ where each pixel lives, decoupled from how many pixels exist. The preview render
 **Stock maps:** `plane` (2D, row-major, `sample` = `pos`, normalized per-axis to match
 the legacy grid loop exactly — the 2D no-regression baseline) and `cube` (3D
 `side×side×side` lattice, default side 8 = 512 pixels). Both are generated, never
-persisted.
+persisted. (Per-axis normalization is current-code; ADR-0009 retargets it to
+aspect-preserving longest-axis anchoring — tracked in #116 / #154. The `plane`'s
+Layout label is being renamed "Plain 2D" → "Square", #155.)
 
 ### 9.2 Viewport shapes (`src/engine/shapes.ts`)
 
@@ -372,9 +376,16 @@ choice if still valid, else the dimension's default (line for 1D, plane for 2D).
 ### 9.4 Camera & projection (`src/engine/camera.ts`)
 
 Pure, fully unit-tested, no DOM:
-- **Locked-2D camera:** `projectIndex` maps a row-major index to clip space
-  (coordinate-identical to the legacy `(col+0.5)/cols` grid); `projectPos` draws a 1D
-  shape's `pos`.
+- **Locked-2D camera (pos-bounds driven, ADR-0009):** the active layout's resolved
+  `pos` is the single source of the preview's extent and aspect — there is no global
+  rows/cols grid. `posBounds2D` measures the layout's bounds; `canvasSizeForBounds`
+  fits the canvas to the bounds' aspect (square today, since `pos` is per-axis
+  normalized to `[0,1]²`; the true rectangle once #116 flips normalization, and a
+  degenerate 1D-line axis falls back to square); `projectPosInBounds` maps each `pos`
+  to clip space, inset by half the measured neighbour pitch so the extreme dots sit a
+  half-cell from the rim — bit-for-bit the legacy `(col+0.5)/cols` cell centring for
+  the stock plane. The plane, rings, clouds, and 1D shape embeddings all flow through
+  this one channel.
 - **Orbit camera (3D):** `OrbitCamera { azimuth, elevation, roll }`; `orbitRotate` /
   `projectOrbit` apply `Rz·Rx·Ry` and an orthographic projection; `fit3DScale` keeps
   the model's worst-case extent inside a margin. The extent is the model's actual
@@ -387,10 +398,12 @@ Pure, fully unit-tested, no DOM:
   `dominantAxis` + `applyTurntableDrag` (plain drag, single-axis, clamped elevation
   horizon) and `applyTrackballDrag` (Shift-drag, free tumble); `advanceAutoOrbit`
   spins the turntable.
-- **Sizing:** `pointSize`/`point3DSize` anchor the drawn light-source diameter to the
-  inter-dot pitch × `lightSize`; `diffusionGlow` derives the per-source glow kernel
-  (grown quad size, dissolving solid-core fraction, overlap-normalised peak) from
-  diffusion + pitch.
+- **Sizing:** the drawn light-source diameter is the MEASURED neighbour pitch ×
+  `lightSize` — `neighborPitch2DPx` (2D, from `nearestNeighborSpacing2D`) and
+  `point3DSize` (3D, from `nearestNeighborSpacing`) — so it is correct for the plane,
+  a ring, a cloud, a cube, a sphere shell, or a pole alike, with no global grid
+  `spacing`; `diffusionGlow` derives the per-source glow kernel (grown quad size,
+  dissolving solid-core fraction, overlap-normalised peak) from diffusion + pitch.
 - **Caps:** `MAX_PIXEL_COUNT = 65,536` (the dimension-agnostic freeze guard, replacing
   the old per-axis 256 cap); `MAX_GRID_AXIS = 256` keeps any one generator axis sane.
 
@@ -408,7 +421,10 @@ inscribed circle.
   `peak` is normalised by neighbour overlap so the brightest point holds steady — the
   field never dims and never blows out (gaps only fill upward).
 - **2D/1D:** one additive pass (`ONE, ONE`, order-independent — no depth sort) draws
-  core + tail; grid or shape positions rebuilt on change.
+  core + tail. A single pos channel (`set2DPositions`) feeds the plane, rings, clouds,
+  and 1D shapes; the renderer measures the layout's bounds + neighbour pitch and sizes
+  the canvas to the bounds' aspect. `resize2D` re-fits to a new container width / light
+  size without remeasuring the layout.
 - **3D:** opaque depth-tested core pass (nearer orbs occlude farther — so diffusion 0
   reads as crisp distinct sources rather than a washed-out additive haze), then an
   additive glow-tail pass (depth-test read-only) that only adds light into the gaps.
@@ -456,15 +472,17 @@ frozen image.
 
 The preview pane is a WebGL viewport plus a small, dimension-gated control set.
 
-- **Layout build.** On source/spacing/fidelity/layout change, the pane bundles the
+- **Layout build.** On source/viewport/fidelity/layout change, the pane bundles the
   pattern, derives native dimensionality, resolves the active layout, builds the map
   points (1D shape embedding / 2D plane squared up from the pixel count / 3D cube
-  lattice whose side is derived from the count), constructs the
-  Fast or Precise shim, loads the handle, seeds the control UI from the pattern's own
-  initialized vars (decoded from raw in Precise mode), and starts the loop.
-- **Auto-fit.** A `ResizeObserver` derives `spacing` from the container width so the
-  grid always fills the pane; light size scales only the drawn sources, never the
-  canvas.
+  lattice whose side is derived from the count), hands the 2D `pos` (or 3D positions)
+  to the renderer, constructs the Fast or Precise shim, loads the handle, seeds the
+  control UI from the pattern's own initialized vars (decoded from raw in Precise
+  mode), and starts the loop.
+- **Auto-fit.** A `ResizeObserver` tracks the container width and calls the renderer's
+  `resize2D`; the canvas is sized to the active map's `pos` aspect (ADR-0009) and the
+  source pitch is measured from the layout, so the preview always fills the pane. Light
+  size scales only the drawn sources, never the canvas.
 - **Run/pause.** The header pill toggles `isRunning`; the app starts running by default
   (`previewInitialState.isRunning = true`). Paused patterns dim and show a single
   frozen frame.
@@ -582,10 +600,12 @@ The toolkit reflects a few design decisions worth recording:
   recognised as a non-candidate early. Porting stays **human-driven with library
   support** — automated GLSL→Pixelblaze rewrite is a non-goal (a research idea tracked
   in the main PRD's Deferred section).
-- **Aspect ratio is a known limitation.** `Shader.toUV(x, y, aspect)` exists, but
-  `aspect` is currently hardcoded to `1`: the preview normalises per-axis and exposes
-  no `cols`/`rows` built-in, while firmware fits the longest axis to 0..1. This is both
-  a porting gap and a hardware divergence, tracked in **#116**.
+- **Aspect ratio is a known limitation (direction now decided — ADR-0009).** As built,
+  `Shader.toUV(x, y, aspect)` hardcodes `aspect = 1`: the preview normalises per-axis and
+  exposes no `cols`/`rows` built-in, while firmware fits the longest axis to 0..1 — both a
+  porting gap and a hardware divergence. **ADR-0009** commits the fix (aspect-preserving,
+  longest-axis-anchored normalization applied to both `sample` and `pos`); implementation
+  is tracked in **#116**. This section describes the current per-axis code, not the target.
 
 ---
 

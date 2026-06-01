@@ -35,42 +35,15 @@ describe('previewStore', () => {
     expect(usePreviewStore.getState().brightness).toBe(0.5)
   })
 
-  it('has default grid config', () => {
-    const { grid } = usePreviewStore.getState()
-    expect(grid.rows).toBe(32)
-    expect(grid.cols).toBe(32)
-    expect(grid.spacing).toBe(20)
+  it('holds no preview-wide grid (retired in ADR-0009)', () => {
+    expect('grid' in usePreviewStore.getState()).toBe(false)
+    expect('setGrid' in usePreviewStore.getState()).toBe(false)
   })
 
   it('defaults light size to 0.5 and diffusion to 0.5 (preview viewport prefs)', () => {
     const s = usePreviewStore.getState()
     expect(s.lightSize).toBe(0.5)
     expect(s.diffusion).toBe(0.5)
-  })
-
-  it('keeps diffusion out of the grid (ADR-0006 hoist)', () => {
-    expect('diffusion' in usePreviewStore.getState().grid).toBe(false)
-  })
-
-  it('setGrid merges partial grid updates', () => {
-    usePreviewStore.getState().setGrid({ rows: 8 })
-    const { grid } = usePreviewStore.getState()
-    expect(grid.rows).toBe(8)
-    expect(grid.cols).toBe(32)
-  })
-
-  it('setGrid clamps dimensions above 256 to 256', () => {
-    usePreviewStore.getState().setGrid({ rows: 100000, cols: 257 })
-    const { grid } = usePreviewStore.getState()
-    expect(grid.rows).toBe(256)
-    expect(grid.cols).toBe(256)
-  })
-
-  it('setGrid clamps dimensions below 1 up to 1', () => {
-    usePreviewStore.getState().setGrid({ rows: 0, cols: -5 })
-    const { grid } = usePreviewStore.getState()
-    expect(grid.rows).toBe(1)
-    expect(grid.cols).toBe(1)
   })
 
   it('does not watch pattern variables by default (all-or-nothing, collapsed)', () => {
@@ -96,22 +69,20 @@ describe('previewStore', () => {
 })
 
 describe('mergePersistedPreview', () => {
-  it('preserves persisted grid dimensions and never re-adds diffusion to the grid', () => {
+  it('drops a legacy persisted grid without crashing or landing it on state', () => {
     const current = usePreviewStore.getState()
     const persisted = { grid: { rows: 8, cols: 8, spacing: 20 } }
     const merged = mergePersistedPreview(persisted, current)
-    expect(merged.grid.rows).toBe(8)
-    expect(merged.grid.cols).toBe(8)
-    expect('diffusion' in merged.grid).toBe(false)
+    expect('grid' in merged).toBe(false)
   })
 
-  it('migrates a pre-ADR-0006 blob: grid.diffusion lifts to the top level, dropped from grid', () => {
+  it('migrates a pre-ADR-0006 blob: legacy grid.diffusion lifts to the top level', () => {
     const current = usePreviewStore.getState()
     // Simulate a blob saved before diffusion was hoisted out of `grid`.
     const persisted = { grid: { rows: 16, cols: 16, spacing: 20, diffusion: 0.6 } }
     const merged = mergePersistedPreview(persisted, current)
     expect(merged.diffusion).toBe(0.6)
-    expect('diffusion' in merged.grid).toBe(false)
+    expect('grid' in merged).toBe(false)
   })
 
   it('prefers a top-level persisted diffusion over a legacy grid.diffusion', () => {
@@ -120,17 +91,9 @@ describe('mergePersistedPreview', () => {
     expect(mergePersistedPreview(persisted, current).diffusion).toBe(0.2)
   })
 
-  it('clamps an oversized persisted grid to 256 on load', () => {
-    const current = usePreviewStore.getState()
-    const persisted = { grid: { rows: 999999, cols: 500, spacing: 20 } }
-    const merged = mergePersistedPreview(persisted, current)
-    expect(merged.grid.rows).toBe(256)
-    expect(merged.grid.cols).toBe(256)
-  })
-
   it('defaults lightSize and diffusion when absent from a pre-feature blob', () => {
     const current = usePreviewStore.getState()
-    const merged = mergePersistedPreview({ grid: current.grid }, current)
+    const merged = mergePersistedPreview({}, current)
     expect(merged.lightSize).toBe(previewInitialState.lightSize)
     expect(merged.diffusion).toBe(previewInitialState.diffusion)
   })

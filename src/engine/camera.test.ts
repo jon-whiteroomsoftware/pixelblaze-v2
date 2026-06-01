@@ -1,14 +1,16 @@
 import {
-  canvasSize,
   clampGridDim,
   clampPixelCount,
   cubeSideForCount,
-  fitSpacing,
   MAX_GRID_AXIS,
   MAX_PIXEL_COUNT,
-  pointSize,
-  projectIndex,
-  type Locked2DGrid,
+  posBounds2D,
+  canvasSizeForBounds,
+  projectPosInBounds,
+  nearestNeighborSpacing2D,
+  insetForSpacing,
+  neighborPitch2DPx,
+  type Bounds2D,
   DEFAULT_ORBIT,
   MAX_ELEVATION,
   clampElevation,
@@ -65,31 +67,94 @@ describe('camera — freeze guard', () => {
   })
 })
 
-describe('camera — fit-to-container & sizing', () => {
-  it('derives spacing so cols fill the container width', () => {
-    expect(fitSpacing(640, 32)).toBe(20)
-    expect(fitSpacing(100, 1)).toBe(100)
+// Build the per-axis-normalized stock-plane pos for a square grid, matching
+// `planePoint`'s `col/(cols-1)`, `row/(rows-1)` convention (row-major order).
+function planePositions(cols: number, rows: number): [number, number][] {
+  const out: [number, number][] = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      out.push([cols > 1 ? c / (cols - 1) : 0, rows > 1 ? r / (rows - 1) : 0])
+    }
+  }
+  return out
+}
+
+// The legacy row-major cell-centred projection the pos path must reproduce.
+function legacyProjectIndex(index: number, cols: number, rows: number): [number, number] {
+  const col = index % cols
+  const row = Math.floor(index / cols)
+  return [((col + 0.5) / cols) * 2 - 1, 1 - ((row + 0.5) / rows) * 2]
+}
+
+describe('camera — pos-bounds 2D extent & sizing', () => {
+  it('measures axis-aligned bounds, falling back to the unit box when empty', () => {
+    expect(posBounds2D([[0.2, 0.1], [0.8, 0.9], [0.5, 0.4]])).toEqual({
+      minX: 0.2, minY: 0.1, maxX: 0.8, maxY: 0.9,
+    })
+    expect(posBounds2D([])).toEqual({ minX: 0, minY: 0, maxX: 1, maxY: 1 })
   })
 
-  it('never produces a sub-pixel spacing', () => {
-    expect(fitSpacing(10, 1000)).toBe(1)
+  it('sizes a square layout to a square canvas', () => {
+    expect(canvasSizeForBounds(640, { minX: 0, minY: 0, maxX: 1, maxY: 1 })).toEqual({
+      width: 640, height: 640,
+    })
   })
 
-  it('sizes the canvas to cols×rows of dots at spacing apart', () => {
-    expect(canvasSize({ rows: 16, cols: 32, spacing: 20 })).toEqual({ width: 640, height: 320 })
+  it('sizes a non-square bounds to its aspect (rangeY / rangeX)', () => {
+    // 2:1 wide bounds → half-height canvas.
+    expect(canvasSizeForBounds(640, { minX: 0, minY: 0, maxX: 1, maxY: 0.5 })).toEqual({
+      width: 640, height: 320,
+    })
   })
 
-  it('point size matches the dot diameter (dots just touch)', () => {
-    expect(pointSize({ rows: 8, cols: 8, spacing: 20 })).toBe(20)
-    expect(pointSize({ rows: 8, cols: 8, spacing: 0.4 })).toBe(1)
+  it('falls back to a square canvas for a degenerate (zero-range) axis', () => {
+    // A horizontal 1D line embedding (no y extent) must not collapse the height.
+    expect(canvasSizeForBounds(640, { minX: 0, minY: 0.5, maxX: 1, maxY: 0.5 })).toEqual({
+      width: 640, height: 640,
+    })
   })
 
-  it('light size scales the source diameter (pitch × fraction) without touching the canvas size', () => {
-    const grid = { rows: 8, cols: 8, spacing: 20 }
-    expect(pointSize(grid, 0.5)).toBe(10)
-    expect(pointSize(grid, 0.95)).toBe(19)
-    // Canvas size is independent of the light size — the grid still fits the pane.
-    expect(canvasSize(grid)).toEqual({ width: 160, height: 160 })
+  it('reproduces the legacy cell-centred projection for the stock plane (parity)', () => {
+    for (const cols of [2, 8, 9, 32]) {
+      const rows = cols
+      const positions = planePositions(cols, rows)
+      const bounds = posBounds2D(positions)
+      const spacing = nearestNeighborSpacing2D(positions)
+      const inset = insetForSpacing(spacing)
+      for (let i = 0; i < positions.length; i++) {
+        const [x, y] = projectPosInBounds(positions[i], bounds, inset)
+        const [lx, ly] = legacyProjectIndex(i, cols, rows)
+        expect(x).toBeCloseTo(lx, 10)
+        expect(y).toBeCloseTo(ly, 10)
+      }
+    }
+  })
+
+  it('centres a degenerate axis instead of dividing by zero', () => {
+    const bounds: Bounds2D = { minX: 0, minY: 0.5, maxX: 1, maxY: 0.5 }
+    const [, y] = projectPosInBounds([0.3, 0.5], bounds, { x: 0.1, y: 0 })
+    expect(y).toBe(0) // clip-space centre
+  })
+
+  it('measures 2D nearest-neighbour spacing (regular grid → 1/(cols-1))', () => {
+    expect(nearestNeighborSpacing2D(planePositions(9, 9))).toBeCloseTo(1 / 8, 10)
+    expect(nearestNeighborSpacing2D([[0.5, 0.5]])).toBe(0)
+  })
+
+  it('derives an on-screen px pitch from the measured spacing (square plane ≈ width/cols)', () => {
+    const cols = 32
+    const positions = planePositions(cols, cols)
+    const bounds = posBounds2D(positions)
+    const spacing = nearestNeighborSpacing2D(positions)
+    const inset = insetForSpacing(spacing)
+    const { width, height } = canvasSizeForBounds(640, bounds)
+    const pitch = neighborPitch2DPx(width, height, bounds, spacing, inset)
+    expect(pitch).toBeCloseTo(640 / cols, 6) // span = cols/(cols-1), spacing = 1/(cols-1)
+  })
+
+  it('never produces a sub-pixel pitch, even for a lone point', () => {
+    const bounds = posBounds2D([[0.5, 0.5]])
+    expect(neighborPitch2DPx(640, 640, bounds, 0, { x: 0, y: 0 })).toBeGreaterThanOrEqual(1)
   })
 
   describe('modelHalfExtent (bounding-sphere fit)', () => {
@@ -242,43 +307,6 @@ describe('camera — per-source diffusion glow (ADR-0006)', () => {
   it('degenerates to the solid core when pitch or core is zero', () => {
     expect(diffusionGlow(1, 20, 0)).toMatchObject({ quadDiameterPx: 20, coreFrac: 1, peak: 1 })
     expect(diffusionGlow(1, 0, 25).coreFrac).toBe(1)
-  })
-})
-
-describe('camera — locked-2D projection', () => {
-  const grid: Locked2DGrid = { rows: 2, cols: 2, spacing: 20 }
-
-  it('maps the default grid to the expected clip-space layout', () => {
-    // Dot centres at fractions (0.25, 0.75) of each axis; y is flipped (up).
-    expect(projectIndex(0, grid)).toEqual([-0.5, 0.5]) // col 0, row 0 (top-left)
-    expect(projectIndex(1, grid)).toEqual([0.5, 0.5]) // col 1, row 0 (top-right)
-    expect(projectIndex(2, grid)).toEqual([-0.5, -0.5]) // col 0, row 1 (bottom-left)
-    expect(projectIndex(3, grid)).toEqual([0.5, -0.5]) // col 1, row 1 (bottom-right)
-  })
-
-  it('returns null for indices beyond the grid row count', () => {
-    expect(projectIndex(4, grid)).toBeNull()
-  })
-
-  it('is coordinate-identical to the legacy cx = col*spacing + spacing/2 centres', () => {
-    const g: Locked2DGrid = { rows: 4, cols: 8, spacing: 13 }
-    const { width, height } = canvasSize(g)
-    for (let i = 0; i < g.rows * g.cols; i++) {
-      const col = i % g.cols
-      const row = Math.floor(i / g.cols)
-      const cx = col * g.spacing + g.spacing / 2
-      const cy = row * g.spacing + g.spacing / 2
-      const expected: [number, number] = [(cx / width) * 2 - 1, 1 - (cy / height) * 2]
-      const got = projectIndex(i, g)!
-      expect(got[0]).toBeCloseTo(expected[0], 10)
-      expect(got[1]).toBeCloseTo(expected[1], 10)
-    }
-  })
-
-  it('projection is independent of spacing (spacing only scales the canvas)', () => {
-    expect(projectIndex(1, { rows: 2, cols: 2, spacing: 20 })).toEqual(
-      projectIndex(1, { rows: 2, cols: 2, spacing: 5 })
-    )
   })
 })
 

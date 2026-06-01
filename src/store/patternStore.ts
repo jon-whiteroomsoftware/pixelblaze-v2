@@ -34,7 +34,7 @@ interface PatternState {
   // both IndexedDB and the in-memory list, so reopening restores it this session.
   updatePatternLayout: (
     id: string,
-    layout: Pick<PatternRecord, 'mapId' | 'shapeId' | 'params' | 'pixelCount'>,
+    layout: Pick<PatternRecord, 'mapId' | 'shapeId' | 'pixelCount'>,
   ) => Promise<void>
 }
 
