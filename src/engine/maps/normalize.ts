@@ -33,20 +33,27 @@ import type { MapPoint } from './types'
 export type NormalizeMode = 'contain' | 'fill'
 
 // Re-normalize resolved map points to the given mode (#174). Contain is the baked/
-// resolved default (every map already emits Contain coords), so it's a pass-through;
-// Fill re-stretches each axis to [0,1] using normalizeFill — valid as a live post-
-// pass precisely because it's idempotent-equivalent on Contain output. Applied at
-// resolve time, before any embedding/surface overwrites `pos`, so `sample` (the map
-// coords the pattern reads) and the flat `pos` both reflect the chosen mode. At
-// resolve `sample` and `pos` coincide, so a single per-axis pass drives both.
+// resolved default (every map already emits Contain coords), so it's a pass-through.
+//
+// Fill stretches each axis independently to [0,1] — but ONLY for `sample`, the
+// coordinates the pattern reads. The map is authoritative for the PHYSICAL layout
+// (project axiom; ADR-0009): the pixels' screen positions and the canvas aspect come
+// from `pos`, which must always stay the aspect-preserving Contain coords. So a 2:1
+// map drawn under Fill keeps its 2:1 pixel arrangement and 2:1 canvas — the pattern
+// merely samples a stretched coordinate field that fills the array. (The earlier
+// build stretched `pos` too, which squared the canvas and spaced the pixels apart —
+// the Mapper's Fill never moves pixels, it only renormalizes the coords patterns
+// read.) Applied at resolve time, before any embedding/surface overwrites `pos`.
 export function applyNormalizeMode(points: MapPoint[], mode: NormalizeMode): MapPoint[] {
   if (mode === 'contain' || points.length === 0) return points
   // Callers pass map-resolved points, whose `pos` is always defined (a 1D shape's
-  // pos-less points never reach here — Fill only applies to map coordinates).
+  // pos-less points never reach here — Fill only applies to map coordinates). At
+  // resolve `sample` and `pos` coincide (both Contain), so stretch the Contain `pos`
+  // per-axis to get the Fill `sample`, and keep `pos` itself untouched.
   const filled = normalizeFill(points.map((p) => p.pos as number[]))
-  return filled.map((c) => ({
-    sample: [...c],
-    pos: [...c] as MapPoint['pos'],
+  return points.map((p, i) => ({
+    sample: filled[i],
+    pos: p.pos,
   }))
 }
 

@@ -11,9 +11,13 @@ describe('applyNormalizeMode', () => {
     expect(applyNormalizeMode(pts, 'contain')).toBe(pts)
   })
 
-  it('re-stretches both sample and pos per-axis under Fill', () => {
+  it('stretches only sample under Fill; pos keeps the map’s physical aspect', () => {
+    // The map dictates the physical layout (project axiom): Fill must NOT move the
+    // pixels or change the canvas aspect. It only stretches the COORDINATES the
+    // pattern samples. So `pos` stays the aspect-preserving Contain coords (a 2:1
+    // map stays 2:1) while `sample` fills the unit square per-axis.
     const out = applyNormalizeMode(pts, 'fill')
-    expect(out.map((p) => p.pos)).toEqual([[0, 0], [0.5, 0.5], [1, 1]])
+    expect(out.map((p) => p.pos)).toEqual([[0, 0], [0.5, 0.25], [1, 0.5]])
     expect(out.map((p) => p.sample)).toEqual([[0, 0], [0.5, 0.5], [1, 1]])
   })
 
