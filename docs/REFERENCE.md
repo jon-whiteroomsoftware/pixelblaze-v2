@@ -389,7 +389,8 @@ Pure, fully unit-tested, no DOM:
   spins the turntable.
 - **Sizing:** `pointSize`/`point3DSize` anchor the drawn light-source diameter to the
   inter-dot pitch × `lightSize`; `diffusionGlow` derives the per-source glow kernel
-  (grown quad size, core fraction, tail strength) from diffusion + pitch.
+  (grown quad size, dissolving solid-core fraction, overlap-normalised peak) from
+  diffusion + pitch.
 - **Caps:** `MAX_PIXEL_COUNT = 65,536` (the dimension-agnostic freeze guard, replacing
   the old per-axis 256 cap); `MAX_GRID_AXIS = 256` keeps any one generator axis sane.
 
@@ -397,18 +398,23 @@ Pure, fully unit-tested, no DOM:
 
 A thin WebGL draw wrapper over `camera.ts`. Draws all pixels as one `gl.POINTS` call;
 the fragment shader renders a per-source light kernel — a solid round core plus an
-optional soft glow tail (diffusion, below) — and discards outside the inscribed circle.
+optional raised-cosine (Hann) glow tail (diffusion, below) — and discards outside the
+inscribed circle.
 - **Diffusion (`setDiffusion`):** modelled as a per-source point-spread, not a frame
-  blur. `diffusionGlow` grows the point quad to hold a radial glow tail around the
-  fixed core; the shader draws core (`u_mode` 1), tail (2), or both (0). At diffusion 0
-  the quad is the bare core, so the draw is unchanged.
+  blur. `diffusionGlow` grows the point quad to hold the radial glow tail; the shader
+  draws core (`u_mode` 1), tail (2), or both (0). At diffusion 0 the quad is the bare
+  core, so the draw is unchanged. As diffusion → 1 the solid core **dissolves**
+  (`coreFrac` → 0) into one smooth Hann bump so neighbours fuse into a gap-free field;
+  `peak` is normalised by neighbour overlap so the brightest point holds steady — the
+  field never dims and never blows out (gaps only fill upward).
 - **2D/1D:** one additive pass (`ONE, ONE`, order-independent — no depth sort) draws
   core + tail; grid or shape positions rebuilt on change.
 - **3D:** opaque depth-tested core pass (nearer orbs occlude farther — so diffusion 0
   reads as crisp distinct sources rather than a washed-out additive haze), then an
-  additive glow-tail pass (depth-test read-only) that only adds light into the gaps so
-  the field never dims. Positions/sizes re-projected through the live orbit camera each
-  paint with per-vertex depth cueing.
+  additive glow-tail pass (depth-test read-only) that only adds light into the gaps.
+  As diffusion rises the opaque core shrinks toward zero, so the cube cross-fades from
+  crisp orbs into one smooth volumetric glow without dimming. Positions/sizes
+  re-projected through the live orbit camera each paint with per-vertex depth cueing.
 - Degrades to a no-op renderer when there is no GL context (jsdom/tests), still
   tracking canvas size — exactly as the old Canvas-2D path did.
 
@@ -471,10 +477,12 @@ The preview pane is a WebGL viewport plus a small, dimension-gated control set.
   Fast/Precise renderer toggle. A read-only `{n}D` native-dimensionality chip sits by
   the pattern name.
 - **Diffusion** is a per-source glow kernel in the WebGL renderer (not a frame blur):
-  each source's solid core stays put and a soft tail grows around it to merge
-  neighbours, so it never dims, never bleeds a halo past the array edge, and never
-  smears the 3D silhouette. Tail reach scales with inter-dot pitch. (A whole-frame SVG
-  `feGaussianBlur` was the prior approach; it read as a blur and was replaced — ADR-0006.)
+  a soft raised-cosine tail grows around each source to merge neighbours, and as
+  diffusion → 1 the solid core dissolves so individual pixels vanish into a gap-free
+  field. Peak is normalised by neighbour overlap so it never dims, never blows out,
+  never bleeds a halo past the array edge, and never smears the 3D silhouette. Tail
+  reach scales with inter-dot pitch. (A whole-frame SVG `feGaussianBlur` was the
+  original approach; it read as a blur and was replaced — ADR-0006.)
 - **3D orbit viewport** (`OrbitControls.tsx`, shown when the active layout's display
   dim is 3): auto-orbit (on by default, an independent rAF decoupled from pattern
   play/pause), plain-drag turntable, Shift-drag trackball, reset view. Depth cueing +

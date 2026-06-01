@@ -197,34 +197,50 @@ describe('camera — 3D light size (ADR-0006)', () => {
 })
 
 describe('camera — per-source diffusion glow (ADR-0006)', () => {
-  it('at diffusion 0 is bit-for-bit the solid core disc (quad == core, no tail)', () => {
+  it('at diffusion 0 is bit-for-bit the solid core disc (quad == core, full peak, no tail)', () => {
     const g = diffusionGlow(0, 20, 25)
     expect(g.quadDiameterPx).toBe(20)
     expect(g.coreFrac).toBe(1)
-    expect(g.glowStrength).toBe(0)
+    expect(g.peak).toBe(1)
   })
 
-  it('grows the quad by the glow reach so the tail clears the core on both sides', () => {
+  it('grows the quad by the glow reach so the tail clears the source centre', () => {
     const pitch = 25
     const core = 20
     const g = diffusionGlow(1, core, pitch)
-    // Tail reaches DIFFUSION_GLOW_REACH pitches beyond the core edge, each side.
+    // The tail reaches DIFFUSION_GLOW_REACH pitches past the source centre each side.
     expect(g.quadDiameterPx).toBeCloseTo(core + 2 * pitch * DIFFUSION_GLOW_REACH, 6)
-    // coreFrac is the core's share of the (now larger) quad — strictly inside it.
-    expect(g.coreFrac).toBeCloseTo(core / g.quadDiameterPx, 6)
-    expect(g.coreFrac).toBeLessThan(1)
   })
 
-  it('scales the tail reach and strength with diffusion', () => {
+  it('dissolves the solid core as diffusion rises (coreFrac 1 → 0)', () => {
+    const mid = diffusionGlow(0.5, 20, 25)
+    const full = diffusionGlow(1, 20, 25)
+    // Mid-diffusion still keeps a (shrunken) solid core; full diffusion has none.
+    expect(mid.coreFrac).toBeGreaterThan(0)
+    expect(mid.coreFrac).toBeLessThan(1)
+    expect(full.coreFrac).toBeCloseTo(0, 6)
+  })
+
+  it('widens the footprint monotonically with diffusion', () => {
     const half = diffusionGlow(0.5, 20, 25)
     const full = diffusionGlow(1, 20, 25)
     expect(half.quadDiameterPx).toBeLessThan(full.quadDiameterPx)
-    expect(half.glowStrength).toBeCloseTo(0.5, 6)
-    expect(full.glowStrength).toBeCloseTo(1, 6)
+  })
+
+  it('normalises peak down as neighbours overlap, never above 1 (pins the brightest point)', () => {
+    // Tight pitch ⇒ heavy overlap ⇒ peak well below 1; the brightest point holds
+    // steady rather than blowing out.
+    const full = diffusionGlow(1, 20, 25)
+    expect(full.peak).toBeGreaterThan(0)
+    expect(full.peak).toBeLessThan(1)
+    // Sparser pitch (less overlap) keeps more of the peak than a dense one.
+    const dense = diffusionGlow(1, 20, 25)
+    const sparse = diffusionGlow(1, 20, 60)
+    expect(sparse.peak).toBeGreaterThan(dense.peak)
   })
 
   it('degenerates to the solid core when pitch or core is zero', () => {
-    expect(diffusionGlow(1, 20, 0)).toMatchObject({ quadDiameterPx: 20, coreFrac: 1, glowStrength: 0 })
+    expect(diffusionGlow(1, 20, 0)).toMatchObject({ quadDiameterPx: 20, coreFrac: 1, peak: 1 })
     expect(diffusionGlow(1, 0, 25).coreFrac).toBe(1)
   })
 })

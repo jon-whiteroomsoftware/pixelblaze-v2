@@ -76,22 +76,25 @@ void main() {
 }
 `
 
-// Per-source light kernel (ADR-0006). The gl.POINTS quad is grown beyond the solid
-// core to hold a soft diffusion glow tail; `q` is the fragment's radius as a
+// Per-source light kernel (ADR-0006, revised). The gl.POINTS quad is grown beyond
+// the solid core to hold the diffusion glow; `q` is the fragment's radius as a
 // fraction of the quad half-width (0 at centre, 1 at the inscribed-circle rim).
 //   - q > 1                discarded (outside the round LED).
-//   - q <= u_coreFrac      the solid core, full intensity (the crisp light source).
-//   - otherwise            the glow tail: u_glowStrength at the core edge, easing
-//                          to 0 at the rim (a physical diffuser's spread).
-// u_mode selects the draw pass so 3D can render opaque cores then add the tail:
-//   0 = full (2D/1D, one additive pass)   1 = core only   2 = tail only.
-// At diffusion 0, coreFrac is 1 and glowStrength 0, so this is a solid disc —
-// bit-for-bit the legacy ctx.arc() / inscribed-circle output.
+//   - q <= u_coreFrac      the solid core, full peak amplitude u_peak.
+//   - otherwise            the raised-cosine (Hann) tail: u_peak at the core edge,
+//                          easing to 0 at the rim (a physical diffuser's spread).
+// As diffusion rises the core dissolves (u_coreFrac → 0) so the whole source becomes
+// one smooth bump that fuses with its neighbours; u_peak is normalised so the
+// brightest point holds steady (never dims, never blows out — see diffusionGlow).
+// u_mode selects the draw pass so 3D can render the (shrinking) opaque cores then
+// add the tail: 0 = full (2D/1D, one additive pass)  1 = core only  2 = tail only.
+// At diffusion 0, coreFrac is 1 and peak 1, so this is a solid disc — bit-for-bit
+// the legacy ctx.arc() / inscribed-circle output.
 const FRAG_SRC = `
 precision mediump float;
 varying vec3 v_color;
 uniform float u_coreFrac;
-uniform float u_glowStrength;
+uniform float u_peak;
 uniform int u_mode;
 void main() {
   vec2 d = gl_PointCoord - vec2(0.5);
@@ -100,12 +103,12 @@ void main() {
   float intensity;
   if (q <= u_coreFrac) {
     if (u_mode == 2) discard; // tail pass skips the solid core
-    intensity = 1.0;
+    intensity = u_peak;
   } else {
     if (u_mode == 1) discard; // core pass skips the tail
-    float t = (q - u_coreFrac) / max(1e-4, 1.0 - u_coreFrac);
-    float f = (1.0 - t) * (1.0 - t);
-    intensity = u_glowStrength * f;
+    float s = (q - u_coreFrac) / max(1e-4, 1.0 - u_coreFrac);
+    float f = 0.5 * (1.0 + cos(3.14159265 * s));
+    intensity = u_peak * f;
   }
   gl_FragColor = vec4(v_color * intensity, 1.0);
 }
@@ -165,7 +168,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   const aSize = gl.getAttribLocation(program, 'a_size')
   const aDepth = gl.getAttribLocation(program, 'a_depth')
   const uCoreFrac = gl.getUniformLocation(program, 'u_coreFrac')
-  const uGlowStrength = gl.getUniformLocation(program, 'u_glowStrength')
+  const uPeak = gl.getUniformLocation(program, 'u_peak')
   const uMode = gl.getUniformLocation(program, 'u_mode')
 
   // 2D positions depend only on the grid, not the frame, so they're rebuilt on
@@ -186,12 +189,12 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   let pos3D: [number, number, number][] | null = null
   let camera: OrbitCamera = DEFAULT_ORBIT
   // Diffusion amount (0–1) and the kernel params it resolves to for the active
-  // mode. `coreFrac`/`glowStrength` are frame-uniform (one diffusion + one pitch
-  // per layout), so the shader reads them as uniforms; only the per-vertex quad
-  // size differs (depth-cued in 3D). Updated by setDiffusion (2D) / project3D (3D).
+  // mode. `coreFrac`/`peak` are frame-uniform (one diffusion + one pitch per
+  // layout), so the shader reads them as uniforms; only the per-vertex quad size
+  // differs (depth-cued in 3D). Updated by setDiffusion (2D) / project3D (3D).
   let diffusion = 0
   let coreFrac = 1
-  let glowStrength = 0
+  let peak = 1
   // Measured normalized nearest-neighbour spacing of the active 3D layout, used
   // to anchor the light-source diameter to the real on-screen neighbour gap (so
   // it is right for a cube, sphere, helix, or pole alike). Set by set3DPositions.
@@ -231,7 +234,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     const core = pointSize(grid, grid.lightSize ?? 1)
     const glow = diffusionGlow(diffusion, core, grid.spacing)
     coreFrac = glow.coreFrac
-    glowStrength = glow.glowStrength
+    peak = glow.peak
     sizes = new Float32Array(drawCount).fill(glow.quadDiameterPx)
     gl!.bindBuffer(gl!.ARRAY_BUFFER, sizeBuffer)
     gl!.bufferData(gl!.ARRAY_BUFFER, sizes, gl!.STATIC_DRAW)
@@ -270,7 +273,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     const pitch = ls > 0 ? baseSize / ls : baseSize
     const glow = diffusionGlow(diffusion, baseSize, pitch)
     coreFrac = glow.coreFrac
-    glowStrength = glow.glowStrength
+    peak = glow.peak
     for (let i = 0; i < cap; i++) {
       const { clip, depth } = projectOrbit(pos3D[i], camera, scale)
       const cue = depthCue(depth, {}, lattice3DHalfExtent)
@@ -344,21 +347,22 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     ctx.vertexAttribPointer(aColor, 3, ctx.FLOAT, false, 0, 0)
 
     ctx.uniform1f(uCoreFrac, coreFrac)
-    ctx.uniform1f(uGlowStrength, glowStrength)
+    ctx.uniform1f(uPeak, peak)
 
     if (pos3D) {
       // 3D in two passes (ADR-0006): opaque cores first (depth test on, blend off)
       // so nearer orbs occlude farther — crisp, solid sources, never a washed-out
       // additive haze at diffusion 0. Then, when diffusing, an ADDITIVE glow-tail
       // pass on top (depth-test read-only, no depth write) fills the inter-orb gaps
-      // to merge them — light is only ADDED into the dark gaps, so the field never
-      // dims and the solid cores stay put.
+      // to merge them. As diffusion rises the opaque core shrinks (coreFrac → 0) so
+      // the cube dissolves from crisp orbs into one smooth volumetric glow — light is
+      // only ADDED into the gaps, so the field never dims.
       ctx.disable(ctx.BLEND)
       ctx.enable(ctx.DEPTH_TEST)
       ctx.depthMask(true)
       ctx.uniform1i(uMode, 1)
       ctx.drawArrays(ctx.POINTS, 0, count)
-      if (glowStrength > 0) {
+      if (diffusion > 0) {
         ctx.enable(ctx.BLEND)
         ctx.blendFunc(ctx.ONE, ctx.ONE)
         ctx.depthMask(false)

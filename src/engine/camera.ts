@@ -302,33 +302,74 @@ export function point3DSize(
 // Default preview light size, and the store's initial value (ADR-0006).
 export const DEFAULT_LIGHT_SIZE = 0.5
 
-// Per-source diffusion glow (ADR-0006, revised). Diffusion is modelled as each
-// light source's point-spread *widening* — a soft radial glow tail grown around
-// the solid core — NOT a Gaussian blur of the whole rendered frame. A frame blur
-// is a low-pass filter: it drains the bright cores, bleeds light past the array
-// edge (the "furry" halo), and in 3D smears the orbiting silhouette. A per-source
-// kernel instead keeps each core crisp and in place, never paints outside a
-// source's own footprint, and only fills the inter-source GAPS — which is what a
-// physical diffuser sheet actually does. The core stays at full intensity (so the
-// field never dims); the tail merges neighbours.
+// Per-source diffusion glow (ADR-0006, revised twice). Diffusion is modelled as
+// each light source's point-spread *widening* — a soft radial profile grown around
+// the core — NOT a Gaussian blur of the whole rendered frame. A frame blur is a
+// low-pass filter: it drains the bright cores, bleeds light past the array edge
+// (the "furry" halo), and in 3D smears the orbiting silhouette. A per-source kernel
+// instead never paints outside a source's own footprint and only fills the
+// inter-source GAPS — what a physical diffuser sheet does.
 //
-// Given the drawn core diameter and the inter-source pitch (both px), this returns
-// the enlarged quad to draw (the WebGL gl_PointSize) plus the two kernel params the
-// fragment shader needs:
-//   - `coreFrac`    — the solid core radius as a fraction of the quad's half-width.
-//   - `glowStrength`— the tail's peak intensity at the core edge (fades to 0 at the
-//                     quad rim).
-// At diffusion 0 the quad equals the core and the tail vanishes, so the draw is
-// bit-for-bit the pre-diffusion solid disc. `DIFFUSION_GLOW_REACH` is how far (in
-// pitches) the tail extends beyond the core edge at diffusion 1; ~0.9 reaches into
-// the neighbours' cores so the field reads fully merged at 100% without ballooning
-// so far that distant sources bleed together.
-export const DIFFUSION_GLOW_REACH = 0.9
+// The first per-source revision kept each core CRISP and at full intensity for all
+// diffusion levels. That honoured "never dims" but meant the solid bright disc — the
+// pixel — was always visible, so 100% never read as "fully merged". This revision
+// lets the core DISSOLVE as diffusion → 1: the solid full-intensity core shrinks to
+// nothing and the whole source becomes a single smooth radial bump (a raised-cosine
+// / Hann profile), which is what actually makes neighbouring sources fuse into a
+// gap-free field at the top of the slider.
+//
+// Non-dimming is preserved by pinning the BRIGHTEST point. Each source's peak
+// amplitude is normalised by how much its neighbours' tails pile onto a source
+// centre (`peak = 1 / centre-overlap`): with no overlap (diffusion 0) peak is 1 and
+// nothing changes; as the tails widen and overlap, peak eases down just enough that
+// the brightest point stays ≈ the original core brightness while the formerly-dark
+// gaps rise to meet it. The brightest feature never darkens and the field never
+// blows out — gaps only fill upward.
+//
+// Given the drawn core diameter and the inter-source pitch (both px), this returns:
+//   - `quadDiameterPx` — the grown gl.POINTS quad (the kernel's full footprint).
+//   - `coreFrac`       — the solid full-amplitude core radius as a fraction of the
+//                        quad half-width; 1 at diffusion 0, → 0 at diffusion 1.
+//   - `peak`           — the source's peak amplitude after overlap normalisation;
+//                        1 at diffusion 0.
+// At diffusion 0 the quad equals the core, coreFrac is 1 and peak is 1, so the draw
+// is bit-for-bit the pre-diffusion solid disc. `DIFFUSION_GLOW_REACH` is how far (in
+// pitches) the tail extends beyond the source centre at diffusion 1; it must be wide
+// enough (> 1 pitch, reaching diagonal neighbours) for the field to read fully
+// merged at 100% — calibrated by eye.
+export const DIFFUSION_GLOW_REACH = 1.4
 export interface DiffusionGlow {
   quadDiameterPx: number
   coreFrac: number
-  glowStrength: number
+  peak: number
 }
+
+// Unit-peak radial profile shared with the fragment shader: flat 1.0 inside the
+// solid core (`q <= coreFrac`), then a raised-cosine (Hann) tail easing to 0 at the
+// rim (`q = 1`). `q` is radius as a fraction of the quad half-width.
+function glowProfile(q: number, coreFrac: number): number {
+  if (q <= coreFrac) return 1
+  if (q >= 1) return 0
+  const s = (q - coreFrac) / Math.max(1e-4, 1 - coreFrac)
+  return 0.5 * (1 + Math.cos(Math.PI * s))
+}
+
+// Sum of the unit-peak profile from a square screen lattice of the given pitch,
+// sampled at a point `offsetPx` from one source's centre. offset 0 = a source
+// centre (the brightest point, includes the self term 1); pitch/2 ≈ a gap. Used
+// only to normalise peak; the on-screen kernel is 2D so this models 1D/2D/3D alike.
+function latticeOverlap(quadRadiusPx: number, coreFrac: number, pitchPx: number, offsetPx: number): number {
+  const span = Math.ceil(quadRadiusPx / pitchPx) + 1
+  let sum = 0
+  for (let i = -span; i <= span; i++) {
+    for (let j = -span; j <= span; j++) {
+      const r = Math.hypot(i * pitchPx + offsetPx, j * pitchPx)
+      if (r < quadRadiusPx) sum += glowProfile(r / quadRadiusPx, coreFrac)
+    }
+  }
+  return sum
+}
+
 export function diffusionGlow(
   diffusion: number,
   coreDiameterPx: number,
@@ -336,11 +377,17 @@ export function diffusionGlow(
 ): DiffusionGlow {
   const d = diffusion <= 0 ? 0 : diffusion >= 1 ? 1 : diffusion
   if (d === 0 || pitchPx <= 0 || coreDiameterPx <= 0) {
-    return { quadDiameterPx: Math.max(1, coreDiameterPx), coreFrac: 1, glowStrength: 0 }
+    return { quadDiameterPx: Math.max(1, coreDiameterPx), coreFrac: 1, peak: 1 }
   }
-  const reachPx = d * pitchPx * DIFFUSION_GLOW_REACH
-  const quadDiameterPx = coreDiameterPx + 2 * reachPx
-  return { quadDiameterPx, coreFrac: coreDiameterPx / quadDiameterPx, glowStrength: d }
+  const coreRadiusPx = coreDiameterPx / 2
+  // The tail reaches d·REACH pitches past the source centre; the solid core melts
+  // from its full radius down to 0 as diffusion → 1.
+  const quadRadiusPx = coreRadiusPx + d * pitchPx * DIFFUSION_GLOW_REACH
+  const solidCoreRadiusPx = coreRadiusPx * (1 - d)
+  const coreFrac = solidCoreRadiusPx / quadRadiusPx
+  // Pin the brightest point: peak·(overlap at a source centre) = 1.
+  const peak = 1 / latticeOverlap(quadRadiusPx, coreFrac, pitchPx, 0)
+  return { quadDiameterPx: 2 * quadRadiusPx, coreFrac, peak }
 }
 
 export interface DepthCue {
