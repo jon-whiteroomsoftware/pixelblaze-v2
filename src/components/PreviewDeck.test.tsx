@@ -16,11 +16,11 @@ describe('PreviewDeck (smoke)', () => {
     useEditorStore.setState({ nativeDim: 2, previewPatternName: 'Demo' })
     render(<PreviewDeck />)
 
-    // Primary band: play/pause + brightness + pixel count + layout.
+    // Primary band: play/pause + brightness + pixel count + layout (Map control).
     expect(screen.getByRole('button', { name: /run|pause/i })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Brightness' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Pixel count' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /layout/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument()
 
     // Secondary band: light size, diffusion, renderer, speed.
     expect(screen.getByRole('slider', { name: 'Light size' })).toBeInTheDocument()

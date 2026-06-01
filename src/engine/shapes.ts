@@ -56,7 +56,7 @@ export const RING: Shape = {
 }
 
 // Pole: the 1D strip helically wrapped around a cylinder, drawn in 3D (it gets
-// the orbit camera, like the Cylinder map and Cube). Unlike Line/Ring this is a
+// the orbit camera, like the Cylinder surface and Cube). Unlike Line/Ring this is a
 // 3D embedding, so its draw positions come from `polePositions` (the 3D channel),
 // not the 2D `embed` above — which is left as a harmless centre placeholder.
 //
@@ -79,7 +79,7 @@ export const SHAPES: Record<ShapeId, Shape> = { line: LINE, ring: RING, pole: PO
 // The strip wraps a cylinder as stacked rings (x-fastest, like the Cylinder
 // map). `cols` pixels go around each wrap; `rows = ceil(N/cols)` wraps stack up
 // the height. To keep each pixel's surface cell SQUARE, the diameter is derived
-// from the same pi relationship the Cylinder map uses, here solved the other
+// from the same pi relationship the Cylinder surface uses, here solved the other
 // way: the horizontal arc pitch between adjacent columns (circumference/cols =
 // 2π·rho/cols) is set equal to the vertical pitch between wraps (height/(rows-1),
 // with height normalized to 1) — giving radius rho = cols / (2π(rows-1)).
@@ -87,7 +87,7 @@ export const SHAPES: Record<ShapeId, Shape> = { line: LINE, ring: RING, pole: PO
 // Sliding `cols` therefore trades diameter for length while the cell stays
 // square: more cols → fatter & shorter, fewer → thinner & taller. The slider is
 // clamped to the taller-than-wide regime (diameter < height); the wide-and-short
-// end is the 2D Cylinder map's territory.
+// end is the 2D Cylinder surface's territory.
 
 const POLE_MIN_COLS = 2
 
@@ -148,7 +148,7 @@ const POLE_VP: readonly [number, number, number] = [
 
 // One pixel of the strip wrapped onto the pole: a centred cylinder of derived
 // radius `rho` and unit length, oriented along the body diagonal and centred in
-// the unit cube. x-fastest, matching the Cylinder map and plane ordering.
+// the unit cube. x-fastest, matching the Cylinder surface and plane ordering.
 export function polePoint(
   index: number,
   pixelCount: number,

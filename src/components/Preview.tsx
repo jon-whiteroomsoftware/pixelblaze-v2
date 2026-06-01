@@ -8,8 +8,11 @@ import {
   useMapStore,
   DEFAULT_MAP_ID,
   DEFAULT_SHAPE_ID,
-  DEFAULT_SHAPE_PIXEL_COUNT,  defaultPixelCountForDim,
+  DEFAULT_SURFACE_ID,
+  DEFAULT_SHAPE_PIXEL_COUNT,
+  defaultPixelCountForDim,
   resolveMap,
+  mapGridDims,
 } from '@/store/mapStore'
 import { useCameraStore } from '@/store/cameraStore'
 import { createShim, createFxShim, type ShimContext } from '@/engine/shim'
@@ -18,7 +21,7 @@ import { bundle } from '@/engine/bundle'
 import { createRenderer } from '@/engine/renderer'
 import { createRenderLoop, type RenderLoop } from '@/engine/renderLoop'
 import { createVirtualClock } from '@/engine/virtualClock'
-import { createCylinderMap, cylinderDims, cubePixelCount, squarePlaneDims } from '@/engine/maps'
+import { cubePixelCount, squarePlaneDims } from '@/engine/maps'
 import {
   clampPixelCount,
   cubeSideForCount,
@@ -33,6 +36,7 @@ import {
   defaultPoleCols,
   type ShapeId,
 } from '@/engine/shapes'
+import { cylinderSurfacePositions, type SurfaceId } from '@/engine/surfaces'
 import type { MapPoint } from '@/engine/maps'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
@@ -61,6 +65,7 @@ export function Preview() {
   const activePatternId = usePatternStore((s) => s.activePatternId)
   const activeMapId = useMapStore((s) => s.activeMapId)
   const activeShapeId = useMapStore((s) => s.activeShapeId)
+  const activeSurfaceId = useMapStore((s) => s.activeSurfaceId)
   const activePixelCount = useMapStore((s) => s.activePixelCount)
   const handleRef = useRef<ReturnType<typeof loadPattern> | null>(null)
   const shimRef = useRef<ShimContext | null>(null)
@@ -137,7 +142,7 @@ export function Preview() {
     // we reflect any correction back so the "Shape" dropdown stays in sync.
     const { userMaps } = useMapStore.getState()
     const selection = resolveLayoutSelection(
-      { mapId: activeMapId, shapeId: activeShapeId },
+      { mapId: activeMapId, shapeId: activeShapeId, surfaceId: activeSurfaceId },
       nativeDim,
       buildLayoutSource({ userMaps }),
     )
@@ -146,6 +151,9 @@ export function Preview() {
     }
     if (selection.shapeId && selection.shapeId !== activeShapeId) {
       useMapStore.getState().setActiveShape(selection.shapeId as ShapeId)
+    }
+    if (selection.surfaceId && selection.surfaceId !== activeSurfaceId) {
+      useMapStore.getState().setActiveSurface(selection.surfaceId)
     }
 
     // 1D shape: pos-only embedding over an empty sample (count from the persisted
@@ -180,21 +188,7 @@ export function Preview() {
       }
     } else {
       const map = resolveMap(selection.mapId ?? DEFAULT_MAP_ID, userMaps)
-      if (map.id === 'cylinder') {
-        // Cylinder: a 2D grid wrapped onto a 3D surface. The pattern samples flat
-        // [u,v] grid coords (render2D runs unchanged), but each pixel is drawn in
-        // 3D on the cylinder wall, so it gets the orbit camera like the cube. The
-        // count is the knob (ADR-0004): squared up to a grid, then wrapped.
-        pixelCount = clampPixelCount(activePixelCount ?? defaultPixelCountForDim(2))
-        // Non-square grid (cols ≈ π·rows) so the wrapped dots stay square on the
-        // visible surface instead of bunching vertically.
-        const dims = cylinderDims(pixelCount)
-        mapPoints = createCylinderMap(dims).resolve(pixelCount)
-        positions3D = mapPoints.map((p) => p.pos as [number, number, number])
-        // A 2D layout (wrapped), even though it's drawn in the 3D viewport.
-        layoutLabel = `${dims.cols}×${dims.rows}`
-        displayDim = 3
-      } else if (map.dim === 3) {
+      if (map.dim === 3) {
         if (map.id === 'cube') {
           // 3D cube lattice: the pixel count is the knob (ADR-0004), so the stock
           // cube cubes the count up to a side³ lattice (count → nearest cube). The
@@ -243,6 +237,23 @@ export function Preview() {
         shapePositions = mapPoints.map((p) => p.pos as [number, number])
         layoutLabel = `${planeDims.cols}×${planeDims.rows}`
         displayDim = 2
+      }
+
+      // 2D surface embedding (ADR-0010): the Cylinder wraps the map's grid onto a
+      // 3D tube. The map still owns `sample` (the pattern reads flat [u,v] and
+      // can't observe the wrap — only `pos` differs from the Flat case); the
+      // surface owns `pos`, derived from the map's RAW cols×rows grid so the
+      // unrolled tube is the map rectangle. Drawn in 3D, so it gets the orbit
+      // camera like the cube. Flat needs no work — the map's intrinsic pos stands.
+      if (selection.surfaceId === 'cylinder' && displayDim === 2) {
+        const gridDims = mapGridDims(map, pixelCount)
+        if (gridDims) {
+          positions3D = cylinderSurfacePositions(pixelCount, gridDims)
+          mapPoints = mapPoints.map((p, i) => ({ sample: p.sample, pos: positions3D![i] }))
+          shapePositions = null
+          layoutLabel = `${gridDims.cols}×${gridDims.rows}`
+          displayDim = 3
+        }
       }
     }
     useEditorStore.getState().setDisplayDim(displayDim)
@@ -379,7 +390,7 @@ export function Preview() {
     if (usePreviewStore.getState().isRunning) loop.start()
 
     return () => loop.stop()
-  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activePixelCount])
+  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activeSurfaceId, activePixelCount])
 
   // Hydrate the per-pattern layout on open (ADR-0004/0005): restore the record's
   // persisted mapId/shapeId/pixelCount, falling back to defaults when absent so a
@@ -392,6 +403,7 @@ export function Preview() {
     const m = useMapStore.getState()
     m.setActiveMap(rec?.mapId ?? DEFAULT_MAP_ID)
     m.setActiveShape((rec?.shapeId as ShapeId) ?? DEFAULT_SHAPE_ID)
+    m.setActiveSurface((rec?.surfaceId as SurfaceId) ?? DEFAULT_SURFACE_ID)
     m.setActivePixelCount(rec?.pixelCount ?? null)
   }, [activePatternId])
 
@@ -405,9 +417,10 @@ export function Preview() {
     usePatternStore.getState().updatePatternLayout(activePatternId, {
       mapId: activeMapId,
       shapeId: activeShapeId,
+      surfaceId: activeSurfaceId,
       pixelCount: activePixelCount ?? undefined,
     })
-  }, [activePatternId, activeMapId, activeShapeId, activePixelCount])
+  }, [activePatternId, activeMapId, activeShapeId, activeSurfaceId, activePixelCount])
 
   // Forward control value changes to the live pattern handle
   useEffect(() => {

@@ -1,42 +1,78 @@
 import { useMapStore, layoutSource } from '@/store/mapStore'
 import { useEditorStore } from '@/store/editorStore'
-import { layoutOptions, selectionForOption, selectedOptionId } from '@/engine/layout'
+import {
+  mapOptions,
+  embeddingOptions,
+  selectionForOption,
+  selectedMapId,
+  selectedEmbeddingId,
+} from '@/engine/layout'
 import type { ShapeId } from '@/engine/shapes'
+import type { SurfaceId } from '@/engine/surfaces'
 import { DeckSelect } from '@/components/DeckSelect'
 
-// The "Layout" dropdown (ADR-0005): one knob over two code owners. It lists the
-// layouts the active pattern can consume — filtered by `sample`-arity — and
-// routes the choice to the right store (1D shapes → shapeId, 2D/3D maps → mapId).
-// All routing/filter logic is the pure `@/engine/layout` helpers; this is a thin
-// wrapper that reads state and dispatches, rendered with the shared DeckSelect so
-// it reads identically to the renderer and speed controls.
+// The Layout controls (ADR-0010): two orthogonal knobs over the layout's two
+// code owners — a MAP control (owns `sample`) and an EMBEDDING control (owns
+// `pos`, populated with shapes for 1D and surfaces for 2D). Each shows only when
+// it carries a real choice: 1D → embedding only; 2D with a wrappable map → both
+// (map left, surface right); 3D → map only. All routing/filter logic is the pure
+// `@/engine/layout` helpers; this is a thin wrapper that reads state, dispatches,
+// and lays the two DeckSelects out side by side so they read like the rest of
+// the deck.
 export function LayoutSelector() {
   const nativeDim = useEditorStore((s) => s.nativeDim)
   const activeMapId = useMapStore((s) => s.activeMapId)
   const activeShapeId = useMapStore((s) => s.activeShapeId)
+  const activeSurfaceId = useMapStore((s) => s.activeSurfaceId)
   const userMaps = useMapStore((s) => s.userMaps)
   const setActiveMap = useMapStore((s) => s.setActiveMap)
   const setActiveShape = useMapStore((s) => s.setActiveShape)
+  const setActiveSurface = useMapStore((s) => s.setActiveSurface)
 
-  const options = layoutOptions(nativeDim, layoutSource({ userMaps }))
-  const currentId = selectedOptionId({ mapId: activeMapId, shapeId: activeShapeId }, nativeDim)
-  if (options.length === 0) return null
+  const source = layoutSource({ userMaps })
+  const maps = mapOptions(nativeDim, source)
+  const activeMap = source.maps.find((m) => m.id === activeMapId)
+  const embeddings = embeddingOptions(nativeDim, source, activeMap)
 
-  function choose(id: string) {
+  const sel = { mapId: activeMapId, shapeId: activeShapeId, surfaceId: activeSurfaceId }
+  const mapValue = selectedMapId(sel, nativeDim)
+  const embeddingValue = selectedEmbeddingId(sel, nativeDim)
+
+  function route(id: string, options: ReturnType<typeof mapOptions>) {
     const opt = options.find((o) => o.id === id)
     if (!opt) return
-    const sel = selectionForOption(opt)
-    if (sel.shapeId) setActiveShape(sel.shapeId as ShapeId)
-    if (sel.mapId) setActiveMap(sel.mapId)
+    const next = selectionForOption(opt)
+    if (next.mapId) setActiveMap(next.mapId)
+    if (next.shapeId) setActiveShape(next.shapeId as ShapeId)
+    if (next.surfaceId) setActiveSurface(next.surfaceId as SurfaceId)
   }
 
+  if (maps.length === 0 && embeddings.length === 0) return null
+
   return (
-    <DeckSelect
-      ariaLabel="Layout"
-      value={currentId ?? options[0].id}
-      options={options.map((o) => ({ value: o.id, label: o.name, badge: `${o.displayDim}D` }))}
-      onChange={choose}
-      menuWidthClass="w-28"
-    />
+    <div className="flex items-center gap-1.5">
+      {maps.length > 0 && (
+        <DeckSelect
+          ariaLabel="Map"
+          value={mapValue ?? maps[0].id}
+          options={maps.map((o) => ({ value: o.id, label: o.name, badge: `${o.displayDim}D` }))}
+          onChange={(id) => route(id, maps)}
+          menuWidthClass="w-28"
+        />
+      )}
+      {embeddings.length > 0 && (
+        <DeckSelect
+          ariaLabel={nativeDim === 1 ? 'Shape' : 'Surface'}
+          value={embeddingValue ?? embeddings[0].id}
+          options={embeddings.map((o) => ({
+            value: o.id,
+            label: o.name,
+            badge: `${o.displayDim}D`,
+          }))}
+          onChange={(id) => route(id, embeddings)}
+          menuWidthClass="w-28"
+        />
+      )}
+    </div>
   )
 }

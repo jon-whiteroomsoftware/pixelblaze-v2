@@ -7,17 +7,19 @@ import {
   deleteMap,
 } from '@/engine/storage'
 import {
-  createCylinderMap,
   createCustomMap,
   createSourceMap,
+  squarePlaneDims,
   SOURCE_STOCK_MAPS,
   SEED_MAP_IDS,
   stockMapSpec,
   MAP_SKELETON,
   bakeMapSource,
+  type GridDims,
   type PixelMap,
 } from '@/engine/maps'
 import { SHAPES, type ShapeId } from '@/engine/shapes'
+import { SURFACES, type SurfaceId } from '@/engine/surfaces'
 import type { LayoutSource } from '@/engine/layout'
 import { uniquePatternName } from '@/engine/patternName'
 import { useEditorStore } from './editorStore'
@@ -27,6 +29,15 @@ export type { MapRecord }
 
 export const DEFAULT_MAP_ID = 'plane'
 export const DEFAULT_SHAPE_ID: ShapeId = 'line'
+// Default 2D viewport surface embedding (ADR-0010): Flat (the identity — the
+// plain 2D preview). Selecting a wrappable map never surprise-wraps.
+export const DEFAULT_SURFACE_ID: SurfaceId = 'flat'
+
+// The stock 2D grid generators that expose a clean integer cols×rows lattice a
+// surface can wrap (ADR-0010). The Square and Wide maps qualify; the example
+// clouds (ring) and 3D maps do not. Custom maps advertise their grid via the
+// `gridDims` recorded at bake instead.
+const WRAPPABLE_STOCK_IDS = new Set(['plane', 'wide'])
 // Default modeled pixel count for a 1D shape embedding when a pattern carries no
 // persisted count (a typical short strip). Map layouts default to rows×cols.
 export const DEFAULT_SHAPE_PIXEL_COUNT = 100
@@ -58,19 +69,33 @@ export function defaultPixelCountForDim(dim: 1 | 2 | 3): number {
 // Reconstruct a runtime PixelMap (with its resolve fn) from a serializable
 // generator descriptor. Stock generators (plane/cube) are source-backed
 // (ADR-0008): rebuild them from their `.js` source so a saved stock reference and
-// the live stock map run identical code. The cylinder keeps its TS form (no
-// source — the ADR-0008 exception). Unknown generators fall back to a plane.
-export function buildMap(
-  id: string,
-  name: string,
-  generator: string,
-  params: Record<string, number>,
-): PixelMap {
-  if (generator === 'cylinder') {
-    return createCylinderMap({ rows: params.rows ?? 32, cols: params.cols ?? 32 }, { id, name })
-  }
+// the live stock map run identical code. Unknown generators fall back to a plane.
+export function buildMap(id: string, name: string, generator: string): PixelMap {
   const spec = stockMapSpec(generator) ?? stockMapSpec('plane')!
   return createSourceMap({ ...spec, id, name })
+}
+
+// The integer cols×rows grid a wrappable map exposes at the given count
+// (ADR-0010), or null when the map has no clean grid (an irregular cloud, or a
+// 3D map). A custom lattice carries its dims on the record (fixed at bake); the
+// stock Square/Wide derive theirs live from the count, mirroring their `.js`
+// sources. Used by surfaces (the cylinder) to wrap `cols` around the
+// circumference and `rows` up the height.
+export function mapGridDims(map: PixelMap, pixelCount: number): GridDims | null {
+  if (map.gridDims) return map.gridDims
+  if (map.id === 'plane') return squarePlaneDims(pixelCount)
+  if (map.id === 'wide') {
+    const n = Math.max(1, Math.floor(pixelCount) || 1)
+    const rows = Math.ceil(Math.sqrt(n / 2))
+    return { cols: Math.ceil(n / rows), rows }
+  }
+  return null
+}
+
+// Whether a map exposes a grid a surface can wrap (ADR-0010): a stock grid
+// generator, or a custom map with recorded lattice dims. Only 2D maps qualify.
+export function isMapWrappable(map: Pick<PixelMap, 'id' | 'dim' | 'gridDims'>): boolean {
+  return map.dim === 2 && (WRAPPABLE_STOCK_IDS.has(map.id) || !!map.gridDims)
 }
 
 export function mapFromRecord(r: MapRecord): PixelMap {
@@ -79,20 +104,15 @@ export function mapFromRecord(r: MapRecord): PixelMap {
   if (r.generator === 'custom') {
     return createCustomMap(r.points ?? [], { id: r.id, name: r.name, gridDims: r.gridDims })
   }
-  return buildMap(r.id, r.name, r.generator, r.params)
+  return buildMap(r.id, r.name, r.generator)
 }
 
 // Built-in stock maps — source-backed (ADR-0008), regenerated live, never
-// persisted. The plane and cube run their `.js` source; the cylinder keeps its
-// TS form (no source). The relocated #140 example clouds (helix/sphere/ring) are
-// now live builtin generators too — stock by provenance, never listed in "Your
-// Maps" (#141). The cylinder slots in after the plane for list ordering.
-export const STOCK_MAPS: PixelMap[] = (() => {
-  const byId = new Map(SOURCE_STOCK_MAPS.map((m) => [m.id, m]))
-  const plane = byId.get('plane')!
-  const rest = SOURCE_STOCK_MAPS.filter((m) => m.id !== 'plane')
-  return [plane, createCylinderMap({ rows: 32, cols: 32 }), ...rest]
-})()
+// persisted. The plane and cube run their `.js` source. The relocated #140
+// example clouds (helix/sphere/ring) are now live builtin generators too — stock
+// by provenance, never listed in "Your Maps" (#141). The cylinder is no longer a
+// stock map: it is a viewport Surface (ADR-0010) composed onto the Square.
+export const STOCK_MAPS: PixelMap[] = SOURCE_STOCK_MAPS
 
 // Resolve a map id to its runtime PixelMap (stock or user). Falls back to the
 // stock plane for an unknown id, mirroring `buildMap`'s default.
@@ -104,21 +124,40 @@ export function resolveMap(mapId: string, userMaps: MapRecord[]): PixelMap {
   return STOCK_MAPS[0]
 }
 
-// The layout catalogue the "Shape" dropdown filters: every viewport shape plus
-// every available map (stock + user). The pure `layoutOptions` helper does the
-// sample-arity filtering; this just gathers the raw metadata.
+// The layout catalogue the Map + embedding controls filter (ADR-0010): every
+// viewport shape, every surface, and every available map (stock + user). The
+// pure `mapOptions`/`embeddingOptions` helpers do the dimension/wrappability
+// filtering; this just gathers the raw metadata. Each map advertises whether a
+// surface can wrap it (`wrappable`).
 export function layoutSource(state: Pick<MapState, 'userMaps'>): LayoutSource {
   return {
     shapes: Object.values(SHAPES).map((s) => ({ id: s.id, name: s.name, displayDim: s.displayDim })),
+    surfaces: Object.values(SURFACES).map((s) => ({
+      id: s.id,
+      name: s.name,
+      displayDim: s.displayDim,
+      needsGrid: s.needsGrid,
+    })),
     maps: [
-      ...STOCK_MAPS.map((m) => ({ id: m.id, name: m.name, dim: m.dim, displayDim: m.displayDim })),
+      ...STOCK_MAPS.map((m) => ({
+        id: m.id,
+        name: m.name,
+        dim: m.dim,
+        displayDim: m.displayDim,
+        wrappable: isMapWrappable(m),
+      })),
       // A custom map can only resolve as a layout once it has baked points; a
       // freshly-created map has none until #143 bakes it, so keep it out of the
       // layout catalogue (it would throw in createCustomMap). Non-custom user maps
       // regenerate from params and are always selectable.
       ...state.userMaps
         .filter((m) => m.generator !== 'custom' || (m.points?.length ?? 0) > 0)
-        .map((m) => ({ id: m.id, name: m.name, dim: m.dim })),
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          dim: m.dim,
+          wrappable: isMapWrappable({ id: m.id, dim: m.dim, gridDims: m.gridDims }),
+        })),
     ],
   }
 }
@@ -144,6 +183,11 @@ interface MapState {
   // `activeMapId` because the "Shape" dropdown blurs both into one knob; which
   // one is live is decided by the pattern's native dimensionality (1D → shape).
   activeShapeId: ShapeId
+  // The active 2D viewport surface embedding (ADR-0010). Lives alongside
+  // `activeMapId` because the embedding control owns `pos` while the map owns
+  // `sample`; which embedding axis is live is decided by the pattern's native
+  // dimensionality (1D → shape, 2D → surface).
+  activeSurfaceId: SurfaceId
   // The modeled pixel count for the active layout, or null to derive a default
   // (the global grid's rows×cols for a map; a 1D default for a shape).
   activePixelCount: number | null
@@ -161,6 +205,7 @@ interface MapState {
   mapEvalError: string | null
   setActiveMap: (id: string) => void
   setActiveShape: (id: ShapeId) => void
+  setActiveSurface: (id: SurfaceId) => void
   setActivePixelCount: (count: number | null) => void
   // Create a fresh custom map (skeleton source), persist it immediately as a row
   // in "Your Maps" (no save step, mirroring New Pattern), and open it in map mode.
@@ -195,6 +240,7 @@ export type EditingMap = { kind: 'existing'; id: string } | null
 export const mapInitialState = {
   activeMapId: DEFAULT_MAP_ID,
   activeShapeId: DEFAULT_SHAPE_ID,
+  activeSurfaceId: DEFAULT_SURFACE_ID,
   activePixelCount: null as number | null,
   userMaps: [] as MapRecord[],
   editingMap: null as EditingMap,
@@ -229,6 +275,7 @@ export const useMapStore = create<MapState>()((set, get) => ({
 
   setActiveMap: (id) => set({ activeMapId: id }),
   setActiveShape: (id) => set({ activeShapeId: id }),
+  setActiveSurface: (id) => set({ activeSurfaceId: id }),
   setActivePixelCount: (count) => set({ activePixelCount: count }),
 
   createNewMap: async () => {

@@ -31,12 +31,12 @@ export interface PixelMap {
   builtin: boolean
   // SAMPLE arity — the coord-arg count fed to the render fn, and what the layout
   // selector filters on (a `dim:2` map is offered to render2D patterns). For
-  // most maps this also equals how it's drawn; the cylinder is the exception
-  // (dim:2 sample, displayDim:3 draw), so see `displayDim`.
+  // every current map this also equals how it's drawn (no map samples and draws
+  // in different dimensions any more — the cylinder's old 2D-sample/3D-draw split
+  // is now a viewport Surface, ADR-0010); `displayDim` remains for a future map
+  // that needs it.
   dim: 1 | 2 | 3
   // How the map is DRAWN, when it differs from `dim`. Absent ⇒ same as `dim`.
-  // The cylinder wraps a 2D grid onto a 3D surface, so it samples in 2D but
-  // draws (and navigates) in 3D via the orbit camera.
   displayDim?: 1 | 2 | 3
   // For a baked custom map (ADR-0007): how many points the frozen array holds.
   // A freshly selected custom map defaults the modeled count to this so it reads

@@ -17,10 +17,10 @@ function source(name: string): string {
 }
 
 // The thin catalogue: stock map identity/metadata paired with its `?raw` source.
-// The drape cylinder is deliberately absent — it has no single faithful Mapper
-// function (sample != pos), so it keeps its TS form and carries no source
-// (ADR-0008 exception). The example clouds (helix/sphere/ring) are live builtin
-// generators here, no longer baked arrays.
+// The cylinder is no longer a stock map at all (ADR-0010): it is a viewport
+// Surface embedding composed onto the Square map, so the ADR-0008 source-less
+// stock-map exception is dissolved. The example clouds (helix/sphere/ring) are
+// live builtin generators here, no longer baked arrays.
 export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   { id: 'plane', name: 'Square', dim: 2, source: source('plane') },
   { id: 'wide', name: 'Wide 2:1', dim: 2, source: source('wide') },

@@ -17,6 +17,7 @@ export interface PatternRecord {
   params?: Record<string, number>  // the active map's generator params
   pixelCount?: number
   shapeId?: string                 // 1D viewport shape embedding, if wrapped
+  surfaceId?: string               // 2D viewport surface embedding (ADR-0010); 'flat' default
 }
 
 // A persisted user map (Phase 2 writes these; stock maps are generated, never
