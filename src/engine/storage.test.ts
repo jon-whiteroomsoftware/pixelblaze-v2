@@ -124,6 +124,19 @@ describe('storage — patterns', () => {
     await createPattern({ ...PATTERN, surfaceId: 'cylinder' }, db)
     expect((await getPattern('p1', db))?.surfaceId).toBe('cylinder')
   })
+
+  it('migrates the retired wireframe star mapId to Star (shell) on read (ADR-0012, #173)', async () => {
+    const db = await makeDb()
+    await createPattern({ ...PATTERN, mapId: 'star' }, db)
+    expect((await getPattern('p1', db))?.mapId).toBe('star-shell')
+    expect((await listPatterns(db))[0].mapId).toBe('star-shell')
+  })
+
+  it('leaves a live mapId untouched on read', async () => {
+    const db = await makeDb()
+    await createPattern({ ...PATTERN, mapId: 'star-volume' }, db)
+    expect((await getPattern('p1', db))?.mapId).toBe('star-volume')
+  })
 })
 
 describe('storage — maps', () => {

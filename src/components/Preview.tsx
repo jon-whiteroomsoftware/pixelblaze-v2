@@ -31,6 +31,7 @@ import {
 import { layoutSource as buildLayoutSource } from '@/store/mapStore'
 import { resolveLayoutSelection, resolveSolidity } from '@/engine/layout'
 import { centroidNormals, faceNormals } from '@/engine/centroidNormals'
+import { starShellNormals } from '@/engine/maps/starGeometry'
 import {
   SHAPES,
   embedPositions,
@@ -244,11 +245,17 @@ export function Preview() {
         // A solid-eligible stock 3D map (ADR-0011) carries no baked normal, so the
         // preview re-derives one, offered ONLY because the catalogue flags the map.
         // The faceted Cube shell uses per-face normals (dominant axis of pos −
-        // centre, ADR-0012); a convex cloud shell (the Sphere) uses the generic
-        // centroid radial. The Helix / volumetric Cube set no flag and stay
+        // centre, ADR-0012); the Star shell uses its stellation faces' normals
+        // (starShellNormals); a convex cloud shell (the Sphere) uses the generic
+        // centroid radial. The Helix / volumetric Cube/Star set no flag and stay
         // see-through. Preview-only: never written to the map record.
         if (map.solidEligible) {
-          normals3D = map.id === 'cube-shell' ? faceNormals(positions3D) : centroidNormals(positions3D)
+          normals3D =
+            map.id === 'cube-shell'
+              ? faceNormals(positions3D)
+              : map.id === 'star-shell'
+                ? starShellNormals(positions3D)
+                : centroidNormals(positions3D)
         }
         displayDim = 3
       } else if (map.id !== 'plane') {

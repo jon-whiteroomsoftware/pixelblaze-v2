@@ -1,5 +1,7 @@
 import { SOURCE_STOCK_MAPS, STOCK_MAP_SPECS, SEED_MAP_IDS, stockMapSpec } from './stockCatalogue'
 import { squarePlaneDims } from './plane'
+import { STAR_FACES, starShellNormals, starSurfaceRadius } from './starGeometry'
+import { evalMapSource } from './evalMapSource'
 
 function mapById(id: string) {
   const m = SOURCE_STOCK_MAPS.find((m) => m.id === id)
@@ -14,7 +16,8 @@ describe('stock catalogue', () => {
       'wide',
       'cube',
       'cube-shell',
-      'star',
+      'star-shell',
+      'star-volume',
       'seed-helix-3d',
       'seed-sphere-3d',
       'sphere-volume',
@@ -47,12 +50,14 @@ describe('stock catalogue', () => {
     // map carry no flag and stay see-through.
     expect(mapById('seed-sphere-3d').solidEligible).toBe(true)
     expect(mapById('cube-shell').solidEligible).toBe(true)
+    expect(mapById('star-shell').solidEligible).toBe(true)
     expect(mapById('seed-helix-3d').solidEligible).toBeUndefined()
     expect(mapById('cube').solidEligible).toBeUndefined()
     expect(mapById('plane').solidEligible).toBeUndefined()
-    // A volume has no per-point boundary normal, so the solid ball is never solid-
-    // eligible — it leans on the renderer's depth-tested opaque cores (ADR-0012).
+    // A volume has no per-point boundary normal, so a solid ball / solid star is
+    // never solid-eligible — it leans on the renderer's depth-tested opaque cores.
     expect(mapById('sphere-volume').solidEligible).toBeUndefined()
+    expect(mapById('star-volume').solidEligible).toBeUndefined()
   })
 
   it('exposes the relocated cloud ids for IDB pruning', () => {
@@ -124,36 +129,84 @@ describe('wide grid', () => {
   })
 })
 
-describe('star (stellated polyhedron)', () => {
-  it('is a 3D map whose points lie on the star wireframe', () => {
-    const star = mapById('star')
-    expect(star.dim).toBe(3)
-    const pts = star.resolve(360)
-    expect(pts).toHaveLength(360)
-    // Every point is a real 3D coordinate in [0,1] (normalize), pos == sample.
-    for (const p of pts) {
-      expect(p.sample).toHaveLength(3)
-      expect(p.pos).toEqual(p.sample)
+// The Star tests work in the source's RAW geometry (centred at the origin),
+// before the shared normalize pass, so a point's radius is directly comparable to
+// the stellated surface's ray-exit radius along its direction — no normalization
+// scale to untangle. `starSurfaceRadius` is the distance to the one triangle a
+// ray from the origin passes through.
+function rawCoords(id: string, count: number): number[][] {
+  return evalMapSource(stockMapSpec(id)!.source, count)
+}
+// For each raw coord: the fraction of the way from the origin to the surface
+// along its direction (1.0 == exactly on the surface).
+function surfaceFractions(coords: number[][]): number[] {
+  return coords.map((p) => {
+    const r = Math.hypot(p[0], p[1], p[2])
+    if (r === 0) return 0
+    const u: [number, number, number] = [p[0] / r, p[1] / r, p[2] / r]
+    return r / starSurfaceRadius(u)
+  })
+}
+
+describe('star shell (stellated surface, ADR-0012)', () => {
+  it('is a distinct, solid-eligible 3D map (not the volume)', () => {
+    expect(mapById('star-shell').dim).toBe(3)
+    expect(mapById('star-shell').solidEligible).toBe(true)
+    expect(mapById('star-shell').id).not.toBe(mapById('star-volume').id)
+  })
+
+  it('retires the wireframe star id', () => {
+    expect(stockMapSpec('star')).toBeUndefined()
+  })
+
+  it('places every point ON the stellated surface (radius == ray exit)', () => {
+    // Every surface point's radius equals the ray's exit radius through the solid,
+    // so its fraction is 1.0.
+    for (const f of surfaceFractions(rawCoords('star-shell', 1200))) {
+      expect(f).toBeCloseTo(1, 6)
     }
   })
 
-  it('reaches 20 spike tips standing out beyond the body', () => {
-    const star = mapById('star')
-    const pts = star.resolve(2000)
-    // The spike tips are the farthest points from the centre; the body corners sit
-    // closer in. Collect the distinct outward directions of the farthest points and
-    // confirm there are 20 (one per icosahedron face).
-    const c = [0.5, 0.5, 0.5]
-    const radius = (p: number[]) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2])
-    const maxR = Math.max(...pts.map((p) => radius(p.sample)))
-    const tips = new Set<string>()
-    for (const p of pts) {
-      const r = radius(p.sample)
-      if (r < maxR - 1e-6) continue
-      const dir = [p.sample[0] - c[0], p.sample[1] - c[1], p.sample[2] - c[2]].map((v) => v / r)
-      tips.add(dir.map((v) => v.toFixed(2)).join(','))
+  it('yields faceted, outward per-face normals (starShellNormals)', () => {
+    const samples = mapById('star-shell').resolve(1200).map((p) => p.sample)
+    // centroid of the normalized samples
+    const c = [0, 0, 0]
+    for (const s of samples) for (let a = 0; a < 3; a++) c[a] += s[a]
+    for (let a = 0; a < 3; a++) c[a] /= samples.length
+    const normals = starShellNormals(samples as [number, number, number][])
+    const distinct = new Set<string>()
+    for (let i = 0; i < samples.length; i++) {
+      const n = normals[i]
+      expect(Math.hypot(n[0], n[1], n[2])).toBeCloseTo(1, 6) // unit length
+      // outward: agrees with the radial direction from the centre
+      const d = [samples[i][0] - c[0], samples[i][1] - c[1], samples[i][2] - c[2]]
+      expect(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]).toBeGreaterThan(0)
+      distinct.add(n.map((v) => v.toFixed(3)).join(','))
     }
-    expect(tips.size).toBe(20)
+    // Many distinct face normals — a faceted shell, not a smooth sphere.
+    expect(distinct.size).toBeGreaterThan(20)
+  })
+
+  it('exposes all 60 stellation faces', () => {
+    expect(STAR_FACES).toHaveLength(60)
+  })
+})
+
+describe('star volume (filled stellated solid, ADR-0012)', () => {
+  it('is NOT solid-eligible', () => {
+    expect(mapById('star-volume').solidEligible).toBeUndefined()
+  })
+
+  it('fills the interior out to the spiky boundary, never past it', () => {
+    const fracs = surfaceFractions(rawCoords('star-volume', 2000))
+    // No point escapes the stellated surface.
+    for (const f of fracs) expect(f).toBeLessThanOrEqual(1 + 1e-6)
+    // The fill reaches the rim and the deep interior — not a shell.
+    expect(Math.max(...fracs)).toBeGreaterThan(0.9)
+    expect(Math.min(...fracs)).toBeLessThan(0.2)
+    // A healthy fraction sit well inside the outer half.
+    const inner = fracs.filter((f) => f < 0.5).length
+    expect(inner / fracs.length).toBeGreaterThan(0.1)
   })
 })
 

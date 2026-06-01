@@ -53,10 +53,17 @@ export interface MapRecord {
 // dead embedding. Pure over the record; returns the same object when nothing
 // changed, a corrected copy otherwise.
 export function migratePatternRecord(record: PatternRecord): PatternRecord {
-  if (record.surfaceId === 'surface-cube') {
-    return { ...record, surfaceId: 'flat' }
+  let next = record
+  if (next.surfaceId === 'surface-cube') {
+    next = { ...next, surfaceId: 'flat' }
   }
-  return record
+  // The retired wireframe `star` map (ADR-0012, #173) splits into Star (shell) /
+  // Star (volume); a pattern that pointed at it lands on the shell, the sensible
+  // faceted default.
+  if (next.mapId === 'star') {
+    next = { ...next, mapId: 'star-shell' }
+  }
+  return next
 }
 
 let _db: IDBDatabase | null = null

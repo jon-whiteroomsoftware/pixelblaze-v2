@@ -29,7 +29,12 @@ export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   // faces, solid-eligible via per-face normals the preview derives (faceNormals,
   // the dominant axis of pos − centre) rather than the sphere's centroid radial.
   { id: 'cube-shell', name: 'Cube (shell)', dim: 3, source: source('cube-shell'), solidEligible: true },
-  { id: 'star', name: 'Star', dim: 3, source: source('star') },
+  // The Star joins the ADR-0012 shell/volume scheme (the lone wireframe star is
+  // retired). The shell scatters points over the 60 stellation triangles and is
+  // solid-eligible via per-face normals the preview derives (starShellNormals);
+  // the volume fills the spiky solid and has no per-point normal.
+  { id: 'star-shell', name: 'Star (shell)', dim: 3, source: source('star-shell'), solidEligible: true },
+  { id: 'star-volume', name: 'Star (volume)', dim: 3, source: source('star-volume') },
   { id: 'seed-helix-3d', name: 'Helix (cloud)', dim: 3, source: source('helix') },
   // The Sphere is a convex shell, so the catalogue vouches it solid-eligible
   // (ADR-0011): the preview re-derives outward normals via normalize(pos −
