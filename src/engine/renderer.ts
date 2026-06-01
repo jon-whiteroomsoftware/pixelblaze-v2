@@ -5,6 +5,7 @@ import {
   MAX_PIXEL_COUNT,
   pointSize,
   point3DSize,
+  nearestNeighborSpacing,
   projectIndex,
   projectPos,
   projectOrbit,
@@ -43,11 +44,12 @@ export interface Renderer {
   // Switch to the 3D orbit path: draw positions come from normalized [0,1]³ `pos`
   // projected through the orbit camera each paint, with depth cueing. `null`
   // leaves 3D mode (back to the 2D grid/shape path). Sizes the canvas to a square
-  // `canvasPx`; `side` is the lattice's points-per-axis, used to anchor the
-  // light-source diameter to the lattice pitch.
+  // `canvasPx`. The light-source diameter is anchored to the layout's MEASURED
+  // nearest-neighbour spacing (computed from `positions`), so it is correct for
+  // any layout — solid cube, sphere shell, helix, or wrapped pole (#63).
   set3DPositions(
     positions: [number, number, number][] | null,
-    opts?: { canvasPx?: number; side?: number },
+    opts?: { canvasPx?: number },
   ): void
   // Update the orbit camera (auto-orbit advance, drag, reset). No-op in 2D mode.
   setCamera(camera: OrbitCamera): void
@@ -150,9 +152,10 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
   // per paint from `pos3D` + `camera`. Takes precedence over the 2D paths.
   let pos3D: [number, number, number][] | null = null
   let camera: OrbitCamera = DEFAULT_ORBIT
-  // Points-per-axis of the active 3D lattice, used to anchor the light-source
-  // diameter to the projected lattice pitch. Set by set3DPositions.
-  let lattice3DSide = 1
+  // Measured normalized nearest-neighbour spacing of the active 3D layout, used
+  // to anchor the light-source diameter to the real on-screen neighbour gap (so
+  // it is right for a cube, sphere, helix, or pole alike). Set by set3DPositions.
+  let lattice3DSpacing = 0
   // The active model's bounding-sphere radius about the rotation centre, so the
   // fit (and depth) zoom to the model's true extent — a thin pole fills the frame
   // just as a full cube does. Set by set3DPositions.
@@ -208,7 +211,7 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
     // scales it per-dot (nearer = larger). Diffusion never touches it — the blur
     // that merges sources is a CSS filter applied by the UI layer.
     const scale = fit3DScale(FIT_3D_MARGIN, lattice3DHalfExtent)
-    const baseSize = point3DSize(canvas.width, lattice3DSide, grid.lightSize ?? 1, scale)
+    const baseSize = point3DSize(canvas.width, lattice3DSpacing, grid.lightSize ?? 1, scale)
     for (let i = 0; i < cap; i++) {
       const { clip, depth } = projectOrbit(pos3D[i], camera, scale)
       const cue = depthCue(depth, {}, lattice3DHalfExtent)
@@ -313,13 +316,13 @@ export function createRenderer(canvas: HTMLCanvasElement, initialGrid: RendererG
 
   function set3DPositions(
     p: [number, number, number][] | null,
-    opts: { canvasPx?: number; side?: number } = {},
+    opts: { canvasPx?: number } = {},
   ): void {
     pos3D = p
     if (p) {
-      // Anchor the orb diameter to the lattice pitch: prefer the caller's `side`,
-      // else recover it as the cube root of the point count (count = side³).
-      lattice3DSide = opts.side ?? Math.max(1, Math.round(Math.cbrt(p.length)))
+      // Anchor the orb diameter to the layout's true neighbour gap, measured from
+      // the points themselves — no cube-root lattice assumption (#63).
+      lattice3DSpacing = nearestNeighborSpacing(p)
       lattice3DHalfExtent = modelHalfExtent(p)
       if (opts.canvasPx) {
         const px = Math.max(1, Math.round(opts.canvasPx))

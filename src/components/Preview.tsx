@@ -8,9 +8,7 @@ import {
   useMapStore,
   DEFAULT_MAP_ID,
   DEFAULT_SHAPE_ID,
-  DEFAULT_SHAPE_PIXEL_COUNT,
-  DEFAULT_CUBE_SIDE,
-  defaultPixelCountForDim,
+  DEFAULT_SHAPE_PIXEL_COUNT,  defaultPixelCountForDim,
   resolveMap,
 } from '@/store/mapStore'
 import { useCameraStore } from '@/store/cameraStore'
@@ -25,7 +23,8 @@ import {
   clampPixelCount,
   cubeSideForCount,
   advanceAutoOrbit,
-  lattice3DPitchPx,
+  neighborPitchPx,
+  nearestNeighborSpacing,
   fit3DScale,
   modelHalfExtent,
   FIT_3D_MARGIN,
@@ -78,9 +77,10 @@ export function Preview() {
   // The square 3D viewport size (CSS px) when a 3D layout is active, else null.
   // Drives the diffusion blur in 3D, where there is no locked-2D `spacing`.
   const [canvas3DPx, setCanvas3DPx] = useState<number | null>(null)
-  // The active cube lattice side when a 3D layout is live; drives the diffusion
-  // blur's projected-pitch calc, which must match the count-derived lattice.
-  const [cube3DSide, setCube3DSide] = useState<number>(DEFAULT_CUBE_SIDE)
+  // The active 3D layout's measured normalized nearest-neighbour spacing; drives
+  // the diffusion blur's projected-pitch calc, so the blur tracks the same real
+  // neighbour gap the orb sizing uses (#63), for any layout (cube/sphere/pole).
+  const [lattice3DSpacing, setLattice3DSpacing] = useState<number>(0)
   // The active 3D model's bounding-sphere radius about the rotation centre, so the
   // diffusion blur's projected pitch tracks the same zoom the renderer fits to.
   const [model3DHalfExtent, setModel3DHalfExtent] = useState<number | null>(null)
@@ -132,9 +132,6 @@ export function Preview() {
     if (!previewSource) return
 
     const gridWithDims = { ...usePreviewStore.getState().grid, ...canvasDims }
-    // The derived cube side for a 3D layout (set in the 3D branch), so the
-    // diffusion blur and renderer use the count-derived lattice, not a fixed one.
-    let cubeSide = DEFAULT_CUBE_SIDE
 
     // Bundle first so the pattern's native dimensionality (highest render fn) is
     // known before resolving its layout — the dropdown filters by it (ADR-0005).
@@ -191,7 +188,6 @@ export function Preview() {
         const cols = useCameraStore.getState().poleCols ?? defaultPoleCols(pixelCount)
         positions3D = polePositions(pixelCount, cols)
         mapPoints = positions3D.map((pos) => ({ sample: [], pos }))
-        cubeSide = cubeSideForCount(pixelCount) // dot-size reference only
         displayDim = 3
       } else {
         shapePositions = embedPositions(shape, pixelCount)
@@ -211,12 +207,6 @@ export function Preview() {
         const dims = cylinderDims(pixelCount)
         mapPoints = createCylinderMap(dims).resolve(pixelCount)
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
-        // Orb-size reference: the cylinder is NOT a cubic lattice, so cbrt(count)
-        // hugely underestimates its on-screen pitch and the orbs overlap (#63).
-        // Its real pitch divisor is the row count — cylinderDims picks cols ≈ π·rows
-        // precisely so the wrapped front-face pitch matches the vertical 1/(rows-1)
-        // pitch in both axes, so `rows` sizes the orbs to the true neighbour gap.
-        cubeSide = dims.rows
         // A 2D layout (wrapped), even though it's drawn in the 3D viewport.
         layoutLabel = `${dims.cols}×${dims.rows}`
         displayDim = 3
@@ -228,7 +218,7 @@ export function Preview() {
           // squared-up count; each point carries a [0,1]³ `pos` the orbit camera
           // projects and the render loop dispatches render3D on the 3-arity sample.
           const count = activePixelCount ?? defaultPixelCountForDim(3)
-          cubeSide = cubeSideForCount(count)
+          const cubeSide = cubeSideForCount(count)
           pixelCount = clampPixelCount(cubePixelCount(cubeSide))
           mapPoints = map.resolve(pixelCount)
           layoutLabel = `${cubeSide}×${cubeSide}×${cubeSide}`
@@ -239,7 +229,6 @@ export function Preview() {
           // map's baked length); over-count pixels fall to the origin, surplus
           // points go unvisited. `cubeSide` is only a dot-size reference here.
           pixelCount = clampPixelCount(activePixelCount ?? map.bakedCount ?? defaultPixelCountForDim(3))
-          cubeSide = cubeSideForCount(pixelCount)
           mapPoints = map.resolve(pixelCount)
         }
         positions3D = mapPoints.map((p) => p.pos as [number, number, number])
@@ -356,10 +345,10 @@ export function Preview() {
       const rect = containerRef.current?.getBoundingClientRect()
       const width = rect?.width ?? 400
       const px = cube3DCanvasPx(width, width)
-      renderer.set3DPositions(positions3D, { canvasPx: px, side: cubeSide })
+      renderer.set3DPositions(positions3D, { canvasPx: px })
       renderer.setCamera(useCameraStore.getState().camera)
       setCanvas3DPx(px)
-      setCube3DSide(cubeSide)
+      setLattice3DSpacing(nearestNeighborSpacing(positions3D))
       setModel3DHalfExtent(modelHalfExtent(positions3D))
     } else {
       renderer.set3DPositions(null)
@@ -509,12 +498,10 @@ export function Preview() {
     const count = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
     const cols = poleCols ?? defaultPoleCols(count)
     const positions = polePositions(count, cols)
-    renderer.set3DPositions(positions, {
-      canvasPx: canvas3DPx,
-      side: cubeSideForCount(count),
-    })
+    renderer.set3DPositions(positions, { canvasPx: canvas3DPx })
     // A shorter pole has a smaller extent → the renderer zooms in further; keep
-    // the diffusion pitch in step with that zoom.
+    // the diffusion pitch and orb spacing in step with the new geometry.
+    setLattice3DSpacing(nearestNeighborSpacing(positions))
     setModel3DHalfExtent(modelHalfExtent(positions))
     if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
   }, [poleCols, activeShapeId, displayDim, canvas3DPx, activePixelCount])
@@ -549,9 +536,9 @@ export function Preview() {
   // `spacing`; in 3D it's the projected lattice pitch — uniform across dimensions.
   const diffusionPitch =
     displayDim === 3
-      ? lattice3DPitchPx(
+      ? neighborPitchPx(
           canvas3DPx ?? 0,
-          cube3DSide,
+          lattice3DSpacing,
           fit3DScale(FIT_3D_MARGIN, model3DHalfExtent ?? undefined),
         )
       : canvasDims?.spacing ?? grid.spacing

@@ -17,6 +17,8 @@ import {
   FIT_3D_MARGIN,
   modelHalfExtent,
   lattice3DPitchPx,
+  neighborPitchPx,
+  nearestNeighborSpacing,
   point3DSize,
   diffusionBlurStdDev,
   DIFFUSION_BLUR_PITCH_FACTOR_2D,
@@ -138,15 +140,60 @@ describe('camera — 3D light size (ADR-0006)', () => {
     expect(lattice3DPitchPx(400, 1)).toBeCloseTo((fit3DScale() / 2) * 400, 6)
   })
 
-  it('point3DSize is the lattice pitch times the light-size fraction', () => {
-    const pitch = lattice3DPitchPx(400, 8)
-    expect(point3DSize(400, 8, 0.5)).toBeCloseTo(pitch * 0.5, 6)
+  it('neighborPitchPx matches the lattice pitch for a regular lattice spacing', () => {
+    // A side-8 cubic lattice has axis spacing 1/(8-1); the measured-spacing pitch
+    // must agree with the side-based lattice pitch (same geometry).
+    expect(neighborPitchPx(400, 1 / 7)).toBeCloseTo(lattice3DPitchPx(400, 8), 6)
+  })
+
+  it('neighborPitchPx falls back to the full extent for a zero spacing', () => {
+    expect(neighborPitchPx(400, 0)).toBeCloseTo((fit3DScale() / 2) * 400, 6)
+  })
+
+  it('point3DSize is the measured neighbour pitch times the light-size fraction', () => {
+    const pitch = neighborPitchPx(400, 1 / 7)
+    expect(point3DSize(400, 1 / 7, 0.5)).toBeCloseTo(pitch * 0.5, 6)
     // Larger light size → larger orb; "almost touching" near 0.95.
-    expect(point3DSize(400, 8, 0.95)).toBeGreaterThan(point3DSize(400, 8, 0.5))
+    expect(point3DSize(400, 1 / 7, 0.95)).toBeGreaterThan(point3DSize(400, 1 / 7, 0.5))
   })
 
   it('never produces a sub-pixel diameter', () => {
-    expect(point3DSize(10, 256, 0.15)).toBe(1)
+    expect(point3DSize(10, 1 / 255, 0.15)).toBe(1)
+  })
+
+  describe('nearestNeighborSpacing', () => {
+    it('returns 0 for fewer than two points', () => {
+      expect(nearestNeighborSpacing([])).toBe(0)
+      expect(nearestNeighborSpacing([[0.5, 0.5, 0.5]])).toBe(0)
+    })
+
+    it('measures the axis pitch of a regular cubic lattice', () => {
+      const side = 4
+      const pts: [number, number, number][] = []
+      for (let z = 0; z < side; z++)
+        for (let y = 0; y < side; y++)
+          for (let x = 0; x < side; x++)
+            pts.push([x / (side - 1), y / (side - 1), z / (side - 1)])
+      expect(nearestNeighborSpacing(pts)).toBeCloseTo(1 / (side - 1), 6)
+    })
+
+    it('measures the true surface gap of a sphere shell, not the cube-root estimate', () => {
+      // A Fibonacci shell's neighbour gap ~ sqrt(area/N), far below the solid-
+      // lattice 1/(cbrt(N)-1) the old sizing assumed — the #63 ballooning cause.
+      const n = 500
+      const pts: [number, number, number][] = []
+      const phi = Math.PI * (3 - Math.sqrt(5))
+      for (let i = 0; i < n; i++) {
+        const y = 1 - (i / (n - 1)) * 2
+        const r = Math.sqrt(1 - y * y)
+        const t = phi * i
+        pts.push([(Math.cos(t) * r + 1) / 2, (y + 1) / 2, (Math.sin(t) * r + 1) / 2])
+      }
+      const measured = nearestNeighborSpacing(pts)
+      const cubeRootEstimate = 1 / (Math.cbrt(n) - 1)
+      expect(measured).toBeGreaterThan(0)
+      expect(measured).toBeLessThan(cubeRootEstimate * 0.75)
+    })
   })
 })
 

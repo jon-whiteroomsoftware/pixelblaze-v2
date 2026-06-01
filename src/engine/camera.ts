@@ -234,16 +234,69 @@ export function lattice3DPitchPx(
   return (clipPitch / 2) * canvasPx
 }
 
-// Drawn light-source diameter in pixels for the 3D lattice (the un-cued base,
-// before per-dot depth cueing): the lattice pitch times the preview light-size
-// fraction (ADR-0006), so "almost touching" lands at the same felt point as 2D.
+// On-screen pixel pitch for a measured normalized inter-source spacing under the
+// orbit camera: the spacing scaled into clip space (×scale) then to pixels (the
+// clip span of 2 covers `canvasPx`). The general form of `lattice3DPitchPx`,
+// which assumed a regular side×side lattice (spacing 1/(side-1)); this takes the
+// actual neighbour spacing, so it is correct for ANY layout — solid cube, sphere
+// shell, or wrapped curve alike (#63). A degenerate (single point / zero) spacing
+// falls back to the full extent so a lone source still draws.
+export function neighborPitchPx(
+  canvasPx: number,
+  spacingNorm: number,
+  scale: number = fit3DScale(),
+): number {
+  const clipPitch = spacingNorm > 0 ? spacingNorm * scale : scale
+  return (clipPitch / 2) * canvasPx
+}
+
+// The typical (median) nearest-neighbour distance among points in normalized
+// space — the REAL inter-source pitch for any layout. A cube-root "lattice side"
+// estimate is only right for a solid cubic lattice; for a sphere shell, a helix,
+// or a wrapped pole the points sit on a 2D/1D manifold, so cbrt(count) wildly
+// overestimates their on-screen neighbour gap and the orbs balloon (#63).
+//
+// Sampled for cost: for up to NN_SAMPLE_LIMIT stride-selected query points we
+// take the exact nearest neighbour over the FULL set, then return the median of
+// those — robust to a lone far point or a wrap seam. O(sample × N), run once per
+// layout change (never per frame). Returns 0 for fewer than two points.
+export const NN_SAMPLE_LIMIT = 1024
+export function nearestNeighborSpacing(
+  positions: readonly (readonly [number, number, number])[],
+): number {
+  const n = positions.length
+  if (n < 2) return 0
+  const stride = Math.max(1, Math.floor(n / NN_SAMPLE_LIMIT))
+  const dists: number[] = []
+  for (let i = 0; i < n; i += stride) {
+    const [xi, yi, zi] = positions[i]
+    let best = Infinity
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue
+      const dx = positions[j][0] - xi
+      const dy = positions[j][1] - yi
+      const dz = positions[j][2] - zi
+      const d2 = dx * dx + dy * dy + dz * dz
+      if (d2 < best) best = d2
+    }
+    if (best < Infinity) dists.push(Math.sqrt(best))
+  }
+  if (dists.length === 0) return 0
+  dists.sort((a, b) => a - b)
+  return dists[dists.length >> 1]
+}
+
+// Drawn light-source diameter in pixels for a 3D layout (the un-cued base, before
+// per-dot depth cueing): the measured neighbour pitch times the preview light-size
+// fraction (ADR-0006), so "almost touching" (lightSize → 1) lands at the same felt
+// point as the 2D plane across every layout (#63).
 export function point3DSize(
   canvasPx: number,
-  side: number,
+  spacingNorm: number,
   lightSize: number,
   scale: number = fit3DScale(),
 ): number {
-  return Math.max(1, lattice3DPitchPx(canvasPx, side, scale) * lightSize)
+  return Math.max(1, neighborPitchPx(canvasPx, spacingNorm, scale) * lightSize)
 }
 
 // Default preview light size, and the store's initial value (ADR-0006).
