@@ -434,7 +434,27 @@ pure helpers:
 - `resolveLayoutSelection` restores a pattern's persisted selection if still valid, else
   the default — first dim-matched map, and Flat (2D) / first shape (1D) for the embedding.
   A stale Cylinder on a now-irregular map falls back to Flat, so selecting a wrappable
-  map never surprise-wraps.
+  map never surprise-wraps. It also accepts an optional `recommendedMapId`: when nothing
+  is persisted, a valid dim-matched recommendation wins over the bare first match (see the
+  demo recommendation hooks below).
+
+**Demo recommendation hooks (`src/pixelblaze/demos.ts`).** A read-only demo has no
+`PatternRecord`, so it persists neither a layout nor a count. Two small IDE-side,
+preview-only registries let a geometry-aware demo name better on-open defaults than the
+generic per-dimension fallbacks:
+- `DEMO_RECOMMENDED_MAPS` (`recommendedMapFor`) — `demoName → mapId`, fed to
+  `resolveLayoutSelection` so the demo opens on the stock map it was built for (e.g.
+  `AuroraSphere → seed-sphere-3d`) instead of the first dim-matched map (Cube for 3D).
+- `DEMO_RECOMMENDED_PIXEL_COUNTS` (`recommendedPixelCountFor`) — `demoName → count`, used
+  in `Preview.tsx`'s count chain ahead of `defaultPixelCountForDim` (and mirrored in the
+  `PreviewDeck` count box) so a demo that needs a dense cloud opens at it (e.g.
+  `AuroraSphere → 4096`, not the 3D cube's 512).
+
+Both are the same category as the per-pattern layout selection: **preview-only, never sent
+to hardware, never in pattern source or the transpiled artifact** — the physical Pixelblaze
+knows only patterns and maps. They set the on-open default only; the map and count stay
+freely switchable, and a custom pattern persists its own selection instead. See the
+"Recommended map" term in `CONTEXT.md`.
 
 `LayoutSelector.tsx` is the thin wrapper: it lays out the Map control and the embedding
 control side by side, hiding either when it carries no real choice (a single-option
