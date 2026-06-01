@@ -111,6 +111,19 @@ describe('storage — patterns', () => {
     expect(result?.pixelCount).toBeUndefined()
     expect(result?.shapeId).toBeUndefined()
   })
+
+  it('migrates a retired surface-cube surfaceId to Flat on read (ADR-0012, #170)', async () => {
+    const db = await makeDb()
+    await createPattern({ ...PATTERN, surfaceId: 'surface-cube' }, db)
+    expect((await getPattern('p1', db))?.surfaceId).toBe('flat')
+    expect((await listPatterns(db))[0].surfaceId).toBe('flat')
+  })
+
+  it('leaves a live surfaceId untouched on read', async () => {
+    const db = await makeDb()
+    await createPattern({ ...PATTERN, surfaceId: 'cylinder' }, db)
+    expect((await getPattern('p1', db))?.surfaceId).toBe('cylinder')
+  })
 })
 
 describe('storage — maps', () => {

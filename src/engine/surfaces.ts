@@ -11,7 +11,7 @@
 import type { GridDims } from './maps/types'
 import { cylinderWallRadius, cylinderWallDiameter } from './cylinderWall'
 
-export type SurfaceId = 'flat' | 'cylinder' | 'surface-cube'
+export type SurfaceId = 'flat' | 'cylinder'
 
 export interface Surface {
   id: SurfaceId
@@ -27,10 +27,9 @@ export interface Surface {
   // clean integer grid and is offered only for maps that have one.
   needsGrid: boolean
   // Solid-eligible iff the surface can supply a per-point outward normal
-  // (ADR-0011): the curved/faceted embeddings (Cylinder, surface cube) can, so
-  // the next slice's solidity fade may suppress their back-facing points; Flat
-  // trivially faces the camera and needs nothing. Volumes (the volumetric cube)
-  // are never surfaces and so never eligible.
+  // (ADR-0011): the curved Cylinder can, so the solidity fade may suppress its
+  // back-facing points; Flat trivially faces the camera and needs nothing.
+  // Volumes (the volumetric cube) are never surfaces and so never eligible.
   solidEligible: boolean
 }
 
@@ -54,23 +53,9 @@ export const CYLINDER: Surface = {
   solidEligible: true,
 }
 
-// Surface cube: LEDs on the six faces of a cube (a shell), drawn in 3D. Like the
-// Cylinder it is a grid-class surface offered only for wrappable maps (an
-// irregular cloud stays Flat-only); this slice distributes the pixel count
-// across the faces by count alone. Exposes a per-point outward face normal — the
-// first faceted solid-eligible embedding (ADR-0011).
-export const SURFACE_CUBE: Surface = {
-  id: 'surface-cube',
-  name: 'Cube (surface)',
-  displayDim: 3,
-  needsGrid: true,
-  solidEligible: true,
-}
-
 export const SURFACES: Record<SurfaceId, Surface> = {
   flat: FLAT,
   cylinder: CYLINDER,
-  'surface-cube': SURFACE_CUBE,
 }
 
 const TAU = Math.PI * 2
@@ -147,87 +132,3 @@ export function cylinderSurfaceNormals(
   return out
 }
 
-// --- Surface cube (ADR-0011 solid-eligible test bed) ------------------------
-//
-// LEDs arranged on the SIX FACES of a cube — a surface (a hollow shell), NOT
-// the filled volumetric `cube` stock map. The pixel count is split as evenly as
-// possible across the faces; each face lays its share out on a square-ish in-
-// plane sub-grid of cell CENTRES, so every point sits strictly inside its face,
-// never on a shared edge where the face normal would be ambiguous.
-//
-// Each point carries an outward unit FACE NORMAL (the dominant axis of
-// pos − centre): this is the first faceted solid-eligible embedding (ADR-0011),
-// the proving ground for the next slice's solidity fade. The normal is
-// preview-only — never written to a map record nor sent to a controller.
-
-export type Vec3 = [number, number, number]
-
-export interface SurfacePoint {
-  pos: Vec3
-  normal: Vec3
-}
-
-// The six faces of the unit cube, each as an in-plane origin + two unit span
-// axes (du, dv) and the outward normal. pos = origin + u·du + v·dv, u,v ∈ (0,1).
-interface CubeFace {
-  origin: Vec3
-  du: Vec3
-  dv: Vec3
-  normal: Vec3
-}
-
-const CUBE_FACES: CubeFace[] = [
-  { origin: [1, 0, 0], du: [0, 1, 0], dv: [0, 0, 1], normal: [1, 0, 0] }, // +x
-  { origin: [0, 0, 0], du: [0, 1, 0], dv: [0, 0, 1], normal: [-1, 0, 0] }, // −x
-  { origin: [0, 1, 0], du: [1, 0, 0], dv: [0, 0, 1], normal: [0, 1, 0] }, // +y
-  { origin: [0, 0, 0], du: [1, 0, 0], dv: [0, 0, 1], normal: [0, -1, 0] }, // −y
-  { origin: [0, 0, 1], du: [1, 0, 0], dv: [0, 1, 0], normal: [0, 0, 1] }, // +z
-  { origin: [0, 0, 0], du: [1, 0, 0], dv: [0, 1, 0], normal: [0, 0, -1] }, // −z
-]
-
-// Split `pixelCount` across the six faces as evenly as possible: the first
-// `pixelCount % 6` faces get one extra, so the totals sum back to pixelCount.
-export function surfaceCubeFaceCounts(pixelCount: number): number[] {
-  const n = Math.max(0, Math.floor(pixelCount))
-  const base = Math.floor(n / 6)
-  const extra = n % 6
-  return CUBE_FACES.map((_, f) => base + (f < extra ? 1 : 0))
-}
-
-// Resolve the surface cube: one position + outward face normal per index,
-// 0 .. pixelCount-1, in face order (+x, −x, +y, −y, +z, −z). Pure over the
-// count alone — no map grid needed (unlike the Cylinder).
-export function surfaceCubePoints(pixelCount: number): SurfacePoint[] {
-  const counts = surfaceCubeFaceCounts(pixelCount)
-  const out: SurfacePoint[] = []
-  CUBE_FACES.forEach((face, f) => {
-    const k = counts[f]
-    if (k === 0) return
-    const cols = Math.ceil(Math.sqrt(k))
-    const rows = Math.ceil(k / cols)
-    for (let j = 0; j < k; j++) {
-      const u = ((j % cols) + 0.5) / cols
-      const v = (Math.floor(j / cols) + 0.5) / rows
-      out.push({
-        pos: [
-          face.origin[0] + u * face.du[0] + v * face.dv[0],
-          face.origin[1] + u * face.du[1] + v * face.dv[1],
-          face.origin[2] + u * face.du[2] + v * face.dv[2],
-        ],
-        normal: [...face.normal] as Vec3,
-      })
-    }
-  })
-  return out
-}
-
-// The display positions alone, for the renderer's existing pos3D channel.
-export function surfaceCubePositions(pixelCount: number): Vec3[] {
-  return surfaceCubePoints(pixelCount).map((p) => p.pos)
-}
-
-// The outward unit face normals alone (preview-only; the next slice's solidity
-// fade keys on normal · viewDir). Never serialized toward a controller.
-export function surfaceCubeNormals(pixelCount: number): Vec3[] {
-  return surfaceCubePoints(pixelCount).map((p) => p.normal)
-}

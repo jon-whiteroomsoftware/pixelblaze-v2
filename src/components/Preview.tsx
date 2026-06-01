@@ -42,8 +42,6 @@ import {
 import {
   cylinderSurfacePositions,
   cylinderSurfaceNormals,
-  surfaceCubePositions,
-  surfaceCubeNormals,
   type SurfaceId,
 } from '@/engine/surfaces'
 import type { MapPoint } from '@/engine/maps'
@@ -297,23 +295,12 @@ export function Preview() {
           displayDim = 3
         }
       }
-      // Surface cube (ADR-0011): the same 2D map wrapped onto the six faces of a
-      // cube shell, drawn in 3D. Needs no map grid — the pixel count alone splits
-      // across the faces. The map still owns `sample`; the surface owns `pos`.
-      if (selection.surfaceId === 'surface-cube' && displayDim === 2) {
-        positions3D = surfaceCubePositions(pixelCount)
-        normals3D = surfaceCubeNormals(pixelCount)
-        mapPoints = mapPoints.map((p, i) => ({ sample: p.sample, pos: positions3D![i] }))
-        shapePositions = null
-        layoutLabel = `cube · ${pixelCount}`
-        displayDim = 3
-      }
     }
     useEditorStore.getState().setDisplayDim(displayDim)
     useEditorStore.getState().setLayoutLabel(layoutLabel)
     // A normal array is fed exactly for a solid-eligible embedding (Pole, Cylinder,
-    // surface cube), so its presence IS the eligibility the deck's solidity slider
-    // keys on (ADR-0011). Volumetric cube / clouds / flat 2D carry none.
+    // Sphere shell), so its presence IS the eligibility the deck's solidity slider
+    // keys on (ADR-0011). Volumetric cube / non-shell clouds / flat 2D carry none.
     useEditorStore.getState().setSolidEligible(normals3D !== null)
 
     const clock = createVirtualClock()

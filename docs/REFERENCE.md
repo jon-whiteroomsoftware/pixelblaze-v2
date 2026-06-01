@@ -59,8 +59,8 @@ Each feature below is detailed in §4+. This section is the orientation layer.
   renderer is the default smooth preview. Validated against a real device.
 - **Pixel maps & dimensional preview.** The pixel map is a first-class entity. The
   preview renders 1D, 2D, and 3D patterns through one position + camera WebGL
-  renderer, with a catalogue of **source-backed** stock maps (Square, Wide 2:1, Cube,
-  Star, Ring, and Sphere/Helix clouds — each a real `function(pixelCount)` the preview
+  renderer, with a catalogue of **source-backed** stock maps (Square, Wide 2:1, Cube (volume),
+  Star, Ring, Sphere (shell), and Helix cloud — each a real `function(pixelCount)` the preview
   runs, ADR-0008), **viewport embeddings** that own where dots are drawn — 1D *shapes*
   (line, ring, pole) and 2D *surfaces* (Flat and Cylinder, which wraps a map's grid onto
   a tube; ADR-0010) — a 3D orbit camera with depth cueing that fits each model's
@@ -528,7 +528,8 @@ inscribed circle.
 `PatternRecord` carries an optional per-pattern layout selection `{ mapId, params,
 pixelCount, shapeId, surfaceId }` (schemaless — no DB bump; the 2D `surfaceId` was added
 for ADR-0010 with no schema change; missing fields default on read — `surfaceId` to
-`flat`). A
+`flat`). `migratePatternRecord` rewrites a retired `surfaceId` on read (the ADR-0012
+`surface-cube` removal → `flat`), still schemaless (no DB bump). A
 `maps` IndexedDB object store exists for user maps (DB version bumped 1→2), with full
 CRUD in `mapStore`. A custom `MapRecord` carries its `source`, the baked `points`, and —
 when those points form a regular lattice — its integer `gridDims` `{cols, rows, depth?}`

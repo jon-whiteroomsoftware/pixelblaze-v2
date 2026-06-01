@@ -47,6 +47,18 @@ export interface MapRecord {
   updatedAt: number
 }
 
+// Normalize a pattern record read from IDB against the live embedding catalogue
+// (schemaless, no DB_VERSION bump — #170). The retired `surface-cube` Surface
+// (ADR-0012) maps to Flat, the safe identity default, so no pattern references a
+// dead embedding. Pure over the record; returns the same object when nothing
+// changed, a corrected copy otherwise.
+export function migratePatternRecord(record: PatternRecord): PatternRecord {
+  if (record.surfaceId === 'surface-cube') {
+    return { ...record, surfaceId: 'flat' }
+  }
+  return record
+}
+
 let _db: IDBDatabase | null = null
 
 export function openDb(dbOverride?: IDBFactory): Promise<IDBDatabase> {
@@ -102,7 +114,8 @@ export async function createPattern(
 
 export async function listPatterns(db?: IDBDatabase): Promise<PatternRecord[]> {
   const d = db ?? (await openDb())
-  return wrap<PatternRecord[]>(tx(d, STORE_PATTERNS, 'readonly').getAll())
+  const records = await wrap<PatternRecord[]>(tx(d, STORE_PATTERNS, 'readonly').getAll())
+  return records.map(migratePatternRecord)
 }
 
 export async function getPattern(
@@ -110,7 +123,8 @@ export async function getPattern(
   db?: IDBDatabase,
 ): Promise<PatternRecord | undefined> {
   const d = db ?? (await openDb())
-  return wrap<PatternRecord | undefined>(tx(d, STORE_PATTERNS, 'readonly').get(id))
+  const record = await wrap<PatternRecord | undefined>(tx(d, STORE_PATTERNS, 'readonly').get(id))
+  return record ? migratePatternRecord(record) : undefined
 }
 
 export async function updatePattern(
