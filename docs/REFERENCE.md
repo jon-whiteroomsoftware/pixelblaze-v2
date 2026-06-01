@@ -59,8 +59,12 @@ Each feature below is detailed in §4+. This section is the orientation layer.
   renderer is the default smooth preview. Validated against a real device.
 - **Pixel maps & dimensional preview.** The pixel map is a first-class entity. The
   preview renders 1D, 2D, and 3D patterns through one position + camera WebGL
-  renderer, with a stock plane and cube map, 1D viewport shapes (line, ring, pole), and
-  a 3D orbit camera with depth cueing that fits each model's bounding sphere.
+  renderer, with a catalogue of **source-backed** stock maps (Square, Cube, Ring, and
+  Sphere/Helix clouds — each a real `function(pixelCount)` the preview runs, ADR-0008),
+  a TS-only drape cylinder, 1D viewport shapes (line, ring, pole), a 3D orbit camera
+  with depth cueing that fits each model's bounding sphere, and an in-editor
+  **map-authoring mode** for writing, baking, and deploying custom
+  `function(pixelCount)` maps.
 - **Monaco editor.** Pixelblaze language mode, live validation, autocomplete and
   signature hints from a hand-maintained built-in manifest, a debounced push to the
   preview on clean compile, and a periodic auto-save tick.
@@ -341,12 +345,28 @@ where each pixel lives, decoupled from how many pixels exist. The preview render
   modeled `pixelCount` (it does **not** own the count) and returns one `MapPoint` per
   index.
 
-**Stock maps:** `plane` (2D, row-major, `sample` = `pos`) and `cube` (3D
-`side×side×side` lattice, default side 8 = 512 pixels). Both are generated, never
-persisted. Normalization is **aspect-preserving, longest-axis anchored** (ADR-0009,
-`normalizeAspect`): a squared count (`cols = ceil(sqrt(n))`) stays square when the
-count is a perfect square and draws its true N×M rectangle otherwise. The `plane`'s
-Layout label is **"Square"** (id stays `plane`), #155.
+**Stock maps are source-backed** (`stockCatalogue.ts`, ADR-0008): each is a real,
+self-contained `function(pixelCount)` living in `src/engine/maps/sources/*.js` (plain
+`.js`, `Math.*` and language built-ins only — pasteable straight into a real
+Pixelblaze Mapper tab), read raw via `import.meta.glob(..., '?raw')` and run through
+the no-shim `new Function` primitive (`evalMapSource`). The `.js` the user can view
+*is* the `.js` the preview runs — the **single source of truth**, with no parallel TS
+generator to drift against. The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (2D,
+Layout label **"Square"**, id unchanged, #155), `cube` (3D lattice, default 512 = 8³),
+`seed-ring-2d` (Ring), and the `seed-sphere-3d` / `seed-helix-3d` clouds — the former
+baked example clouds, now **live generators** that regenerate for any count and can no
+longer go stale (baked replay is custom-map-only, ADR-0007). `createSourceMap` resolves
+each by running its source and passing the raw coordinates through the shared
+**aspect-preserving, longest-axis-anchored** normalize pass (ADR-0009,
+`normalizeAspect`) — so the normalized coords serve as both `sample` and `pos`, and a
+non-square count (the plane squares `n` to its true N×M when not a perfect square)
+shows its true proportion. Stock maps are generated live, never persisted, and never
+openable in place — their code is reached only via the map-mode "Load template"
+dropdown (§9.6). **One exception:** the drape **cylinder** (`cylinder.ts`, id
+`cylinder`) keeps its TS form and carries no source — it is the Case-1 "2D pattern
+drawn on a tube" construct (`sample` `[u,v]` ≠ `pos` `[x,y,z]`, `dim:2`/`displayDim:3`),
+which has no single faithful Mapper function and therefore no source and no template
+(ADR-0008).
 
 ### 9.2 Viewport shapes (`src/engine/shapes.ts`)
 
@@ -441,7 +461,24 @@ pixelCount, shapeId }` (schemaless — no DB bump; missing fields default on rea
 `maps` IndexedDB object store exists for user maps (DB version bumped 1→2), with full
 CRUD in `mapStore`. A custom `MapRecord` carries its `source`, the baked `points`, and —
 when those points form a regular lattice — its integer `gridDims` `{cols, rows, depth?}`
-(ADR-0009, for the layout readout). Map-mode authoring (#143): the open map's source
+(ADR-0009, for the layout readout).
+
+**Map-mode authoring shell (#151, `mapAuthoring.ts` + `MapModeHeader.tsx`).** The editor
+has a second flavor, `'map'` (`editorStore.EditorFlavor`), for writing a custom map's
+plain-JS source. **New Map** opens the editor on a fresh custom map pre-filled with the
+`MAP_SKELETON` — a minimal valid `function(pixelCount)` returning a short 2D line — so
+the buffer opens rendering something rather than empty or broken. A **"Load template"**
+dropdown (`mapTemplates`) lets the user browse the source-backed stock maps and replace
+the buffer with one's *verbatim source text only* (never its name or `dim`); this is the
+**only** way to view stock-map code (stock maps stay non-openable in place). A
+**dirty-guard** (`isPristineToBaseline`) swaps templates silently while the buffer is
+byte-identical to the last-loaded baseline and confirms before clobbering an edited
+buffer. The compile badge is **parse-only** (`parseMapSource` — Acorn parse of
+`(${source})`, no dialect walker, no shim), since a map source is just a JS function
+expression. `isMapOpenable` gates which persisted records can be reopened (only those
+carrying `source`).
+
+Map-mode evaluation (#143): the open map's source
 auto-bakes on the editor sync tick when it parses (`bakeMapSource` — plain-JS `new
 Function`, float64, no shim, ADR-0008; aspect-preserving normalize per ADR-0009, so a
 2:1 map bakes a 2:1 rectangle), and a **"Deploy to preview"** action selects it as the active layout so the running
@@ -549,6 +586,11 @@ Two propagation paths matter and differ from the original PRD's single-tick desi
 
 Read-only files (libraries, demos) skip validation and clear markers. The model is
 force-tokenized on mount and source swap to avoid a flash of un-highlighted text.
+
+The editor also runs in a second **map-authoring flavor** (`editorStore.EditorFlavor
+=== 'map'`) for writing custom `function(pixelCount)` map sources — a JS language mode
+with a parse-only badge, the "Load template" dropdown, and eval/bake/deploy to the
+preview. The full flow lives in §9.6.
 
 ---
 
@@ -685,12 +727,17 @@ tooling:
 ## 19. Pointers
 
 - **PRDs** (`docs/prd/`) — rationale + the not-yet-built direction:
-  `Pixelblaze IDE v2 PRD.md`, `Feature - Pixel Maps & Dimensional Preview.md`,
-  `Feature - Hardware Connectivity.md`. (The hardware-fidelity work shipped in full; its
-  conceptual framing now lives in §8 and §14.1 and in ADR-0003.)
+  `Pixelblaze IDE v2 PRD.md`, `Feature - Hardware Connectivity.md`. (The
+  hardware-fidelity work shipped in full; its conceptual framing now lives in §8 and
+  §14.1 and in ADR-0003. The **Pixel Maps & Dimensional Preview** feature PRD was
+  retired once it fully shipped — its conceptual model is in CONTEXT.md + ADRs
+  0004/0005/0007/0008/0009, its deferred worker analysis folded into ADR-0002, and its
+  Phase-3 controller map push/pull into the Hardware Connectivity PRD.)
 - **ADRs** (`docs/adr/`) — 0001 (float64, superseded by 0003), 0002 (main-thread exec),
   0003 (fixed-point fidelity default), 0004 (pixelCount independent of map), 0005
-  (display `pos` dual-sourced), 0006 (preview light size + diffusion).
+  (display `pos` dual-sourced), 0006 (preview light size + diffusion), 0007 (custom maps
+  bake on save; pixelCount drift exposed), 0008 (map functions are plain JavaScript —
+  source-backed stock maps), 0009 (maps authoritative, true aspect).
 - **Domain glossary** — `CONTEXT.md`.
 - **Porting guide** — `docs/guides/Porting ShaderToy shaders to Pixelblaze.md`.
 </content>

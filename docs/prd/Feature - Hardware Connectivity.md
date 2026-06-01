@@ -54,6 +54,10 @@ Not designed. Recorded as direction:
 
 - **Local bridge** — a small Node process the user runs (à la Firestorm). IDE ↔ bridge over `ws://127.0.0.1`; bridge ↔ controller over `ws://LAN:81`; bridge also does discovery (cloud `/discover` and/or UDP beacons). Optional, local-only, additive. The web page never launches it — the user runs it and the IDE *detects* it.
 - **IDE integration (UI)** — paradigm undecided (see Open questions).
+- **Pixel-map push / pull** *(rehomed from the retired Pixel Maps feature PRD; the offline map model it rode on has shipped — REFERENCE §9)*. Make a workspace map deployable to, and readable from, a real device, as a **deliberate device-configuration action — never part of routine pattern deploy**. On hardware a Pixelblaze stores **one map per device**, shared by every pattern and set once when the installation is built; so overwriting it with a preview default is destructive and must be explicit and guarded.
+  - **Push** — write a selected map to the device's single map slot. Guarded and explicit, framed as "this configures the *installation*, not the pattern."
+  - **Pull / read-back** — import the device's current map into the IDE so the preview reflects what's actually deployed. The safer, more useful first direction.
+  - **Transport** — reuses `PixelblazeConnection` and the same local bridge; no new transport. Map read/write protocol support is a capability to confirm in the Phase 2 spike's spirit (the binary-frame work, REFERENCE §16) before any UI.
 
 ### Open questions (captured, not yet decided)
 

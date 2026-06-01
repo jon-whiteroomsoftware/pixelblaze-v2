@@ -50,8 +50,8 @@ The "why" behind the shape of the product. Mechanics are in the reference; ratio
 - **Single flat artifact.** `bundle()` returns `{ code, … }`; `code` is the one file used for *both* browser preview and hardware upload, with function-level tree-shaking so only referenced library functions are inlined (critical for the device's memory limits). Preview-only companions (metadata, the fixed-point emit) never reach the hardware file.
 - **Libraries are Pixelblaze-dialect `.js`, namespaced by filename.** Acorn parses them directly and the bundled artifact must be valid Pixelblaze code; the filename is the namespace (`SDF.js` → `SDF.*`).
 - **Fixed-point fidelity by default** (ADR-0003, superseding ADR-0001's float64-only stance): the preview defaults to faithful 16.16 emulation so what you see survives upload, with a "Fast" float64 escape hatch. The fidelity engine and the ShaderToy porting toolkit built on it shipped in full — see ADR-0003 and `docs/REFERENCE.md` §8 (fixed-point engine) and §14.1 (porting toolkit).
-- **Main-thread execution** (ADR-0002): patterns run on the main thread via `new Function()` + rAF. A syntactically valid infinite loop can still freeze the tab — there is no watchdog. Accepted; a worker is the designated future lever (analysed in the Pixel Maps feature PRD).
-- **The pixel map is a first-class, workspace-owned entity** (ADR-0004/0005): position is decoupled from index, and the workspace — not a connected device — owns the map. See `Feature - Pixel Maps & Dimensional Preview.md`.
+- **Main-thread execution** (ADR-0002): patterns run on the main thread via `new Function()` + rAF. A syntactically valid infinite loop can still freeze the tab — there is no watchdog. Accepted; a worker is the designated future lever (analysed in ADR-0002).
+- **The pixel map is a first-class, workspace-owned entity** (ADR-0004/0005): position is decoupled from index, and the workspace — not a connected device — owns the map. The dimensional-preview feature shipped in full; see `docs/REFERENCE.md` §9.
 
 ---
 
@@ -68,7 +68,7 @@ Only genuinely-unbuilt scope remains here. Items the original PRD deferred that 
 ### Captured in feature PRDs (direction, not greenlit)
 
 - **Hardware upload & a connection UI** — `Feature - Hardware Connectivity.md`. The Node comms layer and capability spike have shipped; the local bridge + in-app connection UI (Phase 3) is deferred there.
-- **Device maps (Phase 3)** — `Feature - Pixel Maps & Dimensional Preview.md`. Stock maps and the dimensional preview shipped; **custom-map authoring (Phase 2) is now greenlit and building** — stock maps become source-backed plain-JS (single source of truth, ADR-0008), and a coder-first New Map flow loads any stock map as an editable **template**. Controller map push/pull (Phase 3) is still deferred there.
+- **Device map push/pull** — `Feature - Hardware Connectivity.md` (Phase 3+). The offline map model shipped in full — stock maps + dimensional preview, source-backed plain-JS stock maps (single source of truth, ADR-0008), and the coder-first New Map / template authoring flow are all done (REFERENCE §9; the retired Pixel Maps feature PRD). Only **controller map push/pull** remains deferred, rehomed onto the Hardware Connectivity bridge. (The two minor offline remainders — coordinate-import builder #142, stale-map cue #144 — live in the issue tracker.)
 
 ### Still open / unfiled
 
