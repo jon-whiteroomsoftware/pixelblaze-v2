@@ -59,12 +59,13 @@ Each feature below is detailed in §4+. This section is the orientation layer.
   renderer is the default smooth preview. Validated against a real device.
 - **Pixel maps & dimensional preview.** The pixel map is a first-class entity. The
   preview renders 1D, 2D, and 3D patterns through one position + camera WebGL
-  renderer, with a catalogue of **source-backed** stock maps (Square, Cube, Ring, and
-  Sphere/Helix clouds — each a real `function(pixelCount)` the preview runs, ADR-0008),
-  a TS-only drape cylinder, 1D viewport shapes (line, ring, pole), a 3D orbit camera
-  with depth cueing that fits each model's bounding sphere, and an in-editor
-  **map-authoring mode** for writing, baking, and deploying custom
-  `function(pixelCount)` maps.
+  renderer, with a catalogue of **source-backed** stock maps (Square, Wide 2:1, Cube,
+  Star, Ring, and Sphere/Helix clouds — each a real `function(pixelCount)` the preview
+  runs, ADR-0008), **viewport embeddings** that own where dots are drawn — 1D *shapes*
+  (line, ring, pole) and 2D *surfaces* (Flat and Cylinder, which wraps a map's grid onto
+  a tube; ADR-0010) — a 3D orbit camera with depth cueing that fits each model's
+  bounding sphere, and an in-editor **map-authoring mode** for writing, baking, and
+  deploying custom `function(pixelCount)` maps.
 - **Monaco editor.** Pixelblaze language mode, live validation, autocomplete and
   signature hints from a hand-maintained built-in manifest, a debounced push to the
   preview on clean compile, and a periodic auto-save tick.
@@ -116,8 +117,8 @@ dependency resolution) be unit-tested without a DOM.
 |---|---|
 | `previewStore` | `isRunning`, `speed`, `brightness`, `lightSize`, `diffusion`, `fidelity` mode, watch config + values, `fps`. No preview-wide grid — the active map's resolved `pos` is the single source of the preview's extent/aspect (ADR-0009). Persisted (subset) to `localStorage` via `persist`. |
 | `patternStore` | `activePatternId` / `activeLibraryName` / `activeDemoName` (mutually exclusive selection), `userPatterns` list, CRUD + layout-persist actions. |
-| `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`. |
-| `mapStore` | `activeMapId`, `activeShapeId`, `activePixelCount`, `userMaps`; stock-map catalogue + resolution helpers. |
+| `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`, `layoutLabel`, `editorFlavor` (`'pattern' \| 'map'`). |
+| `mapStore` | `activeMapId`, `activeShapeId`, `activeSurfaceId` (the 2D viewport surface, ADR-0010; defaults to `flat`), `activePixelCount`, `userMaps`; stock-map catalogue + `layoutSource` (the map/shape/surface metadata the Layout controls filter on). |
 | `controlStore` | Current pattern UI control values (transient session state). |
 | `cameraStore` | Ephemeral orbit camera angle, auto-orbit armed flag, and pole wrap density (`poleCols`) — never persisted. |
 
@@ -352,23 +353,32 @@ Pixelblaze Mapper tab), read raw via `import.meta.glob(..., '?raw')` and run thr
 the no-shim `new Function` primitive (`evalMapSource`). The `.js` the user can view
 *is* the `.js` the preview runs — the **single source of truth**, with no parallel TS
 generator to drift against. The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (2D,
-Layout label **"Square"**, id unchanged, #155), `cube` (3D lattice, default 512 = 8³),
-`seed-ring-2d` (Ring), and the `seed-sphere-3d` / `seed-helix-3d` clouds — the former
-baked example clouds, now **live generators** that regenerate for any count and can no
-longer go stale (baked replay is custom-map-only, ADR-0007). `createSourceMap` resolves
-each by running its source and passing the raw coordinates through the shared
-**aspect-preserving, longest-axis-anchored** normalize pass (ADR-0009,
-`normalizeAspect`) — so the normalized coords serve as both `sample` and `pos`, and a
-non-square count (the plane squares `n` to its true N×M when not a perfect square)
-shows its true proportion. Stock maps are generated live, never persisted, and never
-openable in place — their code is reached only via the map-mode "Load template"
-dropdown (§9.6). **One exception:** the drape **cylinder** (`cylinder.ts`, id
-`cylinder`) keeps its TS form and carries no source — it is the Case-1 "2D pattern
-drawn on a tube" construct (`sample` `[u,v]` ≠ `pos` `[x,y,z]`, `dim:2`/`displayDim:3`),
-which has no single faithful Mapper function and therefore no source and no template
-(ADR-0008).
+Layout label **"Square"**, id unchanged, #155), `wide` (2D, "Wide 2:1"), `cube` (3D
+lattice, default 512 = 8³), `star` (3D), `seed-ring-2d` (Ring), and the
+`seed-sphere-3d` / `seed-helix-3d` clouds — the former baked example clouds, now **live
+generators** that regenerate for any count and can no longer go stale (baked replay is
+custom-map-only, ADR-0007). `createSourceMap` resolves each by running its source and
+passing the raw coordinates through the shared **aspect-preserving,
+longest-axis-anchored** normalize pass (ADR-0009, `normalizeAspect`) — so the normalized
+coords serve as both `sample` and `pos`, and a non-square count (the plane squares `n`
+to its true N×M when not a perfect square) shows its true proportion. Stock maps are
+generated live, never persisted, and never openable in place — their code is reached
+only via the map-mode "Load template" dropdown (§9.6).
 
-### 9.2 Viewport shapes (`src/engine/shapes.ts`)
+**Every stock map is now source-backed — the cylinder is no longer a map.** The old
+no-source "drape cylinder" stock-map exception is **dissolved** (ADR-0010): the cylinder
+is re-expressed as a 2D viewport **surface** (`surfaces.ts`, §9.2) composed onto an
+ordinary `gridDims` map, so the `sample ≠ pos` divergence it embodies lives in the
+embedding layer, not as a special map. There is no source-less stock map left.
+
+### 9.2 Viewport embeddings — shapes (1D) & surfaces (2D)
+
+A **viewport embedding** owns `pos` (where each dot is drawn) while the map keeps owning
+`sample` (what the pattern reads) — the ADR-0005 sample/position split, now spanning both
+dimensions (ADR-0010). The 1D form is a **shape** (`src/engine/shapes.ts`); the 2D form is
+a **surface** (`src/engine/surfaces.ts`). Both are pure, `pos`-only generators.
+
+#### Shapes (`src/engine/shapes.ts`)
 
 For a 1D (`render`-only) pattern, the path the strip is drawn along is a pure display
 choice (`sample` is empty), so it lives in the viewport, not the map. Shipped shapes
@@ -378,20 +388,59 @@ normalized `pos`. **`pole`** (display dim 3) wraps the strip around a cylinder
 (stacked rings, x-fastest) and is drawn in 3D via the orbit camera. Its draw
 positions come from `polePositions(pixelCount, cols)` (the 3D channel), not the 2D
 `embed`. A wrap-density slider sets `cols` (pixels per wrap); the diameter is derived
-from the Cylinder pi-math so each surface cell stays square (`clampPoleCols` /
-`poleMaxCols` keep it in the taller-than-wide regime, `defaultPoleCols` a long
-~4.5:1). The pole is laid along the cube body diagonal so it reads askew. Wrap density
-lives in `cameraStore` (`poleCols`, ephemeral); changing it re-derives positions live
-without reloading the pattern.
+from the shared square-cell wall math (`cylinderWall.ts` — `cylinderWallRadius`/
+`cylinderWallDiameter`, the one place the π-cell relationship lives, consumed by both
+the Pole and the Cylinder surface, #159) so each surface cell stays square
+(`clampPoleCols` / `poleMaxCols` keep it in the taller-than-wide regime,
+`defaultPoleCols` a long ~4.5:1). The pole is laid along the cube body diagonal so it
+reads askew. Wrap density lives in `cameraStore` (`poleCols`, ephemeral); changing it
+re-derives positions live without reloading the pattern.
 
-### 9.3 The "Shape" dropdown routing (`src/engine/layout.ts`)
+#### Surfaces (`src/engine/surfaces.ts`)
 
-One control blurs two code owners (ADR-0005). `layoutOptions(nativeDim, source)`
-filters layouts by sample-arity: a 1D pattern is offered **every shape** (all shapes
-dispatch the 1D `render` regardless of their display dim); a 2D/3D pattern is offered
-only maps whose `dim` matches. `selectionForOption` routes a shape choice to `shapeId`
-and a map choice to `mapId`. `resolveLayoutSelection` restores a pattern's persisted
-choice if still valid, else the dimension's default (line for 1D, plane for 2D).
+A **surface** is the 2D sibling of a shape (ADR-0010): a `pos`-only embedding a 2D map's
+flat field is *drawn* on, composed with a source map that still owns `sample`. Two ship
+(`SurfaceId` is `'flat' | 'cylinder'`): **Flat** is the identity (display dim 2) — each
+dot stays where the map already puts it, so the layout is exactly the plain 2D preview.
+**Cylinder** (display dim 3) wraps the map's `cols×rows` grid around a tube and is drawn
+through the orbit camera. It reads the map's **raw** integer `gridDims` (not the
+ADR-0009-normalized `sample`, which caps the longest axis at 1 and would flatten every
+map to circumference 1), so `circumference:height = cols:rows`: a square map wraps to a
+tall slender tube (~π:1), a 2:1 map to a fatter shorter one. `cylinderSurfacePositions`
+emits one `[x,y,z]` per index (x-fastest, matching the plane); the wall radius comes from
+the shared `cylinderWall` helper. The pattern's dispatch stays 2D in both cases — only
+`pos` differs, so the wrap is unobservable to the pattern. A surface needs `gridDims`
+(`needsGrid`): Flat needs nothing; Cylinder is offered only for maps with a clean integer
+grid (stock Square/Wide and regular-lattice custom maps), so an irregular cloud gets Flat
+alone. There is no slenderness knob — geometry is fully map-derived (the 1D Pole keeps its
+`cols` slider only because a bare strip has no aspect to read).
+
+### 9.3 The Layout controls' routing (`src/engine/layout.ts`)
+
+Layout is **two orthogonal controls**, not one union dropdown (ADR-0010, superseding the
+single "Shape"/"Layout" dropdown): a **Map** control owns `sample` and an **embedding**
+control owns `pos` (populated with shapes for a 1D pattern, surfaces for a 2D one). The
+pure helpers:
+- `mapOptions(nativeDim, source)` — the maps a pattern can consume, filtered by
+  sample-arity (`m.dim === nativeDim`). A 1D pattern reads no map (always a shape), so
+  this is empty for it.
+- `embeddingOptions(nativeDim, source, activeMap)` — shapes for a 1D pattern (every shape;
+  all dispatch the 1D `render`), surfaces for a 2D pattern (Flat always; Cylinder only
+  when the active map is `wrappable`), and nothing for 3D.
+- `selectionForOption` routes a chosen option to its knob (`shapeId` / `surfaceId` /
+  `mapId`); `LayoutSelection` carries all three.
+- `selectedMapId` / `selectedEmbeddingId` report which option each control shows (the
+  embedding defaults to `flat` for 2D).
+- `resolveLayoutSelection` restores a pattern's persisted selection if still valid, else
+  the default — first dim-matched map, and Flat (2D) / first shape (1D) for the embedding.
+  A stale Cylinder on a now-irregular map falls back to Flat, so selecting a wrappable
+  map never surprise-wraps.
+
+`LayoutSelector.tsx` is the thin wrapper: it lays out the Map control and the embedding
+control side by side, hiding either when it carries no real choice (a single-option
+embedding set — an irregular cloud's Flat-only — is hidden, leaving the Map control
+alone). So a 1D pattern shows one control (shape), a 2D pattern with a wrappable map shows
+two (map left, surface right), and a 3D pattern shows the map alone.
 
 ### 9.4 Camera & projection (`src/engine/camera.ts`)
 
@@ -457,7 +506,9 @@ inscribed circle.
 ### 9.6 Persistence
 
 `PatternRecord` carries an optional per-pattern layout selection `{ mapId, params,
-pixelCount, shapeId }` (schemaless — no DB bump; missing fields default on read). A
+pixelCount, shapeId, surfaceId }` (schemaless — no DB bump; the 2D `surfaceId` was added
+for ADR-0010 with no schema change; missing fields default on read — `surfaceId` to
+`flat`). A
 `maps` IndexedDB object store exists for user maps (DB version bumped 1→2), with full
 CRUD in `mapStore`. A custom `MapRecord` carries its `source`, the baked `points`, and —
 when those points form a regular lattice — its integer `gridDims` `{cols, rows, depth?}`
@@ -543,8 +594,8 @@ The preview pane is a WebGL viewport plus a small, dimension-gated control set.
   squares it up, the stock cube cubes it — so there is no width×height knob), **preview
   light size** (`0.15–0.95`, default 0.5 — source diameter as a fraction of pitch),
   **diffusion** (0–1 blur merging sources), playback **speed** (`SpeedSelector`,
-  0.1×–2× via the virtual clock), the **Shape** dropdown (`ShapeSelector`), and the
-  Fast/Precise renderer toggle. A read-only `{n}D` native-dimensionality chip sits by
+  0.1×–2× via the virtual clock), the **Layout** controls (`LayoutSelector` — the Map +
+  embedding dropdowns, §9.3), and the Fast/Precise renderer toggle. A read-only `{n}D` native-dimensionality chip sits by
   the pattern name.
 - **Diffusion** is a per-source glow kernel in the WebGL renderer (not a frame blur):
   a soft raised-cosine tail grows around each source to merge neighbours, and as
@@ -737,7 +788,9 @@ tooling:
   0003 (fixed-point fidelity default), 0004 (pixelCount independent of map), 0005
   (display `pos` dual-sourced), 0006 (preview light size + diffusion), 0007 (custom maps
   bake on save; pixelCount drift exposed), 0008 (map functions are plain JavaScript —
-  source-backed stock maps), 0009 (maps authoritative, true aspect).
+  source-backed stock maps), 0009 (maps authoritative, true aspect), 0010 (surfaces are
+  2D viewport embeddings; the cylinder wraps a chosen map, retiring the stock cylinder
+  map and ADR-0008's no-source exception).
 - **Domain glossary** — `CONTEXT.md`.
 - **Porting guide** — `docs/guides/Porting ShaderToy shaders to Pixelblaze.md`.
 </content>
