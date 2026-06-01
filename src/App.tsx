@@ -11,6 +11,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { bundle } from '@/engine/bundle'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { uniquePatternName } from '@/engine/patternName'
+import { exportedDims } from '@/engine/exportedDims'
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -143,6 +144,14 @@ export default function App() {
               <>
             <span className="flex-1 min-w-0 flex items-center gap-1.5">
               <span className="truncate">{activeFileName}</span>
+              {exportedDims(source).map((d) => (
+                <span
+                  key={d}
+                  className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-500 border border-zinc-700 leading-none"
+                >
+                  {d}D
+                </span>
+              ))}
               {activePatternId !== null && <CompileStatusBadge />}
               {(activeLibraryName !== null || activeDemoName !== null) && (
                 <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-400 border border-zinc-700 leading-none">

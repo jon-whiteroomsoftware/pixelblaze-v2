@@ -74,6 +74,11 @@ export function MapModeHeader() {
         <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-400 border border-zinc-700 leading-none">
           map
         </span>
+        {openRecord && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-500 border border-zinc-700 leading-none">
+            {openRecord.dim}D
+          </span>
+        )}
         {mapEvalError && (
           <span
             title={mapEvalError}

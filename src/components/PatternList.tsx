@@ -5,6 +5,7 @@ import { DEMOS } from '@/pixelblaze/demos'
 import { nameConflicts, uniquePatternName } from '@/engine/patternName'
 import { NEW_PATTERN_SRC } from '@/pixelblaze/newPattern'
 import { parseEpe } from '@/engine/epeImport'
+import { dimLabel } from '@/engine/exportedDims'
 import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
@@ -27,13 +28,8 @@ const DEMO_NAMES = Object.keys(DEMOS).sort()
 const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
 const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom']
 // Minimal patterns — one per render dimensionality — for visually verifying
-// 1D / 2D / 3D preview behavior. The trailing dim tag mirrors each render fn.
+// 1D / 2D / 3D preview behavior.
 const TEST_PATTERNS = ['TestPattern1D', 'TestPattern2D', 'TestPattern3D']
-const TEST_PATTERN_DIMS: Record<string, string> = {
-  TestPattern1D: '1D',
-  TestPattern2D: '2D',
-  TestPattern3D: '3D',
-}
 const GROUPED_DEMOS = new Set([...OPENGL_DEMOS, ...BRAND_NEW_DEMOS, ...TEST_PATTERNS])
 
 // "Old Favorites" is the rest — anything not explicitly grouped, so new demos
@@ -159,7 +155,7 @@ function ListItem({
       ].join(' ')}
     >
       {label}
-      {dim && <span className="text-zinc-400 text-xs shrink-0">{dim}</span>}
+      {dim && <span aria-hidden className="text-zinc-500 text-[10px] tracking-wide shrink-0">{dim}</span>}
     </li>
   )
 }
@@ -170,6 +166,7 @@ function EditableListItem({
   name,
   noun,
   active,
+  dim,
   takenNames,
   onSelect,
   onRename,
@@ -178,6 +175,7 @@ function EditableListItem({
   name: string
   noun: 'pattern' | 'map'
   active: boolean
+  dim?: string
   takenNames: string[]
   onSelect: () => void
   onRename: (name: string) => void
@@ -270,7 +268,14 @@ function EditableListItem({
             </AlertDialogTrigger>
           </>
         ) : (
-          <span>{name}</span>
+          <>
+            <span className="truncate">{name}</span>
+            {dim && (
+              <span aria-hidden className="text-zinc-500 text-[10px] tracking-wide shrink-0">
+                {dim}
+              </span>
+            )}
+          </>
         )}
       </li>
       <AlertDialogContent>
@@ -541,6 +546,7 @@ export function PatternList() {
               name={pattern.name}
               noun="pattern"
               active={activePatternId === pattern.id}
+              dim={dimLabel(pattern.src)}
               takenNames={userPatterns.filter((p) => p.id !== pattern.id).map((p) => p.name)}
               onSelect={() => openUserPattern(pattern)}
               onRename={(name) => renamePattern(pattern.id, name)}
@@ -567,6 +573,7 @@ export function PatternList() {
                 name={map.name}
                 noun="map"
                 active={editingMap?.kind === 'existing' && editingMap.id === map.id}
+                dim={`${map.dim}D`}
                 takenNames={userMaps.filter((m) => m.id !== map.id).map((m) => m.name)}
                 onSelect={() => openUserMap(map)}
                 onRename={(name) => renameMap(map.id, name)}
@@ -625,7 +632,7 @@ export function PatternList() {
                     <ListItem
                       key={name}
                       label={name}
-                      dim={TEST_PATTERN_DIMS[name]}
+                      dim={dimLabel(DEMOS[name] ?? '')}
                       active={activeDemoName === name}
                       onClick={() => openDemo(name)}
                     />
