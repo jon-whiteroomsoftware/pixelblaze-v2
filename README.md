@@ -22,7 +22,8 @@ This IDE fixes all three:
 
 The preview isn't just a quick approximation — it's built to match the hardware.
 
-- **1D, 2D, and 3D.** Render your pattern as a strip, a ring, a pole, a flat grid, or an orbiting 3D cube you can drag and spin. The shape is a display choice; a 1D pattern can be wrapped onto any of them.
+- **1D, 2D, and 3D.** Render your pattern on a strip, a ring, a pole, a flat grid, an orbiting 3D cube, or a sphere or helix point cloud you can drag and spin. The IDE picks the dimensionality from your render functions; the shape is a display choice, so a 1D pattern can be wrapped onto any of them.
+- **The map is yours, not the device's.** A pixel map says where each LED physically sits, decoupled from its position in the chain. Pick a stock map or **write your own** — New Map opens an editor on a plain `function(pixelCount)`, the very thing a real Pixelblaze Mapper tab evaluates, so you can preview a pattern against the actual geometry of your tree, sphere, or sculpture. Load any stock map as an editable template to start from; every stock map is real, pasteable Mapper code, no hidden magic.
 - **Hardware-faithful math.** Pixelblaze runs 16.16 fixed-point arithmetic, not floats. Flip the preview to **Precise** mode and it emulates that exact arithmetic — overflow, precision loss, and all — validated against a real controller. So what you see in the browser is what the device will actually do. A **Fast** float64 mode is the default for smooth everyday editing.
 - **Live controls and var watching.** Export a `sliderX`, `toggleX`, or color-picker function and the IDE renders the matching widget — the same controls the hardware shows. The Var Watcher tracks every exported variable, refreshed each frame.
 
