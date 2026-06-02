@@ -20,7 +20,7 @@ export function Readout() {
 
   return (
     <div className="font-mono text-xs border-t border-zinc-800 mt-1 pt-1.5 pb-3 pr-3">
-      <h4 className="text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
+      <h4 className="text-[11px] font-semibold text-structural uppercase tracking-wider mb-2">
         Readout
       </h4>
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
@@ -36,7 +36,7 @@ function ReadoutCell({ name, value }: { name: string; value: string }) {
   return (
     <div className="flex justify-between gap-2 min-w-0">
       <span className="text-zinc-400 truncate">{name}</span>
-      <span className="text-amber-400 tabular-nums truncate">{value}</span>
+      <span className="text-live tabular-nums truncate">{value}</span>
     </div>
   )
 }

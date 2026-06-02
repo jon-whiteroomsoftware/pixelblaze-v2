@@ -100,7 +100,7 @@ function PixelCountInput() {
       onChange={(e) => setDraftCount(e.target.value.replace(/\D/g, ''))}
       onKeyDown={(e) => e.key === 'Enter' && commit()}
       onBlur={commit}
-      className="w-12 h-6 px-0.5 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-500 focus:outline-none focus:border-amber-500"
+      className="w-12 h-6 px-0.5 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-500 focus:outline-none focus:border-live"
     />
   )
 }
@@ -150,7 +150,7 @@ function SecondaryBand() {
             step={0.01}
             value={brightness}
             onChange={(e) => setBrightness(Number(e.target.value))}
-            className="w-12 accent-amber-500"
+            className="w-12 accent-live"
           />
         </Cell>
         <Cell label="fit">
@@ -176,7 +176,7 @@ function SecondaryBand() {
             step={0.05}
             value={lightSize}
             onChange={(e) => setLightSize(Number(e.target.value))}
-            className="w-12 accent-amber-500"
+            className="w-12 accent-live"
           />
         </Cell>
         <Cell label="diffusion">
@@ -188,7 +188,7 @@ function SecondaryBand() {
             step={0.01}
             value={diffusion}
             onChange={(e) => setDiffusion(Number(e.target.value))}
-            className="w-12 accent-amber-500"
+            className="w-12 accent-live"
           />
         </Cell>
         <Cell label="renderer">
@@ -216,7 +216,7 @@ function SecondaryBand() {
               step={0.01}
               value={solidity}
               onChange={(e) => setSolidity(Number(e.target.value))}
-              className="w-12 accent-amber-500"
+              className="w-12 accent-live"
             />
           </Cell>
         )}
@@ -232,7 +232,7 @@ function SecondaryBand() {
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mt-1 pt-1.5 pb-3">
-      <h4 className="text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
+      <h4 className="text-[11px] font-semibold text-structural uppercase tracking-wider mb-2">
         {label}
       </h4>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 items-center">{children}</div>

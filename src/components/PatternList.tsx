@@ -22,6 +22,13 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 
+// Module-scope factory for a fresh pattern record. Kept out of the component so its
+// impure id/timestamp generation isn't attributed to render (react-hooks/purity).
+function newPatternRecord(name: string, src: string): PatternRecord {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return { id, name, src, controls: {}, updatedAt: Date.now() }
+}
+
 const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
 
@@ -76,7 +83,7 @@ function HeaderAction({
       disabled={disabled}
       title={title}
       aria-label={title}
-      className="shrink-0 text-zinc-400 hover:text-amber-400 disabled:opacity-30 disabled:hover:text-zinc-400"
+      className="shrink-0 text-zinc-400 hover:text-live disabled:opacity-30 disabled:hover:text-zinc-400"
     >
       {icon}
     </button>
@@ -94,14 +101,15 @@ function SectionHeader({
   collapsed: boolean
   onToggle: () => void
   action?: React.ReactNode
-  // The topmost header has nothing above it to separate from, so it drops the
-  // gap + rule that divide later sections (otherwise they float above the list).
+  // The topmost header has nothing above it to separate from, so it takes less top
+  // pad; later sections lean on generous space above (not a colour/rule) to divide.
   first?: boolean
 }) {
   return (
     <div
       onClick={onToggle}
-      className={`${first ? '' : 'mt-1 border-t border-zinc-800'} px-3 py-1.5 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-amber-500/60 uppercase tracking-wider bg-zinc-950/60 hover:text-amber-500/90`}
+      style={{ letterSpacing: '0.04em' }}
+      className={`${first ? 'pt-1.5' : 'pt-3.5'} pb-1 px-3 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-structural uppercase hover:text-live`}
     >
       <span className="truncate">{label}</span>
       <div className="flex items-center gap-1.5">
@@ -124,7 +132,8 @@ function SubsectionHeader({
   return (
     <div
       onClick={onToggle}
-      className="pl-6 pr-3 py-1 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono text-amber-500/60 uppercase tracking-wider hover:text-amber-500/90"
+      style={{ letterSpacing: '0.04em', paddingLeft: '26px' }}
+      className="pt-2 pb-0.5 pr-3 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-structural uppercase hover:text-live"
     >
       <span className="truncate">{label}</span>
       <CollapseChevron collapsed={collapsed} />
@@ -132,10 +141,44 @@ function SubsectionHeader({
   )
 }
 
+// First-level rows align flush with their section header (12px); rows beneath a
+// Demos sub-category align flush with the sub-header (26px).
+const ROW_PAD_FIRST = '12px'
+const ROW_PAD_SUB = '26px'
+
+// Shared row chrome (#182): tight ~19px rows, a 2px amber left accent bar + subtle
+// warm bg when active, and absolutely-positioned hover affordances so the dim pill
+// can yield to them without any row-width reflow.
+const rowClass = (active: boolean) =>
+  [
+    'group relative flex items-center gap-1.5 pr-3 min-h-[19px] py-px cursor-pointer select-none',
+    active ? 'text-live bg-live/5' : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/60',
+  ].join(' ')
+
+function ActiveBar() {
+  return <span aria-hidden className="absolute left-0 top-0 bottom-0 w-0.5 bg-live" />
+}
+
+// The dimensionality tag: a small bordered pill at the right end of the name. It
+// fades out on row hover so hover-actions can occupy that space (it stays in flow,
+// so the row never reflows).
+function DimPill({ dim }: { dim: string }) {
+  return (
+    <span
+      aria-hidden
+      className="shrink-0 rounded border border-zinc-700 px-1 text-[8px] leading-[1.5] font-mono uppercase tracking-wide text-structural transition-opacity group-hover:opacity-0"
+    >
+      {dim}
+    </span>
+  )
+}
+
 function ListItem({
   label,
   active,
   dim,
+  subItem,
+  onFork,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -143,6 +186,8 @@ function ListItem({
   label: string
   active: boolean
   dim?: string
+  subItem?: boolean
+  onFork?: () => void
   onClick: () => void
   onMouseEnter?: (e: React.MouseEvent<HTMLLIElement>) => void
   onMouseLeave?: () => void
@@ -152,14 +197,24 @@ function ListItem({
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={[
-        'pl-6 pr-3 py-1 cursor-pointer truncate select-none flex items-center gap-1.5',
-        'hover:text-zinc-300 hover:bg-zinc-800/60',
-        active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-400',
-      ].join(' ')}
+      style={{ paddingLeft: subItem ? ROW_PAD_SUB : ROW_PAD_FIRST }}
+      className={rowClass(active)}
     >
-      {label}
-      {dim && <span aria-hidden className="text-zinc-500 text-[10px] tracking-wide shrink-0">{dim}</span>}
+      {active && <ActiveBar />}
+      <span className="flex-1 min-w-0 truncate">{label}</span>
+      {dim && <DimPill dim={dim} />}
+      {onFork && (
+        <span className="absolute right-2 top-0 bottom-0 flex items-center opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={(e) => { e.stopPropagation(); onFork() }}
+            title="Fork to an editable pattern"
+            aria-label="Fork to an editable pattern"
+            className="text-zinc-500 hover:text-live text-xs px-0.5"
+          >
+            ✎
+          </button>
+        </span>
+      )}
     </li>
   )
 }
@@ -186,7 +241,6 @@ function EditableListItem({
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [hovered, setHovered] = useState(false)
   const [draft, setDraft] = useState(name)
   const [conflict, setConflict] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -226,14 +280,10 @@ function EditableListItem({
     <AlertDialogRoot>
       <li
         onClick={onSelect}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        className={[
-          'pl-6 pr-3 py-1 cursor-pointer select-none flex items-center gap-1',
-          'hover:text-zinc-300 hover:bg-zinc-800/60',
-          active ? 'bg-zinc-800/60 text-amber-400' : 'text-zinc-400',
-        ].join(' ')}
+        style={{ paddingLeft: ROW_PAD_FIRST }}
+        className={rowClass(active)}
       >
+        {active && <ActiveBar />}
         {editing ? (
           <input
             ref={inputRef}
@@ -244,41 +294,37 @@ function EditableListItem({
             onKeyDown={onKeyDown}
             onClick={(e) => e.stopPropagation()}
             className={[
-              'flex-1 min-w-0 text-sm px-1 rounded outline-none',
+              'flex-1 min-w-0 text-xs px-1 rounded outline-none',
               conflict
                 ? 'bg-red-900/60 text-red-200 ring-1 ring-red-500'
                 : 'bg-zinc-700 text-zinc-100',
             ].join(' ')}
             title={conflict ? `A ${noun} with that name already exists` : undefined}
           />
-        ) : hovered ? (
-          <>
-            <span className="flex-1 min-w-0 truncate">{name}</span>
-            <button
-              onClick={startEdit}
-              className="text-zinc-500 hover:text-zinc-300 text-xs px-1 shrink-0"
-              title="Rename"
-            >
-              ✎
-            </button>
-            <AlertDialogTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
-                title="Delete"
-              >
-                ✕
-              </button>
-            </AlertDialogTrigger>
-          </>
         ) : (
           <>
-            <span className="truncate">{name}</span>
-            {dim && (
-              <span aria-hidden className="text-zinc-500 text-[10px] tracking-wide shrink-0">
-                {dim}
-              </span>
-            )}
+            <span className="flex-1 min-w-0 truncate">{name}</span>
+            {dim && <DimPill dim={dim} />}
+            <span className="absolute right-2 top-0 bottom-0 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                onClick={startEdit}
+                className="text-zinc-500 hover:text-zinc-300 text-xs px-0.5"
+                title="Rename"
+                aria-label="Rename"
+              >
+                ✎
+              </button>
+              <AlertDialogTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-zinc-500 hover:text-red-400 text-xs px-0.5"
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  ✕
+                </button>
+              </AlertDialogTrigger>
+            </span>
           </>
         )}
       </li>
@@ -481,6 +527,21 @@ export function PatternList() {
     setIsReadOnly(true)
   }
 
+  // Fork a demo into an editable user pattern (#182): the per-row "edit" action in
+  // the Demos list. Mirrors the top-bar "Edit" fork, but for any demo without first
+  // having to open it.
+  async function handleForkDemo(name: string) {
+    closeMapEditor()
+    const newName = uniquePatternName(name, userPatterns.map((p) => p.name))
+    const record = newPatternRecord(newName, DEMOS[name])
+    await addPattern(record)
+    setActivePattern(record.id)
+    setSource(record.src)
+    setPreviewSource(record.src)
+    setPreviewPatternName(record.name)
+    setIsReadOnly(false)
+  }
+
   function openUserPattern(pattern: PatternRecord) {
     closeMapEditor()
     setActivePattern(pattern.id)
@@ -541,7 +602,7 @@ export function PatternList() {
         }
       />
       {importError && (
-        <p className="pl-6 pr-3 py-1 text-red-400 truncate" title={importError}>{importError}</p>
+        <p className="pl-3 pr-3 py-1 text-red-400 truncate" title={importError}>{importError}</p>
       )}
       {!isCollapsed('Your Patterns') && (
         <ul>
@@ -569,7 +630,7 @@ export function PatternList() {
       />
       {!isCollapsed('Your Maps') && (
         userMaps.length === 0 ? (
-          <p className="pl-6 pr-3 py-1.5 text-zinc-600 italic select-none">No custom maps yet</p>
+          <p className="pl-3 pr-3 py-1 text-zinc-600 italic select-none">No custom maps yet</p>
         ) : (
           <ul>
             {userMaps.map((map) => (
@@ -599,7 +660,8 @@ export function PatternList() {
           <li
             onMouseEnter={(e) => startShow('PixelBlaze', e.currentTarget)}
             onMouseLeave={startHide}
-            className="pl-6 pr-3 py-1 select-none flex items-center gap-1.5 cursor-default hover:text-zinc-300 hover:bg-zinc-800/60 text-zinc-400"
+            style={{ paddingLeft: ROW_PAD_FIRST }}
+            className="pr-3 min-h-[19px] py-px select-none flex items-center gap-1.5 cursor-default hover:text-zinc-300 hover:bg-zinc-800/60 text-zinc-400"
           >
             PixelBlaze
           </li>
@@ -637,9 +699,11 @@ export function PatternList() {
                     <ListItem
                       key={name}
                       label={name}
+                      subItem
                       dim={dimLabel(DEMOS[name] ?? '')}
                       active={activeDemoName === name}
                       onClick={() => openDemo(name)}
+                      onFork={() => handleForkDemo(name)}
                     />
                   ))}
                 </ul>

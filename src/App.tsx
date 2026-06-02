@@ -40,7 +40,7 @@ function Splitter({ onDrag }: { onDrag: (dx: number) => void }) {
 
   return (
     <div
-      className="w-1 shrink-0 bg-zinc-800 hover:bg-zinc-600 cursor-col-resize transition-colors select-none"
+      className="w-1 shrink-0 bg-seam hover:bg-zinc-600 cursor-col-resize transition-colors select-none"
       onMouseDown={handleMouseDown}
     />
   )
@@ -120,13 +120,19 @@ export default function App() {
   }, [])
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100">
-      <header data-testid="top-bar" className="h-10 flex items-center px-4 border-b border-zinc-800 shrink-0 bg-zinc-900">
-        <span className="text-base font-mono uppercase tracking-widest text-amber-500/70">
-          Pixelbl<span className="relative inline-block" style={{ marginLeft: '-0.05em', marginRight: '-0.05em' }}>
-            <span className="absolute select-none" style={{ fontSize: '1.26em', top: '-0.35em', left: '50%', transform: 'translateX(calc(-50% - 1px))', opacity: 0.58, zIndex: 0 }}>🔥</span>
-            <span className="relative" style={{ zIndex: 1 }}>a</span>
-          </span>ze IDE
+    <div className="app-vignette flex flex-col h-screen bg-zinc-950 text-zinc-100">
+      <header data-testid="top-bar" className="h-10 flex items-center px-4 border-b border-seam shrink-0 bg-panel">
+        <span className="flex items-center gap-2 select-none">
+          <svg width="26" height="20" viewBox="0 0 26 20" aria-hidden className="shrink-0">
+            <path d="M1 10 Q5 1 9 10 T17 10 T25 10" fill="none" stroke="#fbbf24" strokeWidth="2.4" strokeLinecap="round" />
+            <circle cx="25" cy="10" r="2.6" fill="#fbbf24" />
+          </svg>
+          <span
+            className="font-mono font-semibold text-zinc-100"
+            style={{ fontSize: '17px', letterSpacing: '0.22em', textShadow: '0 0 14px rgba(245,158,11,.45)' }}
+          >
+            PXLBLZ
+          </span>
         </span>
       </header>
       <div className="flex flex-1 min-h-0">

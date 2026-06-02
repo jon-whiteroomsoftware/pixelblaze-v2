@@ -74,9 +74,9 @@ export function ControlsPanel() {
             step={0.01}
             value={value}
             onChange={(e) => setControlValue(c.exportName, Number(e.target.value))}
-            className="w-2/3 accent-amber-500"
+            className="w-2/3 accent-live"
           />
-          <span className="flex-1 text-right text-amber-400 tabular-nums">{value.toFixed(2)}</span>
+          <span className="flex-1 text-right text-live tabular-nums">{value.toFixed(2)}</span>
         </div>
       </label>
     )
@@ -91,7 +91,7 @@ export function ControlsPanel() {
           type="checkbox"
           checked={value === 1}
           onChange={(e) => setControlValue(c.exportName, e.target.checked ? 1 : 0)}
-          className="accent-amber-500 shrink-0"
+          className="accent-live shrink-0"
         />
         <span className="text-zinc-400">{c.label.toLowerCase()}</span>
       </label>
@@ -121,7 +121,7 @@ export function ControlsPanel() {
 
   return (
     <div className="font-mono text-xs mt-1 pt-1.5 pb-3 pr-3">
-      <h4 className="text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider mb-2">
+      <h4 className="text-[11px] font-semibold text-structural uppercase tracking-wider mb-2">
         Controls
       </h4>
       <div className="flex flex-col gap-2">

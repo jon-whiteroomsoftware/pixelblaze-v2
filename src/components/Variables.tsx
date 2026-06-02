@@ -31,7 +31,7 @@ export function Variables() {
       <button
         aria-expanded={watchPatternVars}
         onClick={() => setWatchPatternVars(!watchPatternVars)}
-        className="w-full flex items-center justify-between gap-1 text-[11px] font-semibold text-amber-500/60 uppercase tracking-wider hover:text-amber-400 transition-colors"
+        className="w-full flex items-center justify-between gap-1 text-[11px] font-semibold text-structural uppercase tracking-wider hover:text-live transition-colors"
       >
         <span>Variables</span>
         <ChevronDown
@@ -44,7 +44,7 @@ export function Variables() {
           {patternVars.map((name) => (
             <div key={name} className="flex justify-between gap-2 min-w-0">
               <span className="text-zinc-400 truncate">{name}</span>
-              <span className="text-amber-400 tabular-nums truncate">
+              <span className="text-live tabular-nums truncate">
                 {formatValue(watchValues[name])}
               </span>
             </div>

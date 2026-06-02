@@ -69,7 +69,7 @@ const AlertDialogAction = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialog.Action
     ref={ref}
-    className={cn(dialogButton, 'border border-amber-500 text-amber-400 hover:bg-amber-500/10', className)}
+    className={cn(dialogButton, 'border border-live text-live hover:bg-live/10', className)}
     {...props}
   />
 ))

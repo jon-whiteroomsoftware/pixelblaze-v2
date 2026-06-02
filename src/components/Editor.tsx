@@ -31,7 +31,7 @@ const EDITOR_OPTIONS = {
   minimap: { enabled: false },
   fontSize: 13,
   lineHeight: 20,
-  fontFamily: "'Geist Mono', 'Cascadia Code', 'Fira Code', monospace",
+  fontFamily: "'IBM Plex Mono', 'Cascadia Code', 'Fira Code', monospace",
   fontLigatures: true,
   automaticLayout: true,
   scrollBeyondLastLine: false,
