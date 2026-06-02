@@ -118,3 +118,27 @@
   z-index: 30;
   background: radial-gradient(140% 100% at 50% 0%, transparent 55%, rgba(0, 0, 0, 0.55));
 }
+
+/* Wordmark "chase" (PXLBLZ): a deliberately dull homage to the one-pixel-at-a-time
+   LED fade. Each letter briefly warms to the duller amber (#f59e0b) and fades back,
+   staggered so the next lights as the previous is almost out. Subtle by design —
+   a short bright window inside a long, slow cycle. Per-letter delay is set inline. */
+@keyframes pxlblz-letter-chase {
+  0% { color: inherit; text-shadow: none; }
+  5% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  16% { color: inherit; text-shadow: none; }
+  100% { color: inherit; text-shadow: none; }
+}
+
+.pxlblz-letter {
+  animation: pxlblz-letter-chase 12s linear infinite;
+}
+
+/* Under reduce-motion we keep the chase — it is a pure colour crossfade with no
+   spatial movement, the kind of motion that setting targets — but slow it down so
+   it reads as an even gentler ambient warmth. */
+@media (prefers-reduced-motion: reduce) {
+  .pxlblz-letter {
+    animation-duration: 18s;
+  }
+}
