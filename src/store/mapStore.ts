@@ -104,7 +104,7 @@ export function mapFromRecord(r: MapRecord): PixelMap {
 
 // Built-in stock maps — source-backed (ADR-0008), regenerated live, never
 // persisted. The plane and cube run their `.js` source. The relocated #140
-// example clouds (helix/sphere/ring) are now live builtin generators too — stock
+// example clouds (sphere/ring) are now live builtin generators too — stock
 // by provenance, never listed in "Your Maps" (#141). The cylinder is no longer a
 // stock map: it is a viewport Surface (ADR-0010) composed onto the Square.
 export const STOCK_MAPS: PixelMap[] = SOURCE_STOCK_MAPS

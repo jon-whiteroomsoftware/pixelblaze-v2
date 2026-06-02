@@ -19,7 +19,7 @@ function source(name: string): string {
 // The thin catalogue: stock map identity/metadata paired with its `?raw` source.
 // The cylinder is no longer a stock map at all (ADR-0010): it is a viewport
 // Surface embedding composed onto the Square map, so the ADR-0008 source-less
-// stock-map exception is dissolved. The example clouds (helix/sphere/ring) are
+// stock-map exception is dissolved. The example clouds (sphere/ring) are
 // live builtin generators here, no longer baked arrays.
 export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   { id: 'plane', name: 'Square', dim: 2, source: source('plane'), grid: 'square' },
@@ -35,12 +35,10 @@ export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   // the volume fills the spiky solid and has no per-point normal.
   { id: 'star-shell', name: 'Star - shell', dim: 3, source: source('star-shell'), normals: 'star' },
   { id: 'star-volume', name: 'Star - volume', dim: 3, source: source('star-volume') },
-  { id: 'seed-helix-3d', name: 'Helix - cloud', dim: 3, source: source('helix') },
   // The Sphere is a convex shell, so the catalogue vouches it solid-eligible
   // (ADR-0011): the preview re-derives outward normals via normalize(pos −
-  // centroid) and offers the solidity slider. The Helix is NOT a shell (centroid
-  // normals would be wrong) and the volumetric Cube has no per-point normal, so
-  // neither is flagged.
+  // centroid) and offers the solidity slider. The volumetric Cube has no per-
+  // point normal, so it is not flagged.
   { id: 'seed-sphere-3d', name: 'Sphere - shell', dim: 3, source: source('sphere'), normals: 'centroid' },
   // The solid sibling of the Sphere shell (ADR-0012): points fill the interior of
   // the ball. A volume has no per-point boundary normal, so it is NOT solid-
@@ -60,4 +58,4 @@ export function stockMapSpec(id: string): SourceMapSpec | undefined {
 
 // The ids of the relocated #140 example clouds — used to prune rows an earlier
 // build seeded into the `maps` IDB store before they became stock.
-export const SEED_MAP_IDS: string[] = ['seed-helix-3d', 'seed-sphere-3d', 'seed-ring-2d']
+export const SEED_MAP_IDS: string[] = ['seed-sphere-3d', 'seed-ring-2d']

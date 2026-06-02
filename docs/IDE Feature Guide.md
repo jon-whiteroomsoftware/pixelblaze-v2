@@ -66,7 +66,7 @@ decoupled from its order in the chain. You choose what your pattern previews aga
 
 - **Stock maps** ship ready to use: **Square**, **Wide 2:1**, **Ring**, **Cube
   (shell)** and **Cube (volume)**, **Sphere (shell)** and **Sphere (volume)**, **Star
-  (shell)** and **Star (volume)**, and a **Helix** cloud. "Shell" maps put LEDs on the
+  (shell)** and **Star (volume)**. "Shell" maps put LEDs on the
   surface of the shape; "volume" maps fill the interior.
 - **Custom maps** — click **New Map** and you get an editor on a plain
   `function(pixelCount)`, *exactly* the thing a real Pixelblaze Mapper tab evaluates.

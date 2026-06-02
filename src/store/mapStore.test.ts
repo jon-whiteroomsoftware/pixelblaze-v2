@@ -124,7 +124,6 @@ describe('mapFromRecord', () => {
 describe('seed clouds relocated to stock (#141)', () => {
   it('exposes the example clouds as stock maps, not user maps', () => {
     expect(STOCK_MAPS.some((m) => m.id === 'seed-ring-2d')).toBe(true)
-    expect(STOCK_MAPS.some((m) => m.id === 'seed-helix-3d')).toBe(true)
     expect(STOCK_MAPS.some((m) => m.id === 'seed-sphere-3d')).toBe(true)
   })
 

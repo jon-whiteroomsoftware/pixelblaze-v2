@@ -18,7 +18,6 @@ describe('stock catalogue', () => {
       'cube-shell',
       'star-shell',
       'star-volume',
-      'seed-helix-3d',
       'seed-sphere-3d',
       'sphere-volume',
       'seed-ring-2d',
@@ -40,19 +39,17 @@ describe('stock catalogue', () => {
     expect(mapById('plane').dim).toBe(2)
     expect(mapById('cube').dim).toBe(3)
     expect(mapById('seed-ring-2d').dim).toBe(2)
-    expect(mapById('seed-helix-3d').dim).toBe(3)
     expect(mapById('seed-sphere-3d').dim).toBe(3)
   })
 
   it('ships each shell its normal recipe, so eligibility lives in the catalogue (ADR-0011/0012)', () => {
     // The Sphere vouches a centroid normal is honest; the Cube shell carries per-
     // face normals; the Star shell its stellation faces. The recipe's PRESENCE is
-    // the solid-eligibility gate. The Helix (not a shell), the volume Cube and every
-    // other stock map carry no recipe and stay see-through.
+    // the solid-eligibility gate. The volume Cube and every other stock map carry
+    // no recipe and stay see-through.
     expect(mapById('seed-sphere-3d').normals).toBe('centroid')
     expect(mapById('cube-shell').normals).toBe('face')
     expect(mapById('star-shell').normals).toBe('star')
-    expect(mapById('seed-helix-3d').normals).toBeUndefined()
     expect(mapById('cube').normals).toBeUndefined()
     expect(mapById('plane').normals).toBeUndefined()
     // A volume has no per-point boundary normal, so a solid ball / solid star is
@@ -74,7 +71,7 @@ describe('stock catalogue', () => {
   })
 
   it('exposes the relocated cloud ids for IDB pruning', () => {
-    expect(SEED_MAP_IDS).toEqual(['seed-helix-3d', 'seed-sphere-3d', 'seed-ring-2d'])
+    expect(SEED_MAP_IDS).toEqual(['seed-sphere-3d', 'seed-ring-2d'])
   })
 })
 

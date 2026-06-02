@@ -281,8 +281,8 @@ runs — single source of truth, no parallel TS generator to drift. Stock maps
 The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (label "Square"), `wide`
 ("Wide 2:1"), `seed-ring-2d` ("Ring") — 2D; and the 3D set, named by the **shell /
 volume** scheme (ADR-0012): `cube` ("Cube (volume)"), `cube-shell` ("Cube (shell)"),
-`star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere (shell)"), `sphere-volume`,
-plus `seed-helix-3d` ("Helix (cloud)"). Shell entries carry a `normals` recipe
+`star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere (shell)"), and
+`sphere-volume`. Shell entries carry a `normals` recipe
 (`'face' | 'star' | 'centroid'`), whose presence is the solid-eligibility gate
 (§9). A lattice entry carries a `grid` recipe (`'square' | 'wide' | 'cube'`),
 which `createSourceMap` maps to the live count→dims derivation backing
