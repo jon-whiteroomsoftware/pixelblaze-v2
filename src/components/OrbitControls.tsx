@@ -121,7 +121,9 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
         onClick={() => setAutoOrbit(!autoOrbit)}
         className="flex items-center justify-center h-7 w-7 rounded bg-zinc-900/70 text-zinc-300 hover:text-amber-400 hover:bg-zinc-800/80 transition-colors"
       >
-        {autoOrbit ? <Pause size={14} /> : <Play size={14} />}
+        {/* Current-state semantics (matches the header pattern play/pause): the icon
+            shows what's happening now — Play while orbiting, Pause when stopped. */}
+        {autoOrbit ? <Play size={14} /> : <Pause size={14} />}
       </button>
       <button
         aria-label="Reset view"
