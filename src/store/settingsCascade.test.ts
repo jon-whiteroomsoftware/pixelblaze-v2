@@ -7,6 +7,8 @@ import {
   seedActiveSettings,
   writeCascadedOverride,
   writeHybrid,
+  forkSettingsSnapshot,
+  forkSettingsSnapshotForDemo,
 } from './settingsCascade'
 
 beforeEach(() => {
@@ -74,6 +76,26 @@ describe('writeCascadedOverride', () => {
     usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
     expect(() => writeCascadedOverride('brightness', 0.3)).not.toThrow()
     expect(usePatternStore.getState().userPatterns).toHaveLength(0)
+  })
+})
+
+describe('fork snapshot', () => {
+  it('captures the active demo effective settings, omitting pure-global fidelity', () => {
+    usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
+    const snap = forkSettingsSnapshot()
+    expect(snap.mapId).toBe('seed-sphere-3d')
+    expect(snap.pixelCount).toBe(4096)
+    expect(snap.solidity).toBe(1)
+    expect('fidelity' in snap).toBe(false)
+  })
+
+  it('snapshots a named demo regardless of what is active', () => {
+    // A different demo is "active"; the per-row fork still resolves by name.
+    usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
+    const snap = forkSettingsSnapshotForDemo('NebulaSphere')
+    expect(snap.mapId).toBe('seed-sphere-3d')
+    expect(snap.pixelCount).toBe(8192)
+    expect('fidelity' in snap).toBe(false)
   })
 })
 

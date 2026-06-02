@@ -41,6 +41,14 @@ export function resolveActiveSettings(): Settings {
   return resolveSettings(activeOverrides(), recommended, globalSticky(), DEV_DEFAULTS)
 }
 
+// Resolve the effective settings for a named demo, regardless of what's active. Used
+// by the per-row demo fork (#182), which forks a demo without first opening it — so
+// it can't rely on `activeDemoName`. No overrides (a demo has none); just the demo's
+// recommendation over the global-sticky and dev-default layers.
+export function resolveSettingsForDemo(demoName: string): Settings {
+  return resolveSettings({}, recommendedSettingsFor(demoName), globalSticky(), DEV_DEFAULTS)
+}
+
 // Seed the live working stores from the resolved settings (open-time, ADR-0013).
 // Replaces the former per-field hydrate/solidity effects. `fidelity` is pure-global
 // (already live in previewStore), so it is not reseeded here.
@@ -88,6 +96,23 @@ export function writeHybrid(field: 'lightSize' | 'diffusion', value: number): vo
   } else {
     usePreviewStore.getState().setDiffusionSticky(value)
   }
+}
+
+// Snapshot the active demo's *effective* settings as a frozen layer-1 override copy
+// for a fork (ADR-0013). Everything except `fidelity` is captured — `fidelity` is
+// pure-global and never per-pattern. The fork carries no live pointer back to the
+// demo: later changes to the demo's recommendations never reach this copy. Call this
+// while the demo is still active (before `setActivePattern` flips state).
+export function forkSettingsSnapshot(): Partial<Settings> {
+  const { fidelity: _fidelity, ...rest } = resolveActiveSettings()
+  return rest
+}
+
+// Same frozen snapshot for a named demo (per-row fork, #182), which forks without the
+// demo being active. Captures every field except pure-global `fidelity`.
+export function forkSettingsSnapshotForDemo(demoName: string): Partial<Settings> {
+  const { fidelity: _fidelity, ...rest } = resolveSettingsForDemo(demoName)
+  return rest
 }
 
 // "Reset to defaults" (ADR-0013): clear the active pattern's layer-1 overrides, then

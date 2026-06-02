@@ -46,3 +46,7 @@ The kernel lives in the WebGL fragment shader (a Hann radial falloff keyed off `
 - Diffusion is owned by the WebGL renderer (`setDiffusion`), driven by `diffusionGlow(diffusion, coreDiameterPx, pitchPx)` in `camera.ts`, which returns the grown quad size, the (dissolving) solid-core fraction `coreFrac`, and the overlap-normalised `peak` amplitude. The old SVG `feGaussianBlur` filter and the `diffusionBlurStdDev` / per-dimension `DIFFUSION_BLUR_PITCH_FACTOR_*` helpers are removed.
 - A by-eye acceptance test is added: sweep diffusion 0 → 100 at fixed brightness in each dimension and confirm the field never looks darker overall.
 - Closes the loop on the historical brightness-vs-diffusion bug (#75) and the preview-sizing confusion (#82); supersedes the "spacing" language in [ADR-0005](0005-display-position-dual-sourced.md) and the Pixel Maps feature PRD §5.
+
+## Later refinement
+
+[ADR-0013](0013-per-pattern-settings-cascade.md) reclassifies light size and diffusion as **hybrid** fields of the per-pattern settings cascade: a user **global-sticky** baseline (set once, applies everywhere) that a curated pattern may recommend and the user may override per-pattern. Their invariants here are unchanged — only how their value is sourced and stored.

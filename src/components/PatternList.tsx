@@ -10,6 +10,7 @@ import { getSetting } from '@/engine/storage'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
 import { useMapStore, MapRecord } from '@/store/mapStore'
+import { forkSettingsSnapshotForDemo } from '@/store/settingsCascade'
 import { LibraryHoverCard } from '@/components/LibraryHoverCard'
 import {
   AlertDialogRoot,
@@ -534,6 +535,9 @@ export function PatternList() {
     closeMapEditor()
     const newName = uniquePatternName(name, userPatterns.map((p) => p.name))
     const record = newPatternRecord(newName, DEMOS[name])
+    // Snapshot the demo's effective settings as frozen layer-1 overrides (ADR-0013)
+    // so the fork keeps the demo's curated look with no live pointer back to it.
+    record.settings = forkSettingsSnapshotForDemo(name)
     await addPattern(record)
     setActivePattern(record.id)
     setSource(record.src)

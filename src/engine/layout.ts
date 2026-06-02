@@ -190,25 +190,20 @@ export function effectivePixelCount(opts: {
 // A stale cylinder on a now-irregular map falls back to Flat (cylinder drops out
 // of the offered set), so selecting a wrappable map never surprise-wraps.
 //
-// `recommendedMapId` is an IDE-side, preview-only default supplied by a
-// geometry-aware demo (see demos.ts): when a pattern carries NO persisted map it
-// overrides the bare first-match default, so the demo opens on the map it was
-// built for. It is ignored the moment a pattern persists its own `mapId`, and is
-// honoured only when it is still a valid dim-matched option.
+// On-open demo recommendations no longer enter here: the settings cascade
+// (ADR-0013) seeds a recommended `mapId` into the persisted selection before this
+// runs, so a demo's map arrives as the persisted choice like any other.
 export function resolveLayoutSelection(
   persisted: LayoutSelection,
   nativeDim: 1 | 2 | 3,
   source: LayoutSource,
-  recommendedMapId?: string,
 ): LayoutSelection {
   const sel: LayoutSelection = {}
 
   if (nativeDim !== 1) {
     const maps = mapOptions(nativeDim, source)
-    // A valid persisted map wins outright. Otherwise the recommendation (if a
-    // valid dim-matched option) is the default, ahead of the bare first match.
-    const recommended = maps.find((m) => m.id === recommendedMapId)
-    const map = maps.find((m) => m.id === persisted.mapId) ?? recommended ?? maps[0]
+    // A valid persisted map wins outright; otherwise the bare first match.
+    const map = maps.find((m) => m.id === persisted.mapId) ?? maps[0]
     if (map) sel.mapId = map.id
   }
 
@@ -288,12 +283,11 @@ export interface ResolveLayoutInput {
   selection: LayoutSelection
   nativeDim: 1 | 2 | 3
   source: LayoutSource
-  // The persisted modeled count (null ⇒ use a default / recommendation).
+  // The modeled pixel count (null ⇒ use a default). A demo's recommended count
+  // arrives here already, seeded into the persisted selection by the settings
+  // cascade (ADR-0013).
   persistedCount: number | null
   normalizeMode: NormalizeMode
-  // IDE-side, preview-only on-open defaults for a demo (see demos.ts).
-  recommendedMapId?: string
-  recommendedCount?: number
   // The ephemeral pole-wrap density (null ⇒ the shape default).
   poleCols: number | null
   // The 1D-shape on-open count (DEFAULT_SHAPE_PIXEL_COUNT), injected to keep
@@ -311,19 +305,12 @@ export function resolveLayout(
     source,
     persistedCount,
     normalizeMode,
-    recommendedMapId,
-    recommendedCount,
     poleCols,
     shapeDefaultCount,
   } = input
   const { resolveMap, defaultCountForDim } = deps
 
-  const correctedSelection = resolveLayoutSelection(
-    selection,
-    nativeDim,
-    source,
-    recommendedMapId,
-  )
+  const correctedSelection = resolveLayoutSelection(selection, nativeDim, source)
 
   let pixelCount: number
   let mapPoints: MapPoint[]
@@ -357,7 +344,6 @@ export function resolveLayout(
     // carries no `baked`, so that slot drops out; the cube then squares this up.
     const modeledCount = effectivePixelCount({
       persisted: persistedCount,
-      recommended: recommendedCount,
       baked: map.bakedCount,
       fallback: defaultCountForDim(map.dim),
     })

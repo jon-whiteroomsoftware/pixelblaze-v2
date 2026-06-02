@@ -20,6 +20,12 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     plugins: { 'react-hooks': reactHooks },
-    rules: { ...reactHooks.configs.recommended.rules },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // Allow `_`-prefixed bindings to be intentionally unused — the convention
+      // for destructuring keys purely to drop them (e.g. stripping a legacy
+      // persisted blob's stale fields out of a rest spread).
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
   },
 )

@@ -152,27 +152,14 @@ describe('resolveLayoutSelection (open / restore)', () => {
     expect(resolveLayoutSelection({}, 3, { shapes: [], surfaces: [], maps: [] })).toEqual({})
   })
 
-  it('opens on a recommended map when nothing is persisted', () => {
-    // A demo recommending the second 3D map opens on it, not the first match.
+  it('honours a seeded map id, ignoring the first-match default', () => {
+    // Demo recommendations now arrive pre-seeded into the persisted selection
+    // (the settings cascade, ADR-0013), so they resolve like any persisted map.
     const source: LayoutSource = {
       ...SOURCE,
       maps: [...SOURCE.maps, { id: 'sphere', name: 'Sphere', dim: 3 }],
     }
-    expect(resolveLayoutSelection({}, 3, source, 'sphere')).toEqual({ mapId: 'sphere' })
-  })
-
-  it('falls back to the first match when the recommendation is not a valid option', () => {
-    // A recommendation of the wrong dimension (or a missing id) is ignored.
-    expect(resolveLayoutSelection({}, 3, SOURCE, 'plane')).toEqual({ mapId: 'cube' })
-    expect(resolveLayoutSelection({}, 3, SOURCE, 'nope')).toEqual({ mapId: 'cube' })
-  })
-
-  it('ignores a recommendation once a valid map is persisted', () => {
-    const source: LayoutSource = {
-      ...SOURCE,
-      maps: [...SOURCE.maps, { id: 'sphere', name: 'Sphere', dim: 3 }],
-    }
-    expect(resolveLayoutSelection({ mapId: 'cube' }, 3, source, 'sphere')).toEqual({ mapId: 'cube' })
+    expect(resolveLayoutSelection({ mapId: 'sphere' }, 3, source)).toEqual({ mapId: 'sphere' })
   })
 })
 

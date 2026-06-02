@@ -83,7 +83,7 @@ A hard split, enforced by convention and load-bearing for the test strategy:
 
 | Store | Holds |
 |---|---|
-| `previewStore` | `isRunning`, `speed`, `brightness`, `lightSize`, `diffusion`, `fidelity`, `watchPatternVars`, `watchValues`, `fps`, `elapsed`. Persists only `brightness`/`speed`/`lightSize`/`diffusion` to `localStorage`. |
+| `previewStore` | `isRunning`, `speed`, `brightness`, `lightSize`, `diffusion` (live working copies), `lightSizeSticky`/`diffusionSticky` (global-sticky baselines), `fidelity`, `watchPatternVars`, `watchValues`, `fps`, `elapsed`. Persists only `fidelity` + the two `*Sticky` baselines to `localStorage` (ADR-0013); the cascaded `speed`/`brightness` and the live `lightSize`/`diffusion` are seeded per-pattern by the resolver, not persisted here. |
 | `patternStore` | tri-state selection: `activePatternId` / `activeLibraryName` / `activeDemoName`; `userPatterns`; CRUD. |
 | `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`, `solidEligible`, `editorFlavor` (`'pattern' \| 'map'`). |
 | `mapStore` | `activeMapId`, `activeShapeId`, `activeSurfaceId`, `activePixelCount`, `activeNormalizeMode` (Fill/Contain), `activeSolidity`, `userMaps`, stock catalogue. |
@@ -93,11 +93,21 @@ A hard split, enforced by convention and load-bearing for the test strategy:
 Zustand is chosen specifically because the **render loop and other engine code read
 and write state outside React**. Each store exports `*InitialState`; tests reset with
 `setState(initialState)` (merge mode). `previewStore`'s persist layer
-(`mergePersistedPreview`) drops the legacy `grid` blob and migrates `grid.diffusion`
-forward — the preview-wide grid is retired (ADR-0009; §8).
+(`mergePersistedPreview`) drops the legacy `grid` blob, the stale per-pattern
+`brightness`/`speed`, and migrates `grid.diffusion` — and a pre-cascade blob's
+live `lightSize`/`diffusion` — forward into the global-sticky baselines (ADR-0013).
+The preview-wide grid is retired (ADR-0009; §8).
 
-> **Note on `fidelity`.** It is transient (defaults to `fast` each load); per-pattern
-> persistence of the renderer choice is unbuilt (#90).
+> **Per-pattern settings cascade (ADR-0013).** Effective preview settings resolve
+> field-by-field through four layers, first hit wins: per-pattern override →
+> recommended (curated patterns only) → user global-sticky (comfort prefs only) →
+> developer default. The pure resolver is `resolveSettings` (`src/engine/resolveSettings.ts`)
+> over the `Settings` vocabulary + `DEV_DEFAULTS` (`src/engine/settings.ts`); the
+> store orchestration seam is `src/store/settingsCascade.ts` (`seedActiveSettings`
+> on open, `writeCascadedOverride`/`writeHybrid` per control, `forkSettingsSnapshot`,
+> `resetActiveSettings`). Per-pattern overrides live sparsely on
+> `PatternRecord.settings` and are written only on genuine user manipulation.
+> `fidelity` is the one **pure-global** field — never cascaded, persisted as before.
 
 ---
 
@@ -369,12 +379,16 @@ sphere shell) don't. Each branch's MODELED count runs through one selector,
 recommended ?? baked ?? fallback`, ADR-0004) — re-exported so the deck's editable count
 box reads the same chain the renderer does, rather than open-coding it.
 
-### Recommendation registries (`demos.ts`)
+### Recommended settings (`demos.ts`)
 
-Read-only demos carry no `PatternRecord`, so three preview-only, IDE-side registries
-set better on-open defaults: `DEMO_RECOMMENDED_MAPS`, `DEMO_RECOMMENDED_PIXEL_COUNTS`,
-and `DEMO_RECOMMENDED_SOLIDITIES` (e.g. `AuroraSphere → sphere shell, 4096 px, solid`).
-They set the on-open default only; everything stays switchable. **None reaches the
+Read-only demos carry no `PatternRecord`, so a single preview-only, IDE-side table
+sets better on-open defaults: `RECOMMENDED_SETTINGS`, keyed by curated-pattern id, with
+`recommendedSettingsFor(name)` the lookup (e.g. `AuroraSphere → { mapId:'seed-sphere-3d',
+pixelCount: 4096, solidity: 1 }`). This is **layer 2** of the settings cascade
+(ADR-0013) and collapses the three former sibling registries
+(`DEMO_RECOMMENDED_MAPS`/`_PIXEL_COUNTS`/`_SOLIDITIES`) into one object holding any
+subset of the cascaded fields. It sets the on-open default only; everything stays
+switchable, and a user override outranks the recommendation. **None reaches the
 pattern source, the artifact, or a controller** — the physical Pixelblaze knows only
 patterns and maps, never associations.
 
@@ -489,18 +503,23 @@ decisions:
 ## 12. Storage & pattern management
 
 **IndexedDB** (`pixelblaze-ide`, version 2): `patterns`, `settings`, `maps` object
-stores. `PatternRecord` carries the per-pattern layout selection and preview prefs as
-**schemaless optional fields** (no DB bump needed to add one): `mapId`, `params`,
-`pixelCount`, `shapeId`, `surfaceId` (default `flat`), `solidity` (default `1.0`,
-never shipped), `normalize` (default `contain`). `migratePatternRecord` rewrites
-retired ids on read (the ADR-0012 `surface-cube` → `flat`, `star` → `star-shell`),
-still schemaless. `MapRecord` carries `source`/`points`/`gridDims` (§8).
+stores. `PatternRecord` carries the per-pattern preview overrides in a sparse
+`settings?: Partial<Settings>` field — **layer 1** of the settings cascade (ADR-0013),
+superseding the older flat `mapId`/`shapeId`/`surfaceId`/`pixelCount`/`solidity`/
+`normalize` columns. `migratePatternRecord` lifts a pre-cascade record's flat fields
+into the nested `settings` bag on read, and still rewrites retired ids (the ADR-0012
+`surface-cube` → `flat`, `star` → `star-shell`) — schemaless throughout, so no DB
+bump. Overrides are written sparsely and only on genuine user manipulation
+(`updatePatternSettings`, a sparse merge that does **not** bump `src`/`updatedAt`);
+`resetPatternSettings` clears them. `MapRecord` carries `source`/`points`/`gridDims` (§8).
 
 Selection is tri-state (pattern / library / demo). **Create** writes a runnable
 animated starter immediately. **Import** parses `.epe` JSON (`epeImport.ts`, takes
 `sources.main`) into a new user pattern. **Fork** copies a read-only demo into an
-editable pattern. CRUD helpers accept an injectable `IDBFactory` for tests
-(`fake-indexeddb`).
+editable pattern, snapshotting the demo's *effective* settings into the new record's
+`settings` as frozen layer-1 overrides (everything except pure-global `fidelity`) — a
+frozen copy with no live pointer back to the demo (`forkSettingsSnapshot`, ADR-0013).
+CRUD helpers accept an injectable `IDBFactory` for tests (`fake-indexeddb`).
 
 ---
 
@@ -536,9 +555,9 @@ tooling:
   is preview-only and never exported.
 
 The artifact is the *only* thing that crosses to hardware. Metadata, the fixed-point
-emit, layout selection, recommended-map/count/solidity, light size, diffusion, and
-solidity all stay browser-side — the consistent rule that **nothing the IDE invents
-for the preview ever reaches a controller.**
+emit, the whole settings cascade (per-pattern overrides, recommended settings, light
+size, diffusion, solidity, fidelity) all stay browser-side — the consistent rule that
+**nothing the IDE invents for the preview ever reaches a controller.**
 
 ---
 
@@ -568,7 +587,9 @@ out-of-band.
   responsiveness genuinely bites.
 - **Inert sensors** — sound/sensor-expansion globals are stubs; reactive patterns run
   but don't animate.
-- **`fidelity` not persisted per-pattern** (#90).
+- **`fidelity` is pure-global by design** (ADR-0013) — the renderer is a
+  machine/performance choice, never recommended and never per-pattern; it persists as
+  one global value (superseding the old #90 "not per-pattern" framing).
 
 ---
 
@@ -579,7 +600,8 @@ out-of-band.
 - **ADRs** — `docs/adr/` (0002 main-thread; 0003 fixed-point fidelity; 0004 pixelCount
   independence; 0005 sample/pos; 0006 light size + diffusion; 0007 bake-on-save; 0008
   map functions are plain JS; 0009 maps authoritative / Fill+Contain; 0010 surfaces;
-  0011 solidity; 0012 shell/volume + three embedding mechanisms).
+  0011 solidity; 0012 shell/volume + three embedding mechanisms; 0013 per-pattern
+  settings cascade).
 - **Domain glossary** — `CONTEXT.md`.
 - **PRDs** (rationale + deferred direction) — `docs/prd/`.
 - **Porting guide** — `docs/guides/Porting ShaderToy shaders to Pixelblaze.md`.

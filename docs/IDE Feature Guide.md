@@ -127,8 +127,12 @@ your pattern's math or ever reach hardware):
 - **Solidity** — appears only for shapes that have a front and a back (a sphere shell,
   a cube shell, a cylinder, a pole). It fades out the back-facing dots so a solid
   object hides its own back, on a slider from transparent (see straight through, like
-  LEDs on glass or wire mesh) to fully solid. This one is *per-pattern* — it's part of
-  what the object *is* — whereas light size and diffusion are global comfort settings.
+  LEDs on glass or wire mesh) to fully solid.
+
+Light size and diffusion are *comfort* settings: the value you dial in becomes your
+default for every pattern (set once, stays set), unless a particular pattern needs its
+own — then your adjustment on that pattern sticks to just that pattern. Solidity is
+always *per-pattern*: it's part of what the object *is*, not a viewing preference.
 
 ### Fill vs. Contain
 
@@ -216,7 +220,14 @@ The left rail holds three kinds of things:
   per-dimension test patterns. They're read-only, but **Edit** forks any demo into
   your own editable copy. Some demos open on a recommended map, pixel count, and
   solidity (e.g. the sphere demos open as dense, solid spheres) — defaults only;
-  everything stays switchable.
+  everything stays switchable. Forking takes a snapshot of how the demo looks *right
+  now* into your copy, with no live link back: later tweaks to the demo's recommended
+  look won't change your fork.
+
+Once you adjust a pattern's preview settings, those tweaks are remembered with that
+pattern and restored next time you open it. A **Reset to defaults** action on the deck
+clears a pattern's own adjustments, dropping it back to its recommended (or default)
+look.
 
 ---
 

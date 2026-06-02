@@ -8,6 +8,7 @@ import { PaneHeader } from '@/components/PaneHeader'
 import { MapModeHeader } from '@/components/MapModeHeader'
 import { usePatternStore, PatternRecord } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
+import { forkSettingsSnapshot } from '@/store/settingsCascade'
 import { bundle } from '@/engine/bundle'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { uniquePatternName } from '@/engine/patternName'
@@ -77,11 +78,15 @@ export default function App() {
     const id = generateId()
     const existingNames = userPatterns.map((p) => p.name)
     const name = uniquePatternName(activeDemoName, existingNames)
+    // Snapshot the demo's effective settings as frozen layer-1 overrides (ADR-0013)
+    // BEFORE setActivePattern flips state, so the fork keeps the demo's curated look.
+    const settings = forkSettingsSnapshot()
     const record: PatternRecord = {
       id,
       name,
       src: source,
       controls: {},
+      settings,
       updatedAt: Date.now(),
     }
     await addPattern(record)

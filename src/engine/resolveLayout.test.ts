@@ -216,24 +216,19 @@ describe('resolveLayout — selection correction & precedence', () => {
     expect(r.draw.kind).toBe('2d')
   })
 
-  it('a demo recommendation sets the on-open map when none is persisted', () => {
-    const r = resolveLayout(input({ nativeDim: 3, selection: {}, recommendedMapId: 'sphere' }), deps)
+  // Demo recommendations no longer enter resolveLayout: the settings cascade
+  // (ADR-0013) seeds a recommended map/count into the persisted selection upstream,
+  // so they arrive here as ordinary persisted values.
+  it('honours a seeded map id in the selection', () => {
+    const r = resolveLayout(input({ nativeDim: 3, selection: { mapId: 'sphere' } }), deps)
     expect(r.correctedSelection.mapId).toBe('sphere')
   })
 
-  it('a demo recommended count beats the per-dim default', () => {
+  it('honours a seeded pixel count over the per-dim default', () => {
     const r = resolveLayout(
-      input({ nativeDim: 3, selection: { mapId: 'helix' }, recommendedCount: 4096 }),
+      input({ nativeDim: 3, selection: { mapId: 'helix' }, persistedCount: 4096 }),
       deps,
     )
     expect(r.pixelCount).toBe(4096)
-  })
-
-  it('a persisted count beats a recommendation', () => {
-    const r = resolveLayout(
-      input({ nativeDim: 3, selection: { mapId: 'helix' }, persistedCount: 999, recommendedCount: 4096 }),
-      deps,
-    )
-    expect(r.pixelCount).toBe(999)
   })
 })
