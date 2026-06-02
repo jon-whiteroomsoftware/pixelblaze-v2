@@ -166,7 +166,7 @@ function DimPill({ dim }: { dim: string }) {
   return (
     <span
       aria-hidden
-      className="shrink-0 rounded border border-zinc-700 px-1 text-[8px] leading-[1.5] font-mono uppercase tracking-wide text-structural transition-opacity group-hover:opacity-0"
+      className="shrink-0 rounded border border-zinc-700 px-1 text-[8px] leading-[1.5] font-mono uppercase tracking-wide text-zinc-400 transition-opacity group-hover:opacity-0"
     >
       {dim}
     </span>

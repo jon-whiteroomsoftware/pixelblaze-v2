@@ -24,28 +24,28 @@ function source(name: string): string {
 export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   { id: 'plane', name: 'Square', dim: 2, source: source('plane'), grid: 'square' },
   { id: 'wide', name: 'Wide 2:1', dim: 2, source: source('wide'), grid: 'wide' },
-  { id: 'cube', name: 'Cube (volume)', dim: 3, source: source('cube') },
+  { id: 'cube', name: 'Cube - volume', dim: 3, source: source('cube') },
   // The faceted shell sibling of the volume cube (ADR-0012): points on the six
   // faces, solid-eligible via per-face normals the preview derives (faceNormals,
   // the dominant axis of pos − centre) rather than the sphere's centroid radial.
-  { id: 'cube-shell', name: 'Cube (shell)', dim: 3, source: source('cube-shell'), normals: 'face' },
+  { id: 'cube-shell', name: 'Cube - shell', dim: 3, source: source('cube-shell'), normals: 'face' },
   // The Star joins the ADR-0012 shell/volume scheme (the lone wireframe star is
   // retired). The shell scatters points over the 60 stellation triangles and is
   // solid-eligible via per-face normals the preview derives (starShellNormals);
   // the volume fills the spiky solid and has no per-point normal.
-  { id: 'star-shell', name: 'Star (shell)', dim: 3, source: source('star-shell'), normals: 'star' },
-  { id: 'star-volume', name: 'Star (volume)', dim: 3, source: source('star-volume') },
-  { id: 'seed-helix-3d', name: 'Helix (cloud)', dim: 3, source: source('helix') },
+  { id: 'star-shell', name: 'Star - shell', dim: 3, source: source('star-shell'), normals: 'star' },
+  { id: 'star-volume', name: 'Star - volume', dim: 3, source: source('star-volume') },
+  { id: 'seed-helix-3d', name: 'Helix - cloud', dim: 3, source: source('helix') },
   // The Sphere is a convex shell, so the catalogue vouches it solid-eligible
   // (ADR-0011): the preview re-derives outward normals via normalize(pos −
   // centroid) and offers the solidity slider. The Helix is NOT a shell (centroid
   // normals would be wrong) and the volumetric Cube has no per-point normal, so
   // neither is flagged.
-  { id: 'seed-sphere-3d', name: 'Sphere (shell)', dim: 3, source: source('sphere'), normals: 'centroid' },
+  { id: 'seed-sphere-3d', name: 'Sphere - shell', dim: 3, source: source('sphere'), normals: 'centroid' },
   // The solid sibling of the Sphere shell (ADR-0012): points fill the interior of
   // the ball. A volume has no per-point boundary normal, so it is NOT solid-
   // eligible — it relies on the renderer's depth-tested opaque cores instead.
-  { id: 'sphere-volume', name: 'Sphere (volume)', dim: 3, source: source('sphere-volume') },
+  { id: 'sphere-volume', name: 'Sphere - volume', dim: 3, source: source('sphere-volume') },
   { id: 'seed-ring-2d', name: 'Ring', dim: 2, source: source('ring') },
 ]
 

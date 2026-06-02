@@ -77,7 +77,7 @@ export function DeckSelect<T extends string | number>({
                 onChange(opt.value)
                 setIsOpen(false)
               }}
-              className={`block w-full text-left px-3 py-1 text-xs tabular-nums transition-colors hover:bg-zinc-800 ${
+              className={`block w-full whitespace-nowrap text-left px-3 py-1 text-xs tabular-nums transition-colors hover:bg-zinc-800 ${
                 opt.value === current?.value ? 'text-amber-400' : 'text-zinc-300'
               }`}
             >

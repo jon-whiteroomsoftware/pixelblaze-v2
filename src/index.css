@@ -119,75 +119,97 @@
   background: radial-gradient(140% 100% at 50% 0%, transparent 55%, rgba(0, 0, 0, 0.55));
 }
 
-/* Wordmark "chase" (PXLBLZ): a deliberately dull homage to the one-pixel-at-a-time
-   LED fade. A single bright-amber pulse crawls letter to letter and ping-pongs — on
-   reaching Z it turns and walks back to P, then bounces again. Across one --cycle the
-   pulse visits ten slots: P X L B L Z B L X (and back to P). The two end letters light
-   once per round-trip, the four inner letters twice, so each letter owns a keyframe
-   placing its pulse(s) at the right phase. Subtle by design — a brief warm flare in a
-   long, slow crawl. (#63)
+/* Wordmark "wave" (PXLBLZ): a deliberately dull homage to the one-pixel-at-a-time
+   LED fade. A bright-amber crest glides letter to letter and ping-pongs — on reaching
+   Z it turns and walks back to P, then bounces again. It is not one lit letter but a
+   soft wave: the crest letter is 100%, its immediate neighbours ~22%, the next ones
+   out ~5%, so you can just tell the glow is spreading sideways like a wave projected
+   behind the lens. Across one --cycle the crest visits ten slots: P X L B L Z B L X
+   (and back to P); the two ends peak once per round-trip, the four inner letters
+   twice. Subtle by design. (#63)
 
-   Pulse: each lit moment is centred on a slot (1/10 of the cycle) and spans ~1/10
-   either side, warming to the bright amber accent then fading back to the base text. */
-@keyframes pxlblz-bounce-end-a { /* P: lit once, centred on slot 0 (cycle wrap) */
-  0% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  5%, 95% { color: inherit; text-shadow: none; }
-  100% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+   Mechanics: each letter animates a single numeric intensity (--pxlblz-lvl, 0..100)
+   describing its own brightness over the cycle — a bump that peaks when the crest is
+   over it, with a 22/5 skirt for the one/two slots either side. Colour and glow are
+   derived from that one number below, so the keyframes stay terse and the falloff is
+   defined in exactly one place. */
+@property --pxlblz-lvl {
+  syntax: '<number>';
+  initial-value: 0;
+  inherits: false;
 }
-@keyframes pxlblz-bounce-end-b { /* Z: lit once, centred on slot 5 (mid-cycle) */
-  0%, 45% { color: inherit; text-shadow: none; }
-  50% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  55%, 100% { color: inherit; text-shadow: none; }
+@keyframes pxlblz-wave-p { /* slot 0 (cycle wrap) */
+  0% { --pxlblz-lvl: 100 } 5% { --pxlblz-lvl: 65 } 10% { --pxlblz-lvl: 22.5 }
+  15% { --pxlblz-lvl: 17.5 } 20% { --pxlblz-lvl: 5 } 25% { --pxlblz-lvl: 2.5 }
+  30%, 70% { --pxlblz-lvl: 0 } 75% { --pxlblz-lvl: 2.5 } 80% { --pxlblz-lvl: 5 }
+  85% { --pxlblz-lvl: 17.5 } 90% { --pxlblz-lvl: 22.5 } 95% { --pxlblz-lvl: 65 }
+  100% { --pxlblz-lvl: 100 }
 }
-@keyframes pxlblz-bounce-1 { /* slots 1 and 9 */
-  0%, 5% { color: inherit; text-shadow: none; }
-  10% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  15%, 85% { color: inherit; text-shadow: none; }
-  90% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  95%, 100% { color: inherit; text-shadow: none; }
+@keyframes pxlblz-wave-x { /* slots 1 and 9 */
+  0% { --pxlblz-lvl: 22.5 } 5% { --pxlblz-lvl: 65 } 10% { --pxlblz-lvl: 100 }
+  15% { --pxlblz-lvl: 65 } 20% { --pxlblz-lvl: 22.5 } 25% { --pxlblz-lvl: 17.5 }
+  30% { --pxlblz-lvl: 5 } 35% { --pxlblz-lvl: 2.5 } 40%, 60% { --pxlblz-lvl: 0 }
+  65% { --pxlblz-lvl: 2.5 } 70% { --pxlblz-lvl: 5 } 75% { --pxlblz-lvl: 17.5 }
+  80% { --pxlblz-lvl: 22.5 } 85% { --pxlblz-lvl: 65 } 90% { --pxlblz-lvl: 100 }
+  95% { --pxlblz-lvl: 65 } 100% { --pxlblz-lvl: 22.5 }
 }
-@keyframes pxlblz-bounce-2 { /* slots 2 and 8 */
-  0%, 15% { color: inherit; text-shadow: none; }
-  20% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  25%, 75% { color: inherit; text-shadow: none; }
-  80% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  85%, 100% { color: inherit; text-shadow: none; }
+@keyframes pxlblz-wave-l { /* slots 2 and 8 */
+  0% { --pxlblz-lvl: 5 } 5% { --pxlblz-lvl: 17.5 } 10% { --pxlblz-lvl: 22.5 }
+  15% { --pxlblz-lvl: 65 } 20% { --pxlblz-lvl: 100 } 25% { --pxlblz-lvl: 65 }
+  30% { --pxlblz-lvl: 22.5 } 35% { --pxlblz-lvl: 17.5 } 40% { --pxlblz-lvl: 5 }
+  45% { --pxlblz-lvl: 2.5 } 50% { --pxlblz-lvl: 0 } 55% { --pxlblz-lvl: 2.5 }
+  60% { --pxlblz-lvl: 5 } 65% { --pxlblz-lvl: 17.5 } 70% { --pxlblz-lvl: 22.5 }
+  75% { --pxlblz-lvl: 65 } 80% { --pxlblz-lvl: 100 } 85% { --pxlblz-lvl: 65 }
+  90% { --pxlblz-lvl: 22.5 } 95% { --pxlblz-lvl: 17.5 } 100% { --pxlblz-lvl: 5 }
 }
-@keyframes pxlblz-bounce-3 { /* slots 3 and 7 */
-  0%, 25% { color: inherit; text-shadow: none; }
-  30% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  35%, 65% { color: inherit; text-shadow: none; }
-  70% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  75%, 100% { color: inherit; text-shadow: none; }
+@keyframes pxlblz-wave-b { /* slots 3 and 7 */
+  0% { --pxlblz-lvl: 0 } 5% { --pxlblz-lvl: 2.5 } 10% { --pxlblz-lvl: 5 }
+  15% { --pxlblz-lvl: 17.5 } 20% { --pxlblz-lvl: 22.5 } 25% { --pxlblz-lvl: 65 }
+  30% { --pxlblz-lvl: 100 } 35% { --pxlblz-lvl: 65 } 40% { --pxlblz-lvl: 22.5 }
+  45% { --pxlblz-lvl: 17.5 } 50% { --pxlblz-lvl: 5 } 55% { --pxlblz-lvl: 17.5 }
+  60% { --pxlblz-lvl: 22.5 } 65% { --pxlblz-lvl: 65 } 70% { --pxlblz-lvl: 100 }
+  75% { --pxlblz-lvl: 65 } 80% { --pxlblz-lvl: 22.5 } 85% { --pxlblz-lvl: 17.5 }
+  90% { --pxlblz-lvl: 5 } 95% { --pxlblz-lvl: 2.5 } 100% { --pxlblz-lvl: 0 }
 }
-@keyframes pxlblz-bounce-4 { /* slots 4 and 6 */
-  0%, 35% { color: inherit; text-shadow: none; }
-  40% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  45%, 55% { color: inherit; text-shadow: none; }
-  60% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  65%, 100% { color: inherit; text-shadow: none; }
+@keyframes pxlblz-wave-l2 { /* slots 4 and 6 */
+  0%, 10% { --pxlblz-lvl: 0 } 15% { --pxlblz-lvl: 2.5 } 20% { --pxlblz-lvl: 5 }
+  25% { --pxlblz-lvl: 17.5 } 30% { --pxlblz-lvl: 22.5 } 35% { --pxlblz-lvl: 65 }
+  40% { --pxlblz-lvl: 100 } 45% { --pxlblz-lvl: 65 } 50% { --pxlblz-lvl: 22.5 }
+  55% { --pxlblz-lvl: 65 } 60% { --pxlblz-lvl: 100 } 65% { --pxlblz-lvl: 65 }
+  70% { --pxlblz-lvl: 22.5 } 75% { --pxlblz-lvl: 17.5 } 80% { --pxlblz-lvl: 5 }
+  85% { --pxlblz-lvl: 2.5 } 90%, 100% { --pxlblz-lvl: 0 }
+}
+@keyframes pxlblz-wave-z { /* slot 5 (mid-cycle) */
+  0%, 20% { --pxlblz-lvl: 0 } 25% { --pxlblz-lvl: 2.5 } 30% { --pxlblz-lvl: 5 }
+  35% { --pxlblz-lvl: 17.5 } 40% { --pxlblz-lvl: 22.5 } 45% { --pxlblz-lvl: 65 }
+  50% { --pxlblz-lvl: 100 } 55% { --pxlblz-lvl: 65 } 60% { --pxlblz-lvl: 22.5 }
+  65% { --pxlblz-lvl: 17.5 } 70% { --pxlblz-lvl: 5 } 75% { --pxlblz-lvl: 2.5 }
+  80%, 100% { --pxlblz-lvl: 0 }
 }
 
-/* The crawl visits ten slots per round-trip, so a 20s cycle keeps the original
-   ~2s-per-letter pace. Each letter gets the keyframe for its position in PXLBLZ. */
+/* The crest visits ten slots per round-trip, so a 2.8s cycle gives a ~0.28s-per-letter
+   pace. Colour and glow are derived from --pxlblz-lvl: at 0 the letter rests at the
+   wordmark zinc; at 100 it is the full bright amber with its glow. */
 .pxlblz-letter {
-  --cycle: 20s;
+  --cycle: 2.8s;
+  color: color-mix(in srgb, #fbbf24 calc(var(--pxlblz-lvl) * 1%), #f4f4f5);
+  text-shadow: 0 0 9px rgba(251, 191, 36, calc(var(--pxlblz-lvl) * 0.0055));
   animation-duration: var(--cycle);
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
-.pxlblz-letter:nth-child(1) { animation-name: pxlblz-bounce-end-a; } /* P */
-.pxlblz-letter:nth-child(2) { animation-name: pxlblz-bounce-1; }     /* X */
-.pxlblz-letter:nth-child(3) { animation-name: pxlblz-bounce-2; }     /* L */
-.pxlblz-letter:nth-child(4) { animation-name: pxlblz-bounce-3; }     /* B */
-.pxlblz-letter:nth-child(5) { animation-name: pxlblz-bounce-4; }     /* L */
-.pxlblz-letter:nth-child(6) { animation-name: pxlblz-bounce-end-b; } /* Z */
+.pxlblz-letter:nth-child(1) { animation-name: pxlblz-wave-p; }  /* P */
+.pxlblz-letter:nth-child(2) { animation-name: pxlblz-wave-x; }  /* X */
+.pxlblz-letter:nth-child(3) { animation-name: pxlblz-wave-l; }  /* L */
+.pxlblz-letter:nth-child(4) { animation-name: pxlblz-wave-b; }  /* B */
+.pxlblz-letter:nth-child(5) { animation-name: pxlblz-wave-l2; } /* L */
+.pxlblz-letter:nth-child(6) { animation-name: pxlblz-wave-z; }  /* Z */
 
 /* Under reduce-motion we keep the chase — it is a pure colour crossfade with no
    spatial movement, the kind of motion that setting targets — but slow it down so
    it reads as an even gentler ambient warmth. */
 @media (prefers-reduced-motion: reduce) {
   .pxlblz-letter {
-    --cycle: 30s;
+    --cycle: 4.2s;
   }
 }

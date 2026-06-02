@@ -156,11 +156,11 @@ export default function App() {
             ) : (
               <>
             <span className="flex-1 min-w-0 flex items-center gap-1.5">
-              <span className="truncate">{activeFileName}</span>
+              <span className="truncate text-zinc-200">{activeFileName}</span>
               {exportedDims(source).map((d) => (
                 <span
                   key={d}
-                  className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-500 border border-zinc-700 leading-none"
+                  className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-400 border border-zinc-700 leading-none"
                 >
                   {d}D
                 </span>

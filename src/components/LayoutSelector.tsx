@@ -62,7 +62,7 @@ export function LayoutSelector() {
           value={mapValue ?? maps[0].id}
           options={maps.map((o) => ({ value: o.id, label: o.name, badge: `${o.displayDim}D` }))}
           onChange={(id) => route(id, maps)}
-          menuWidthClass="w-28"
+          menuWidthClass="w-44"
         />
       )}
       {showEmbedding && (
