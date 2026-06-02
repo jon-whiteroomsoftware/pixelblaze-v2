@@ -31,11 +31,11 @@ export function Variables() {
       <button
         aria-expanded={watchPatternVars}
         onClick={() => setWatchPatternVars(!watchPatternVars)}
-        className="w-full flex items-center justify-between gap-1 text-[11px] font-semibold text-structural uppercase tracking-wider hover:text-live transition-colors"
+        className="flex items-center gap-1 text-[11px] font-semibold text-structural uppercase tracking-wider hover:text-live transition-colors"
       >
-        <span>Variables</span>
+        <span>Watch variables</span>
         <ChevronDown
-          size={15}
+          size={17}
           className={`shrink-0 transition-transform ${watchPatternVars ? '' : '-rotate-90'}`}
         />
       </button>

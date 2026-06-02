@@ -55,7 +55,7 @@ const DEMO_SECTIONS: { label: string; names: string[] }[] = [
 function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
     <ChevronDown
-      size={15}
+      size={17}
       className={`shrink-0 transition-transform ${collapsed ? '-rotate-90' : ''}`}
     />
   )

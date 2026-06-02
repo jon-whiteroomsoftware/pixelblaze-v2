@@ -1,5 +1,6 @@
 import { useEditorStore } from '@/store/editorStore'
 import { useControlStore, type ControlValue } from '@/store/controlStore'
+import { DeckSlider } from '@/components/DeckSlider'
 
 function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   const i = Math.floor(h * 6)
@@ -64,21 +65,15 @@ export function ControlsPanel() {
     const raw = controlValues[c.exportName]
     const value = typeof raw === 'number' ? raw : 0.5
     return (
-      <label key={c.exportName} className="flex flex-col gap-1">
-        <span className="text-zinc-400">{c.label.toLowerCase()}</span>
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={value}
-            onChange={(e) => setControlValue(c.exportName, Number(e.target.value))}
-            className="w-2/3 accent-live"
-          />
-          <span className="flex-1 text-right text-live tabular-nums">{value.toFixed(2)}</span>
-        </div>
-      </label>
+      <DeckSlider
+        key={c.exportName}
+        label={c.label.toLowerCase()}
+        value={value}
+        min={0}
+        max={1}
+        step={0.01}
+        onChange={(v) => setControlValue(c.exportName, v)}
+      />
     )
   }
 
@@ -122,7 +117,7 @@ export function ControlsPanel() {
   return (
     <div className="font-mono text-xs mt-1 pt-1.5 pb-3 pr-3">
       <h4 className="text-[11px] font-semibold text-structural uppercase tracking-wider mb-2">
-        Controls
+        Pattern controls
       </h4>
       <div className="flex flex-col gap-2">
         {sliders.length > 0 && (
