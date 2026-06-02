@@ -354,10 +354,13 @@ null` to `editorStore`, and feeds `mapPoints`/`draw` to the renderer and render 
 holds no layout branching itself. To stay engine-pure (no store/React import, no import
 cycle), `resolveLayout` takes its store-coupled lookups as injected `deps`
 (`resolveMap`, `defaultCountForDim`); this is also what makes every branch
-table-testable with fake maps (`resolveLayout.test.ts`). The cylinder wrap reads the
-map's grid off the map itself — `PixelMap.gridDims(count)` (stock generators derive it
-live, a custom lattice replays its baked dims), so no `mapGridDims` provenance helper is
-injected. Each branch's MODELED count runs through one selector,
+table-testable with fake maps (`resolveLayout.test.ts`). Both the cylinder wrap and the
+`cols×rows(×depth)` readout label read the map's grid off the map itself —
+`PixelMap.gridDims(count)` (stock generators derive it live, a custom lattice replays its
+baked dims), so no `mapGridDims` provenance helper is injected. One rule, no id special-
+cases: a map shows a label exactly when its `gridDims` is non-null — the Square/Wide 2:1
+planes and the volumetric cube's side³ lattice do; shells and irregular clouds (Ring,
+sphere shell) don't. Each branch's MODELED count runs through one selector,
 `effectivePixelCount({ persisted, recommended, baked, fallback })` (`persisted ??
 recommended ?? baked ?? fallback`, ADR-0004) — re-exported so the deck's editable count
 box reads the same chain the renderer does, rather than open-coding it.
