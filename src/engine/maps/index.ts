@@ -1,4 +1,4 @@
-export type { MapPoint, PixelMap, GridDims } from './types'
+export type { MapPoint, PixelMap, GridDims, NormalRecipe } from './types'
 export { bakeMapSource, detectGridDims } from './bake'
 export type { BakedMap } from './bake'
 export { createPlaneMap, planePoint, squarePlaneDims } from './plane'

@@ -15,7 +15,7 @@
 
 import type { ShapeId } from './shapes'
 import type { SurfaceId } from './surfaces'
-import type { MapPoint, PixelMap, GridDims, NormalizeMode } from './maps'
+import type { MapPoint, PixelMap, GridDims, NormalizeMode, NormalRecipe } from './maps'
 import { cubePixelCount, squarePlaneDims, applyNormalizeMode } from './maps'
 import {
   SHAPES,
@@ -28,6 +28,15 @@ import { cylinderSurfacePositions, cylinderSurfaceNormals } from './surfaces'
 import { clampPixelCount, cubeSideForCount } from './camera'
 import { centroidNormals, faceNormals } from './centroidNormals'
 import { starShellNormals } from './maps/starGeometry'
+
+// The map a NormalRecipe tag resolves to its derivation (ADR-0011/0012): the
+// catalogue declares the recipe NAME; the resolver owns the function lookup, so
+// no map-id strings leak in here. A new shell ships its recipe in the catalogue.
+const NORMAL_FNS: Record<NormalRecipe, (positions: [number, number, number][]) => [number, number, number][]> = {
+  face: faceNormals,
+  star: starShellNormals,
+  centroid: centroidNormals,
+}
 
 export type LayoutKind = 'shape' | 'surface' | 'map'
 
@@ -213,7 +222,8 @@ export function resolveLayoutSelection(
 // surface normals, and reports the realized grid label. The component that
 // consumes it is pure wiring: it writes correctedSelection back to the store,
 // feeds `draw`/`mapPoints` to the renderer and render loop, and surfaces
-// `displayDim`/`layoutLabel`/`solidEligible` to the editor store.
+// `displayDim`/`layoutLabel` to the editor store (solid-eligibility falls out as
+// `draw.normals !== null`).
 //
 // Store-coupled lookups are INJECTED (`deps`) so this stays engine-pure (no
 // store/React import, no import cycle) and table-testable with fakes: a test
@@ -334,17 +344,12 @@ export function resolveLayout(
         mapPoints = applyNormalizeMode(map.resolve(pixelCount), normalizeMode)
       }
       positions3D = mapPoints.map((p) => p.pos as [number, number, number])
-      // A solid-eligible stock 3D map (ADR-0011/0012) carries no baked normal,
-      // so the preview re-derives one — the faceted Cube shell uses per-face
-      // normals, the Star shell its stellation faces, a convex shell the generic
-      // centroid radial. (Candidate 2 will move this recipe onto the map.)
-      if (map.solidEligible) {
-        normals3D =
-          map.id === 'cube-shell'
-            ? faceNormals(positions3D)
-            : map.id === 'star-shell'
-              ? starShellNormals(positions3D)
-              : centroidNormals(positions3D)
+      // A solid-eligible stock 3D map (ADR-0011/0012) carries no baked normal, so
+      // the preview re-derives one per the map's declared recipe — the faceted Cube
+      // shell uses per-face normals, the Star shell its stellation faces, a convex
+      // shell the generic centroid radial. No recipe ⇒ not solid-eligible.
+      if (map.normals) {
+        normals3D = NORMAL_FNS[map.normals](positions3D)
       }
       displayDim = 3
     } else if (map.id !== 'plane') {

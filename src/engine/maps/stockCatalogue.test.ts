@@ -44,20 +44,21 @@ describe('stock catalogue', () => {
     expect(mapById('seed-sphere-3d').dim).toBe(3)
   })
 
-  it('flags the convex Sphere shell and the faceted Cube shell solid-eligible (ADR-0011/0012)', () => {
+  it('ships each shell its normal recipe, so eligibility lives in the catalogue (ADR-0011/0012)', () => {
     // The Sphere vouches a centroid normal is honest; the Cube shell carries per-
-    // face normals. The Helix (not a shell), the volume Cube and every other stock
-    // map carry no flag and stay see-through.
-    expect(mapById('seed-sphere-3d').solidEligible).toBe(true)
-    expect(mapById('cube-shell').solidEligible).toBe(true)
-    expect(mapById('star-shell').solidEligible).toBe(true)
-    expect(mapById('seed-helix-3d').solidEligible).toBeUndefined()
-    expect(mapById('cube').solidEligible).toBeUndefined()
-    expect(mapById('plane').solidEligible).toBeUndefined()
+    // face normals; the Star shell its stellation faces. The recipe's PRESENCE is
+    // the solid-eligibility gate. The Helix (not a shell), the volume Cube and every
+    // other stock map carry no recipe and stay see-through.
+    expect(mapById('seed-sphere-3d').normals).toBe('centroid')
+    expect(mapById('cube-shell').normals).toBe('face')
+    expect(mapById('star-shell').normals).toBe('star')
+    expect(mapById('seed-helix-3d').normals).toBeUndefined()
+    expect(mapById('cube').normals).toBeUndefined()
+    expect(mapById('plane').normals).toBeUndefined()
     // A volume has no per-point boundary normal, so a solid ball / solid star is
     // never solid-eligible — it leans on the renderer's depth-tested opaque cores.
-    expect(mapById('sphere-volume').solidEligible).toBeUndefined()
-    expect(mapById('star-volume').solidEligible).toBeUndefined()
+    expect(mapById('sphere-volume').normals).toBeUndefined()
+    expect(mapById('star-volume').normals).toBeUndefined()
   })
 
   it('exposes the relocated cloud ids for IDB pruning', () => {
@@ -151,7 +152,7 @@ function surfaceFractions(coords: number[][]): number[] {
 describe('star shell (stellated surface, ADR-0012)', () => {
   it('is a distinct, solid-eligible 3D map (not the volume)', () => {
     expect(mapById('star-shell').dim).toBe(3)
-    expect(mapById('star-shell').solidEligible).toBe(true)
+    expect(mapById('star-shell').normals).toBe('star')
     expect(mapById('star-shell').id).not.toBe(mapById('star-volume').id)
   })
 
@@ -194,7 +195,7 @@ describe('star shell (stellated surface, ADR-0012)', () => {
 
 describe('star volume (filled stellated solid, ADR-0012)', () => {
   it('is NOT solid-eligible', () => {
-    expect(mapById('star-volume').solidEligible).toBeUndefined()
+    expect(mapById('star-volume').normals).toBeUndefined()
   })
 
   it('fills the interior out to the spiky boundary, never past it', () => {

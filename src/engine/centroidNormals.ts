@@ -3,9 +3,10 @@
 // A baked 3D point cloud (the Sphere stock map) arrives as `xyz` with no
 // formula, so the preview re-derives a per-point outward normal as
 // `normalize(pos − centroid)`. This is exact for a CONVEX SHELL (a sphere) and
-// is why eligibility is provenance-gated: the stock catalogue flags the sphere
-// as `solidEligible`, vouching that the centroid math is honest for it. A
-// non-flagged cloud (a torus, a measured tree) never reaches this code.
+// is why eligibility is provenance-gated: the stock catalogue tags the sphere
+// with the `centroid` normal recipe, vouching that the centroid math is honest
+// for it. A cloud carrying no recipe (a torus, a measured tree) never reaches
+// this code.
 //
 // Pure: no DOM/React. The normals are preview-only — never written to a map
 // record nor sent to a controller (the same status as the analytic surface

@@ -282,7 +282,8 @@ The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (label "Square"), `wide`
 ("Wide 2:1"), `seed-ring-2d` ("Ring") — 2D; and the 3D set, named by the **shell /
 volume** scheme (ADR-0012): `cube` ("Cube (volume)"), `cube-shell` ("Cube (shell)"),
 `star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere (shell)"), `sphere-volume`,
-plus `seed-helix-3d` ("Helix (cloud)"). Shell entries carry `solidEligible: true`
+plus `seed-helix-3d` ("Helix (cloud)"). Shell entries carry a `normals` recipe
+(`'face' | 'star' | 'centroid'`), whose presence is the solid-eligibility gate
 (§9). The old wireframe `star` and the no-source "drape cylinder" are both retired.
 
 ### Custom maps bake on save (ADR-0007)
@@ -380,8 +381,10 @@ Eligibility is **the presence of a per-point normal**, and is **provenance-gated
 geometry-inferred**: the IDE supplies a normal only because it owns the generator —
 analytic embeddings (Cylinder) emit it from their formula, faceted shells (Cube/Star
 shell) emit per-face normals, a convex shell (Sphere) re-derives
-`normalize(pos − centroid)` *because the catalogue entry sets `solidEligible: true`*.
-A hand-imported sphere-shaped cloud sets no flag and is never solid-able. Normals
+`normalize(pos − centroid)` *because the catalogue entry tags it with a `normals`
+recipe* (`'face' | 'star' | 'centroid'`); the resolver maps that tag to the
+derivation (`NORMAL_FNS` in `layout.ts`), so no map-id strings leak into it.
+A hand-imported sphere-shaped cloud carries no recipe and is never solid-able. Normals
 (`centroidNormals.ts`, `starGeometry.ts`) are preview-only — **never** stored in a map
 or sent to a controller (a Pixelblaze map is positions only). Solidity persists on
 `PatternRecord.solidity` (default `1.0`) and `editorStore.solidEligible` gates whether

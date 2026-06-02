@@ -1,4 +1,4 @@
-import type { MapPoint, PixelMap } from './types'
+import type { MapPoint, NormalRecipe, PixelMap } from './types'
 import { evalMapSource } from './evalMapSource'
 import { normalizeAspect } from './normalize'
 
@@ -12,10 +12,10 @@ export interface SourceMapSpec {
   displayDim?: 1 | 2 | 3
   // Raw `function(pixelCount){ … return coords }` JavaScript (Vite `?raw` text).
   source: string
-  // Provenance-gated solidity eligibility (ADR-0011): set only on a stock map the
-  // catalogue vouches is a convex shell, so the preview re-derives centroid
-  // normals and offers the solidity slider. Carried through onto the PixelMap.
-  solidEligible?: boolean
+  // Provenance-gated normal recipe (ADR-0011/0012): set only on a stock 3D shell
+  // the catalogue vouches for, so the preview derives the matching per-point normal
+  // and offers the solidity slider. Carried through onto the PixelMap.
+  normals?: NormalRecipe
 }
 
 // Build a live, source-backed PixelMap. `resolve(pixelCount)` runs the raw source
@@ -31,7 +31,7 @@ export function createSourceMap(spec: SourceMapSpec): PixelMap {
     builtin: true,
     dim: spec.dim,
     ...(spec.displayDim !== undefined ? { displayDim: spec.displayDim } : {}),
-    ...(spec.solidEligible ? { solidEligible: true } : {}),
+    ...(spec.normals ? { normals: spec.normals } : {}),
     resolve(pixelCount: number): MapPoint[] {
       const normalized = normalizeAspect(evalMapSource(spec.source, pixelCount))
       return normalized.map((c) => ({ sample: [...c], pos: [...c] as MapPoint['pos'] }))

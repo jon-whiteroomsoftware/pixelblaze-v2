@@ -54,9 +54,9 @@ const MAPS: Record<string, PixelMap> = {
   plane: makeMap({ id: 'plane', dim: 2 }),
   ring2d: makeMap({ id: 'ring2d', dim: 2, bakedCount: 60 }),
   cube: makeMap({ id: 'cube', dim: 3 }),
-  'cube-shell': makeMap({ id: 'cube-shell', dim: 3, solidEligible: true }),
-  'star-shell': makeMap({ id: 'star-shell', dim: 3, solidEligible: true }),
-  sphere: makeMap({ id: 'sphere', dim: 3, solidEligible: true }),
+  'cube-shell': makeMap({ id: 'cube-shell', dim: 3, normals: 'face' }),
+  'star-shell': makeMap({ id: 'star-shell', dim: 3, normals: 'star' }),
+  sphere: makeMap({ id: 'sphere', dim: 3, normals: 'centroid' }),
   helix: makeMap({ id: 'helix', dim: 3 }),
 }
 

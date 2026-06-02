@@ -25,6 +25,15 @@ export interface GridDims {
   depth?: number
 }
 
+// The recipe for a 3D shell map's per-point outward normals (ADR-0011/0012), a
+// declarative tag the catalogue stamps on a map and the layout resolver maps to
+// the matching derivation: `face` (the faceted Cube shell's dominant-axis normal),
+// `star` (the Star shell's per-stellation-face normal), `centroid` (the generic
+// `normalize(pos − centroid)` for a convex shell, e.g. the Sphere). Its PRESENCE
+// is the provenance gate that makes the map solid-eligible (ADR-0011) — absent for
+// volumes and irregular clouds, which never offer the solidity slider.
+export type NormalRecipe = 'face' | 'star' | 'centroid'
+
 export interface PixelMap {
   id: string
   name: string
@@ -47,13 +56,14 @@ export interface PixelMap {
   // at bake (ADR-0009) so the layout readout shows `cols×rows(×depth)`. Absent
   // for irregular clouds and for stock generators (which derive dims live).
   gridDims?: GridDims
-  // Provenance-gated solidity eligibility (ADR-0011): set ONLY on a stock map the
-  // catalogue vouches is a convex shell (the 3D Sphere). The preview then derives
-  // a per-point outward normal generically as `normalize(pos − centroid)` and
-  // offers the solidity slider. A hand-imported sphere-shaped cloud sets no flag
-  // and is never solid-able, even though the identical centroid math would run.
-  // Preview-only — never written to a map record nor sent to a controller.
-  solidEligible?: boolean
+  // Provenance-gated solidity eligibility (ADR-0011): the normal RECIPE the stock
+  // catalogue vouches for a 3D shell (`face`/`star`/`centroid`). The preview derives
+  // the per-point outward normal accordingly and offers the solidity slider; its
+  // presence IS the eligibility gate (there is no separate flag). A hand-imported
+  // sphere-shaped cloud carries no recipe and is never solid-able, even though the
+  // identical centroid math would run. Preview-only — never written to a map record
+  // nor sent to a controller.
+  normals?: NormalRecipe
   // Stock maps store their generator params (re-derivable/editable). Handed the
   // modeled pixelCount; returns one MapPoint per index, 0 .. pixelCount-1.
   resolve(pixelCount: number): MapPoint[]
