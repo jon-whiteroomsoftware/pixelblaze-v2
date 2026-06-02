@@ -25,7 +25,7 @@ import { createVirtualClock } from '@/engine/virtualClock'
 import { clampPixelCount, advanceAutoOrbit } from '@/engine/camera'
 import { layoutSource as buildLayoutSource } from '@/store/mapStore'
 import { resolveLayout, resolveSolidity } from '@/engine/layout'
-import { polePositions, poleNormals, defaultPoleCols, type ShapeId } from '@/engine/shapes'
+import { resolvePole, type ShapeId } from '@/engine/shapes'
 import { type SurfaceId } from '@/engine/surfaces'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
@@ -442,9 +442,8 @@ export function Preview() {
     const renderer = rendererRef.current
     if (!renderer) return
     const count = clampPixelCount(activePixelCount ?? DEFAULT_SHAPE_PIXEL_COUNT)
-    const cols = poleCols ?? defaultPoleCols(count)
-    const positions = polePositions(count, cols)
-    renderer.set3DPositions(positions, { canvasPx: canvas3DPx, normals: poleNormals(count, cols) })
+    const pole = resolvePole(count, poleCols)
+    renderer.set3DPositions(pole.positions, { canvasPx: canvas3DPx, normals: pole.normals })
     // set3DPositions re-measures the layout's neighbour pitch + extent, so the orb
     // sizing and diffusion glow track the new geometry; reassert diffusion + solidity.
     renderer.setDiffusion(usePreviewStore.getState().diffusion)

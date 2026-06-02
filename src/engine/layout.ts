@@ -20,9 +20,7 @@ import { cubePixelCount, squarePlaneDims, applyNormalizeMode } from './maps'
 import {
   SHAPES,
   embedPositions,
-  polePositions,
-  poleNormals,
-  defaultPoleCols,
+  resolvePole,
 } from './shapes'
 import { cylinderSurfacePositions, cylinderSurfaceNormals } from './surfaces'
 import { clampPixelCount, cubeSideForCount } from './camera'
@@ -332,9 +330,9 @@ export function resolveLayout(
     )
     if (shape.displayDim === 3) {
       // Pole: a 1D strip wrapped onto a cylinder, drawn in 3D.
-      const cols = poleCols ?? defaultPoleCols(pixelCount)
-      positions3D = polePositions(pixelCount, cols)
-      normals3D = poleNormals(pixelCount, cols)
+      const pole = resolvePole(pixelCount, poleCols)
+      positions3D = pole.positions
+      normals3D = pole.normals
       mapPoints = positions3D.map((pos) => ({ sample: [], pos }))
       displayDim = 3
     } else {

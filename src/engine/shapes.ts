@@ -219,6 +219,26 @@ export function polePositions(
   return out
 }
 
+// Resolve the pole's full 3D draw geometry in one shot: fill the wrap-column
+// default, then derive the parallel position + normal arrays. The single source
+// of truth shared by `resolveLayout` (initial build) and the pole-density
+// fast-path effect (slider re-derive), so both stay in lockstep.
+export function resolvePole(
+  pixelCount: number,
+  poleCols: number | null,
+): {
+  cols: number
+  positions: [number, number, number][]
+  normals: [number, number, number][]
+} {
+  const cols = poleCols ?? defaultPoleCols(pixelCount)
+  return {
+    cols,
+    positions: polePositions(pixelCount, cols),
+    normals: poleNormals(pixelCount, cols),
+  }
+}
+
 // Resolve a whole 1D path: one display position per index, 0 .. pixelCount-1.
 // Pure over `pixelCount` — touches no `sample`.
 export function embedPositions(shape: Shape, pixelCount: number): [number, number][] {

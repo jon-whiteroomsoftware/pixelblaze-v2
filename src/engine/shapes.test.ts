@@ -10,6 +10,7 @@ import {
   polePositions,
   poleNormal,
   poleNormals,
+  resolvePole,
   type Shape,
 } from './shapes'
 import type { MapPoint } from './maps'
@@ -164,6 +165,25 @@ describe('shapes (viewport 1D embeddings)', () => {
     it('repeats the normal each wrap (depends on column, not row)', () => {
       const cols = 8
       expect(poleNormal(0, 64, cols)).toEqual(poleNormal(cols, 64, cols))
+    })
+
+    describe('resolvePole (shared geometry helper)', () => {
+      it('fills the column default when none is requested', () => {
+        const { cols } = resolvePole(64, null)
+        expect(cols).toBe(defaultPoleCols(64))
+      })
+
+      it('honours an explicit column request', () => {
+        const { cols } = resolvePole(64, 5)
+        expect(cols).toBe(5)
+      })
+
+      it('returns positions + normals parallel to the standalone resolvers', () => {
+        const r = resolvePole(64, 5)
+        expect(r.positions).toEqual(polePositions(64, 5))
+        expect(r.normals).toEqual(poleNormals(64, 5))
+        expect(r.normals).toHaveLength(r.positions.length)
+      })
     })
   })
 
