@@ -6,6 +6,7 @@ import { useMapStore, defaultPixelCountForDim } from '@/store/mapStore'
 import { usePatternStore } from '@/store/patternStore'
 import { recommendedPixelCountFor } from '@/pixelblaze/demos'
 import { clampPixelCount } from '@/engine/camera'
+import { effectivePixelCount } from '@/engine/layout'
 import { LayoutSelector } from '@/components/LayoutSelector'
 import { SpeedSelector } from '@/components/SpeedSelector'
 import { DeckSelect } from '@/components/DeckSelect'
@@ -64,12 +65,16 @@ function PixelCountInput() {
   const nativeDim = useEditorStore((s) => s.nativeDim)
   const activeDemoName = usePatternStore((s) => s.activeDemoName)
 
-  // The effective count: the per-pattern value, else a demo's recommended count, else
-  // the dimension's default. Keyed off the layout's coordinate dimension (nativeDim),
-  // not the viewport dimension — and mirrors the same fallback the renderer uses, so
-  // the box reads the count actually rendered.
-  const effectiveCount =
-    activePixelCount ?? recommendedPixelCountFor(activeDemoName) ?? defaultPixelCountForDim(nativeDim)
+  // The effective modeled count, via the same `effectivePixelCount` selector the
+  // renderer feeds every layout branch through (ADR-0004) — the per-pattern value,
+  // else a demo's recommended count, else the dimension's default. Keyed off the
+  // layout's coordinate dimension (nativeDim), not the viewport dimension, so the box
+  // reads the count actually rendered. (No `baked` slot: the deck has no resolved map.)
+  const effectiveCount = effectivePixelCount({
+    persisted: activePixelCount,
+    recommended: recommendedPixelCountFor(activeDemoName),
+    fallback: defaultPixelCountForDim(nativeDim),
+  })
   const [draftCount, setDraftCount] = useState(String(effectiveCount))
 
   // Reflect external count changes (pattern switch, default per dimension) into the

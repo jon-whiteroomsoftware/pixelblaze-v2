@@ -357,7 +357,10 @@ cycle), `resolveLayout` takes its store-coupled lookups as injected `deps`
 table-testable with fake maps (`resolveLayout.test.ts`). The cylinder wrap reads the
 map's grid off the map itself — `PixelMap.gridDims(count)` (stock generators derive it
 live, a custom lattice replays its baked dims), so no `mapGridDims` provenance helper is
-injected.
+injected. Each branch's MODELED count runs through one selector,
+`effectivePixelCount({ persisted, recommended, baked, fallback })` (`persisted ??
+recommended ?? baked ?? fallback`, ADR-0004) — re-exported so the deck's editable count
+box reads the same chain the renderer does, rather than open-coding it.
 
 ### Recommendation registries (`demos.ts`)
 

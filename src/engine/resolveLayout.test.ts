@@ -1,5 +1,6 @@
 import {
   resolveLayout,
+  effectivePixelCount,
   type LayoutSource,
   type ResolveLayoutDeps,
   type ResolveLayoutInput,
@@ -80,6 +81,19 @@ function input(over: Partial<ResolveLayoutInput>): ResolveLayoutInput {
     ...over,
   }
 }
+
+describe('effectivePixelCount — the modeled-count precedence chain', () => {
+  it('persisted beats recommended beats baked beats fallback', () => {
+    expect(effectivePixelCount({ persisted: 7, recommended: 8, baked: 9, fallback: 10 })).toBe(7)
+    expect(effectivePixelCount({ persisted: null, recommended: 8, baked: 9, fallback: 10 })).toBe(8)
+    expect(effectivePixelCount({ persisted: null, baked: 9, fallback: 10 })).toBe(9)
+    expect(effectivePixelCount({ persisted: null, fallback: 10 })).toBe(10)
+  })
+
+  it('treats a 0 count as a real value (not skipped by ??)', () => {
+    expect(effectivePixelCount({ persisted: 0, fallback: 10 })).toBe(0)
+  })
+})
 
 describe('resolveLayout — 1D shapes', () => {
   it('line draws through the 2D channel with an empty sample', () => {

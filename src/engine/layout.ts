@@ -166,6 +166,23 @@ export function resolveSolidity(
   return persisted ?? recommended ?? fallback
 }
 
+// The single precedence chain for a layout's MODELED pixel count (ADR-0004), the
+// pre-arrangement knob the user edits — before a map squares it up to a lattice
+// (cube/plane) or a shape stretches it along a strip. A pattern's PERSISTED count
+// wins; else a demo's RECOMMENDED count; else a custom map's BAKED length (the
+// count its frozen array was authored at); else the per-dimension default. Stock
+// generators carry no `baked`, so that slot drops out for them. The resolver feeds
+// every map branch through this, and the deck's count box reads the same selector
+// so the editable number matches what is rendered.
+export function effectivePixelCount(opts: {
+  persisted: number | null
+  recommended?: number
+  baked?: number
+  fallback: number
+}): number {
+  return opts.persisted ?? opts.recommended ?? opts.baked ?? opts.fallback
+}
+
 // Resolve the layout a pattern opens with, validating its persisted selection
 // against the pattern's native dimensionality and the live catalogue:
 //   • the MAP is the persisted `mapId` if still a valid dim-matched option, else
@@ -310,7 +327,9 @@ export function resolveLayout(
   if (correctedSelection.shapeId) {
     // 1D shape: pos-only embedding over an empty sample.
     const shape = SHAPES[correctedSelection.shapeId as ShapeId]
-    pixelCount = clampPixelCount(persistedCount ?? shapeDefaultCount)
+    pixelCount = clampPixelCount(
+      effectivePixelCount({ persisted: persistedCount, fallback: shapeDefaultCount }),
+    )
     if (shape.displayDim === 3) {
       // Pole: a 1D strip wrapped onto a cylinder, drawn in 3D.
       const cols = poleCols ?? defaultPoleCols(pixelCount)
@@ -325,20 +344,25 @@ export function resolveLayout(
     }
   } else {
     const map = resolveMap(correctedSelection.mapId)
+    // The shared modeled count for every map branch (ADR-0004): a stock generator
+    // carries no `baked`, so that slot drops out; the cube then squares this up.
+    const modeledCount = effectivePixelCount({
+      persisted: persistedCount,
+      recommended: recommendedCount,
+      baked: map.bakedCount,
+      fallback: defaultCountForDim(map.dim),
+    })
     if (map.dim === 3) {
       if (map.id === 'cube') {
         // 3D cube lattice: the count squares up to a side³ lattice (ADR-0004/0008).
-        const count = persistedCount ?? recommendedCount ?? defaultCountForDim(3)
-        const cubeSide = cubeSideForCount(count)
+        const cubeSide = cubeSideForCount(modeledCount)
         pixelCount = clampPixelCount(cubePixelCount(cubeSide))
         mapPoints = applyNormalizeMode(map.resolve(pixelCount), normalizeMode)
         layoutLabel = `${cubeSide}×${cubeSide}×${cubeSide}`
       } else {
         // 3D point cloud: stock regenerates live; a custom replays its baked
         // array index-aligned to the count (ADR-0007/0008).
-        pixelCount = clampPixelCount(
-          persistedCount ?? recommendedCount ?? map.bakedCount ?? defaultCountForDim(3),
-        )
+        pixelCount = clampPixelCount(modeledCount)
         mapPoints = applyNormalizeMode(map.resolve(pixelCount), normalizeMode)
       }
       positions3D = mapPoints.map((p) => p.pos as [number, number, number])
@@ -352,15 +376,13 @@ export function resolveLayout(
       displayDim = 3
     } else if (map.id !== 'plane') {
       // 2D point cloud: irregular positions drawn through the 2D pos channel.
-      pixelCount = clampPixelCount(
-        persistedCount ?? recommendedCount ?? map.bakedCount ?? defaultCountForDim(2),
-      )
+      pixelCount = clampPixelCount(modeledCount)
       mapPoints = applyNormalizeMode(map.resolve(pixelCount), normalizeMode)
       positions2D = mapPoints.map((p) => p.pos as [number, number])
       displayDim = 2
     } else {
       // 2D stock plane: the count squares up to the most-square grid (ADR-0004/0009).
-      pixelCount = clampPixelCount(persistedCount ?? recommendedCount ?? defaultCountForDim(2))
+      pixelCount = clampPixelCount(modeledCount)
       const planeDims = squarePlaneDims(pixelCount)
       mapPoints = applyNormalizeMode(map.resolve(pixelCount), normalizeMode)
       positions2D = mapPoints.map((p) => p.pos as [number, number])
