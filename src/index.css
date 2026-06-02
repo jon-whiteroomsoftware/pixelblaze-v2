@@ -120,25 +120,74 @@
 }
 
 /* Wordmark "chase" (PXLBLZ): a deliberately dull homage to the one-pixel-at-a-time
-   LED fade. Each letter briefly warms to the duller amber (#f59e0b) and fades back,
-   staggered so the next lights as the previous is almost out. Subtle by design —
-   a short bright window inside a long, slow cycle. Per-letter delay is set inline. */
-@keyframes pxlblz-letter-chase {
-  0% { color: inherit; text-shadow: none; }
-  5% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
-  16% { color: inherit; text-shadow: none; }
-  100% { color: inherit; text-shadow: none; }
+   LED fade. A single bright-amber pulse crawls letter to letter and ping-pongs — on
+   reaching Z it turns and walks back to P, then bounces again. Across one --cycle the
+   pulse visits ten slots: P X L B L Z B L X (and back to P). The two end letters light
+   once per round-trip, the four inner letters twice, so each letter owns a keyframe
+   placing its pulse(s) at the right phase. Subtle by design — a brief warm flare in a
+   long, slow crawl. (#63)
+
+   Pulse: each lit moment is centred on a slot (1/10 of the cycle) and spans ~1/10
+   either side, warming to the bright amber accent then fading back to the base text. */
+@keyframes pxlblz-bounce-end-a { /* P: lit once, centred on slot 0 (cycle wrap) */
+  0% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  5%, 95% { color: inherit; text-shadow: none; }
+  100% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+}
+@keyframes pxlblz-bounce-end-b { /* Z: lit once, centred on slot 5 (mid-cycle) */
+  0%, 45% { color: inherit; text-shadow: none; }
+  50% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  55%, 100% { color: inherit; text-shadow: none; }
+}
+@keyframes pxlblz-bounce-1 { /* slots 1 and 9 */
+  0%, 5% { color: inherit; text-shadow: none; }
+  10% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  15%, 85% { color: inherit; text-shadow: none; }
+  90% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  95%, 100% { color: inherit; text-shadow: none; }
+}
+@keyframes pxlblz-bounce-2 { /* slots 2 and 8 */
+  0%, 15% { color: inherit; text-shadow: none; }
+  20% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  25%, 75% { color: inherit; text-shadow: none; }
+  80% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  85%, 100% { color: inherit; text-shadow: none; }
+}
+@keyframes pxlblz-bounce-3 { /* slots 3 and 7 */
+  0%, 25% { color: inherit; text-shadow: none; }
+  30% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  35%, 65% { color: inherit; text-shadow: none; }
+  70% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  75%, 100% { color: inherit; text-shadow: none; }
+}
+@keyframes pxlblz-bounce-4 { /* slots 4 and 6 */
+  0%, 35% { color: inherit; text-shadow: none; }
+  40% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  45%, 55% { color: inherit; text-shadow: none; }
+  60% { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, 0.55); }
+  65%, 100% { color: inherit; text-shadow: none; }
 }
 
+/* The crawl visits ten slots per round-trip, so a 20s cycle keeps the original
+   ~2s-per-letter pace. Each letter gets the keyframe for its position in PXLBLZ. */
 .pxlblz-letter {
-  animation: pxlblz-letter-chase 12s linear infinite;
+  --cycle: 20s;
+  animation-duration: var(--cycle);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
 }
+.pxlblz-letter:nth-child(1) { animation-name: pxlblz-bounce-end-a; } /* P */
+.pxlblz-letter:nth-child(2) { animation-name: pxlblz-bounce-1; }     /* X */
+.pxlblz-letter:nth-child(3) { animation-name: pxlblz-bounce-2; }     /* L */
+.pxlblz-letter:nth-child(4) { animation-name: pxlblz-bounce-3; }     /* B */
+.pxlblz-letter:nth-child(5) { animation-name: pxlblz-bounce-4; }     /* L */
+.pxlblz-letter:nth-child(6) { animation-name: pxlblz-bounce-end-b; } /* Z */
 
 /* Under reduce-motion we keep the chase — it is a pure colour crossfade with no
    spatial movement, the kind of motion that setting targets — but slow it down so
    it reads as an even gentler ambient warmth. */
 @media (prefers-reduced-motion: reduce) {
   .pxlblz-letter {
-    animation-duration: 18s;
+    --cycle: 30s;
   }
 }

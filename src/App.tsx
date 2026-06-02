@@ -133,14 +133,9 @@ export default function App() {
             style={{ fontSize: '17px', letterSpacing: '0.22em', textShadow: '0 0 14px rgba(245,158,11,.45)' }}
           >
             {'PXLBLZ'.split('').map((ch, i) => (
-              <span
-                key={i}
-                aria-hidden
-                className="pxlblz-letter"
-                // Stagger each letter by one slot of the 12s cycle so the chase
-                // crawls left-to-right, one lit letter at a time.
-                style={{ animationDelay: `${i * 2}s` }}
-              >
+              // Each letter's keyframe (assigned by nth-child in index.css) places
+              // its pulse so the lit dot ping-pongs P->Z->P across the wordmark.
+              <span key={i} aria-hidden className="pxlblz-letter">
                 {ch}
               </span>
             ))}
