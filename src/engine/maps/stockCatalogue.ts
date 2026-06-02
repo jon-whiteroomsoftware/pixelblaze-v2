@@ -22,8 +22,8 @@ function source(name: string): string {
 // stock-map exception is dissolved. The example clouds (helix/sphere/ring) are
 // live builtin generators here, no longer baked arrays.
 export const STOCK_MAP_SPECS: SourceMapSpec[] = [
-  { id: 'plane', name: 'Square', dim: 2, source: source('plane') },
-  { id: 'wide', name: 'Wide 2:1', dim: 2, source: source('wide') },
+  { id: 'plane', name: 'Square', dim: 2, source: source('plane'), grid: 'square' },
+  { id: 'wide', name: 'Wide 2:1', dim: 2, source: source('wide'), grid: 'wide' },
   { id: 'cube', name: 'Cube (volume)', dim: 3, source: source('cube') },
   // The faceted shell sibling of the volume cube (ADR-0012): points on the six
   // faces, solid-eligible via per-face normals the preview derives (faceNormals,

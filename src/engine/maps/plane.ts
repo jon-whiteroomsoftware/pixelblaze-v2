@@ -28,6 +28,17 @@ export function squarePlaneDims(pixelCount: number): PlaneParams {
   return { rows, cols }
 }
 
+// The Wide 2:1 grid's count→dims, mirroring sources/wide.js: `rows =
+// ceil(sqrt(n/2))` so `cols = ceil(n/rows)` comes out roughly twice the rows.
+// The live preview readout and the cylinder wrap both derive dims from this, the
+// same way `squarePlaneDims` backs the Square map.
+export function widePlaneDims(pixelCount: number): PlaneParams {
+  const n = Math.max(1, Math.floor(pixelCount) || 1)
+  const rows = Math.ceil(Math.sqrt(n / 2))
+  const cols = Math.ceil(n / rows)
+  return { rows, cols }
+}
+
 // Normalize an integer position on [0, n) into [0, 1], matching the legacy grid
 // loop's per-axis normalization (`x = col/(cols-1)`). A single-cell axis maps to
 // 0 (avoids divide-by-zero), as the old renderer did.
@@ -52,6 +63,8 @@ export function createPlaneMap(params: PlaneParams, opts: { id?: string; name?: 
     name: opts.name ?? 'Plane',
     builtin: true,
     dim: 2,
+    // A fixed-grid plane: its dims are the explicit params, count-independent.
+    gridDims: () => ({ cols: params.cols, rows: params.rows }),
     resolve(pixelCount: number): MapPoint[] {
       const points: MapPoint[] = []
       for (let i = 0; i < pixelCount; i++) points.push(planePoint(i, params))

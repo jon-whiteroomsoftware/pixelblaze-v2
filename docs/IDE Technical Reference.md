@@ -353,8 +353,11 @@ preview's render effect (`Preview.tsx`) is pure wiring over this: it writes
 null` to `editorStore`, and feeds `mapPoints`/`draw` to the renderer and render loop — it
 holds no layout branching itself. To stay engine-pure (no store/React import, no import
 cycle), `resolveLayout` takes its store-coupled lookups as injected `deps`
-(`resolveMap`, `mapGridDims`, `defaultCountForDim`); this is also what makes every branch
-table-testable with fake maps (`resolveLayout.test.ts`).
+(`resolveMap`, `defaultCountForDim`); this is also what makes every branch
+table-testable with fake maps (`resolveLayout.test.ts`). The cylinder wrap reads the
+map's grid off the map itself — `PixelMap.gridDims(count)` (stock generators derive it
+live, a custom lattice replays its baked dims), so no `mapGridDims` provenance helper is
+injected.
 
 ### Recommendation registries (`demos.ts`)
 

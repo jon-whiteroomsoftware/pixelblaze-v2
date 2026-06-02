@@ -9,7 +9,6 @@ import {
 import {
   createCustomMap,
   createSourceMap,
-  squarePlaneDims,
   SOURCE_STOCK_MAPS,
   SEED_MAP_IDS,
   stockMapSpec,
@@ -84,26 +83,13 @@ export function buildMap(id: string, name: string, generator: string): PixelMap 
   return createSourceMap({ ...spec, id, name })
 }
 
-// The integer cols×rows grid a wrappable map exposes at the given count
-// (ADR-0010), or null when the map has no clean grid (an irregular cloud, or a
-// 3D map). A custom lattice carries its dims on the record (fixed at bake); the
-// stock Square/Wide derive theirs live from the count, mirroring their `.js`
-// sources. Used by surfaces (the cylinder) to wrap `cols` around the
-// circumference and `rows` up the height.
-export function mapGridDims(map: PixelMap, pixelCount: number): GridDims | null {
-  if (map.gridDims) return map.gridDims
-  if (map.id === 'plane') return squarePlaneDims(pixelCount)
-  if (map.id === 'wide') {
-    const n = Math.max(1, Math.floor(pixelCount) || 1)
-    const rows = Math.ceil(Math.sqrt(n / 2))
-    return { cols: Math.ceil(n / rows), rows }
-  }
-  return null
-}
-
 // Whether a map exposes a grid a surface can wrap (ADR-0010): a stock grid
 // generator, or a custom map with recorded lattice dims. Only 2D maps qualify.
-export function isMapWrappable(map: Pick<PixelMap, 'id' | 'dim' | 'gridDims'>): boolean {
+// A structural check over a map RECORD's shape (id/dim/baked dims) — the runtime
+// `PixelMap.gridDims(count)` method (which the resolver reads) supersedes the old
+// free `mapGridDims` helper for the live grid; this stays record-oriented because
+// it runs over the catalogue/`userMaps` before a runtime map is built.
+export function isMapWrappable(map: { id: string; dim: 1 | 2 | 3; gridDims?: GridDims }): boolean {
   return map.dim === 2 && (WRAPPABLE_STOCK_IDS.has(map.id) || !!map.gridDims)
 }
 
@@ -153,7 +139,7 @@ export function layoutSource(state: Pick<MapState, 'userMaps'>): LayoutSource {
         name: m.name,
         dim: m.dim,
         displayDim: m.displayDim,
-        wrappable: isMapWrappable(m),
+        wrappable: isMapWrappable({ id: m.id, dim: m.dim }),
       })),
       // A custom map can only resolve as a layout once it has baked points; a
       // freshly-created map has none until #143 bakes it, so keep it out of the

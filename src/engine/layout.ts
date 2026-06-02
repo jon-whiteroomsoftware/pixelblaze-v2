@@ -15,7 +15,7 @@
 
 import type { ShapeId } from './shapes'
 import type { SurfaceId } from './surfaces'
-import type { MapPoint, PixelMap, GridDims, NormalizeMode, NormalRecipe } from './maps'
+import type { MapPoint, PixelMap, NormalizeMode, NormalRecipe } from './maps'
 import { cubePixelCount, squarePlaneDims, applyNormalizeMode } from './maps'
 import {
   SHAPES,
@@ -254,8 +254,6 @@ export interface ResolveLayoutDeps {
   // Resolve a map id to its PixelMap (applies the store's DEFAULT_MAP_ID
   // fallback at the injection site so this module stays constant-free).
   resolveMap: (mapId: string | undefined) => PixelMap
-  // The integer grid of a map at a count, or null for an irregular cloud.
-  mapGridDims: (map: PixelMap, pixelCount: number) => GridDims | null
   // Per-dimension default modeled count.
   defaultCountForDim: (dim: 1 | 2 | 3) => number
 }
@@ -292,7 +290,7 @@ export function resolveLayout(
     poleCols,
     shapeDefaultCount,
   } = input
-  const { resolveMap, mapGridDims, defaultCountForDim } = deps
+  const { resolveMap, defaultCountForDim } = deps
 
   const correctedSelection = resolveLayoutSelection(
     selection,
@@ -373,7 +371,7 @@ export function resolveLayout(
     // 2D surface embedding (ADR-0010): the Cylinder wraps the map's grid onto a
     // 3D tube. The map still owns `sample`; the surface owns `pos`.
     if (correctedSelection.surfaceId === 'cylinder' && displayDim === 2) {
-      const gridDims = mapGridDims(map, pixelCount)
+      const gridDims = map.gridDims(pixelCount)
       if (gridDims) {
         positions3D = cylinderSurfacePositions(pixelCount, gridDims)
         normals3D = cylinderSurfaceNormals(pixelCount, gridDims)

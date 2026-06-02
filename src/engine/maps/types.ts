@@ -52,10 +52,13 @@ export interface PixelMap {
   // correctly out of the gate — it stays a free knob, so changing it surfaces the
   // count/map drift. Absent for live-regenerating stock maps.
   bakedCount?: number
-  // For a regular-lattice custom map: its intended integer grid dims, recorded
-  // at bake (ADR-0009) so the layout readout shows `cols×rows(×depth)`. Absent
-  // for irregular clouds and for stock generators (which derive dims live).
-  gridDims?: GridDims
+  // The map's integer `cols×rows(×depth)` grid at a modeled count (ADR-0009/0010),
+  // or null when it has no clean lattice (an irregular cloud, a 3D map). A stock
+  // grid generator derives its dims live from the count (Square squares up, Wide
+  // runs 2:1); a custom lattice returns its baked dims (recorded at bake), ignoring
+  // the count. Callers (the layout readout, the cylinder wrap) read it without
+  // branching on provenance — that switch used to live in `mapStore.mapGridDims`.
+  gridDims(pixelCount: number): GridDims | null
   // Provenance-gated solidity eligibility (ADR-0011): the normal RECIPE the stock
   // catalogue vouches for a 3D shell (`face`/`star`/`centroid`). The preview derives
   // the per-point outward normal accordingly and offers the solidity slider; its

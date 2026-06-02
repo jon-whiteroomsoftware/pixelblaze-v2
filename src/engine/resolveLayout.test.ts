@@ -38,6 +38,9 @@ function makeMap(opts: Partial<PixelMap> & Pick<PixelMap, 'id' | 'dim'>): PixelM
   return {
     name: opts.id,
     builtin: true,
+    // Default: no clean grid. The Square overrides this below to a 1-row strip so
+    // the cylinder-wrap branch has a grid to lift, mirroring a wrappable stock map.
+    gridDims: () => null,
     ...opts,
     resolve(pixelCount: number): MapPoint[] {
       return Array.from({ length: pixelCount }, (_, i) => {
@@ -51,7 +54,7 @@ function makeMap(opts: Partial<PixelMap> & Pick<PixelMap, 'id' | 'dim'>): PixelM
 }
 
 const MAPS: Record<string, PixelMap> = {
-  plane: makeMap({ id: 'plane', dim: 2 }),
+  plane: makeMap({ id: 'plane', dim: 2, gridDims: (count) => ({ cols: count, rows: 1 }) }),
   ring2d: makeMap({ id: 'ring2d', dim: 2, bakedCount: 60 }),
   cube: makeMap({ id: 'cube', dim: 3 }),
   'cube-shell': makeMap({ id: 'cube-shell', dim: 3, normals: 'face' }),
@@ -62,8 +65,6 @@ const MAPS: Record<string, PixelMap> = {
 
 const deps: ResolveLayoutDeps = {
   resolveMap: (mapId) => MAPS[mapId ?? 'plane'] ?? MAPS.plane,
-  // Treat the Square as a clean grid; everything else as an irregular cloud.
-  mapGridDims: (map, count) => (map.id === 'plane' ? { cols: count, rows: 1 } : null),
   defaultCountForDim: (dim) => (dim === 1 ? 100 : dim === 2 ? 256 : 512),
 }
 

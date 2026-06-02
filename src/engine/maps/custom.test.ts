@@ -68,4 +68,18 @@ describe('createCustomMap', () => {
     pts[0][0] = 0.9
     expect(m.resolve(1)[0].pos).toEqual([0.1, 0.2])
   })
+
+  it('replays its baked grid dims count-independently, null when none recorded', () => {
+    const lattice = createCustomMap([[0, 0], [1, 0], [0, 1], [1, 1]], {
+      id: 'g',
+      name: 'Grid',
+      gridDims: { cols: 2, rows: 2 },
+    })
+    // The recorded dims ride along regardless of the modeled count.
+    expect(lattice.gridDims(4)).toEqual({ cols: 2, rows: 2 })
+    expect(lattice.gridDims(999)).toEqual({ cols: 2, rows: 2 })
+    // An irregular cloud baked no dims, so it exposes no grid.
+    const cloud = createCustomMap([[0.1, 0.2], [0.3, 0.4]], { id: 'c', name: 'Cloud' })
+    expect(cloud.gridDims(2)).toBeNull()
+  })
 })

@@ -44,9 +44,9 @@ export function createCustomMap(
     name: opts.name,
     builtin: false,
     dim,
-    // Carry recorded grid dims through for the layout readout (ADR-0009); absent
-    // when the baked points are an irregular cloud.
-    ...(opts.gridDims ? { gridDims: opts.gridDims } : {}),
+    // Replay the grid dims recorded at bake for the layout readout (ADR-0009),
+    // count-independent; null when the baked points are an irregular cloud.
+    gridDims: () => opts.gridDims ?? null,
     bakedCount: baked.length,
     resolve(pixelCount: number): MapPoint[] {
       const out: MapPoint[] = []

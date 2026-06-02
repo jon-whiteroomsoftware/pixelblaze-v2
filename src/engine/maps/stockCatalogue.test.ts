@@ -1,5 +1,5 @@
 import { SOURCE_STOCK_MAPS, STOCK_MAP_SPECS, SEED_MAP_IDS, stockMapSpec } from './stockCatalogue'
-import { squarePlaneDims } from './plane'
+import { squarePlaneDims, widePlaneDims } from './plane'
 import { STAR_FACES, starShellNormals, starSurfaceRadius } from './starGeometry'
 import { evalMapSource } from './evalMapSource'
 
@@ -59,6 +59,17 @@ describe('stock catalogue', () => {
     // never solid-eligible — it leans on the renderer's depth-tested opaque cores.
     expect(mapById('sphere-volume').normals).toBeUndefined()
     expect(mapById('star-volume').normals).toBeUndefined()
+  })
+
+  it('derives a wrappable grid live from the count, null for everything else (ADR-0010)', () => {
+    // The Square squares up; the Wide runs 2:1 — both from the count, mirroring
+    // their `.js` sources, so the cylinder wrap and layout readout read the grid
+    // off the map with no provenance switch.
+    expect(mapById('plane').gridDims(100)).toEqual(squarePlaneDims(100))
+    expect(mapById('wide').gridDims(100)).toEqual(widePlaneDims(100))
+    // A 3D map and an irregular 2D cloud expose no clean lattice.
+    expect(mapById('cube').gridDims(512)).toBeNull()
+    expect(mapById('seed-ring-2d').gridDims(60)).toBeNull()
   })
 
   it('exposes the relocated cloud ids for IDB pruning', () => {

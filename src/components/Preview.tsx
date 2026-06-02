@@ -14,7 +14,6 @@ import {
   DEFAULT_SHAPE_PIXEL_COUNT,
   defaultPixelCountForDim,
   resolveMap,
-  mapGridDims,
 } from '@/store/mapStore'
 import { useCameraStore } from '@/store/cameraStore'
 import { createShim, createFxShim, type ShimContext } from '@/engine/shim'
@@ -166,7 +165,6 @@ export function Preview() {
       },
       {
         resolveMap: (mapId) => resolveMap(mapId ?? DEFAULT_MAP_ID, userMaps),
-        mapGridDims,
         defaultCountForDim: defaultPixelCountForDim,
       },
     )
