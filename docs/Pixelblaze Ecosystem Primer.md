@@ -2,8 +2,8 @@
 
 This document is a medium-detail mental model of **Pixelblaze itself** — the
 hardware, the firmware, the language, and the workflow ElectroMage built. It is
-*not* about this IDE; for that, read the **IDE Feature Guide** (what the IDE does)
-or the **IDE Technical Reference** (how it's built). The point of this primer is to
+*not* about PXLBLZ; for that, read the **PXLBLZ Feature Guide** (what PXLBLZ does)
+or the **PXLBLZ Technical Reference** (how it's built). The point of this primer is to
 give you the model you need *before* either of those makes full sense: what the
 device knows, what the browser knows, why patterns and maps use two subtly
 different dialects of JavaScript, and how a pattern actually gets onto a strip of
@@ -375,7 +375,7 @@ The practical consequence: a deployed (https) web app cannot talk to a Pixelblaz
 its own. It needs a **local helper process** running outside the browser sandbox
 (on the LAN) that the page can reach at `ws://127.0.0.1` (localhost is exempt from
 mixed-content blocking) and which in turn reaches the device. ElectroMage's own
-Firestorm is exactly such a local process. (This IDE's stance on that is in the IDE
+Firestorm is exactly such a local process. (PXLBLZ's stance on that is in the IDE
 Technical Reference §Hardware connectivity.)
 
 ### Discovery

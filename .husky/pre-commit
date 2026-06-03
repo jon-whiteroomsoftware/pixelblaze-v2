@@ -1,24 +1,24 @@
 npm run lint && npm test
 
-# If *significant* (non-test) src/ files are staged but docs/IDE Technical Reference.md is not,
+# If *significant* (non-test) src/ files are staged but docs/PXLBLZ Technical Reference.md is not,
 # prompt to confirm the system reference is still accurate before the commit lands.
 # Test-only changes (*.test.* / *.bench.*) don't alter the described behaviour, so
 # they're excluded to avoid nag fatigue.
 STAGED_SRC=$(git diff --cached --name-only | grep "^src/" || true)
 SIGNIFICANT_SRC=$(echo "$STAGED_SRC" | grep -vE '\.(test|bench)\.[tj]sx?$' | grep -v '^$' || true)
-REFERENCE_CHANGED=$(git diff --cached --name-only | grep -c "^docs/IDE Technical Reference.md$" || true)
+REFERENCE_CHANGED=$(git diff --cached --name-only | grep -c "^docs/PXLBLZ Technical Reference.md$" || true)
 
 if [ -n "$SIGNIFICANT_SRC" ] && [ "$REFERENCE_CHANGED" -eq 0 ]; then
   echo ""
-  echo "⚠️  Source files are staged but docs/IDE Technical Reference.md has no changes."
+  echo "⚠️  Source files are staged but docs/PXLBLZ Technical Reference.md has no changes."
   echo "   Staged non-test src/ files:"
   echo "$SIGNIFICANT_SRC" | sed 's/^/     /'
   echo ""
-  printf "   Does docs/IDE Technical Reference.md still accurately reflect these changes? (y/n) "
+  printf "   Does docs/PXLBLZ Technical Reference.md still accurately reflect these changes? (y/n) "
   { read -r answer < /dev/tty; } 2>/dev/null || answer="y"
   if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
     echo ""
-    echo "   Aborting. Update docs/IDE Technical Reference.md and re-commit."
+    echo "   Aborting. Update docs/PXLBLZ Technical Reference.md and re-commit."
     exit 1
   fi
 fi

@@ -1,11 +1,11 @@
-# Pixelblaze IDE — Feature Guide
+# PXLBLZ — Feature Guide
 
-This is the guide for someone who **uses Pixelblaze** and wants to know what this
-IDE does for them — what's on the screen, what each control means, and how the whole
-thing fits the way a real Pixelblaze works. It assumes you already understand
+This is the guide for someone who **uses Pixelblaze** and wants to know what
+**PXLBLZ** does for them — what's on the screen, what each control means, and how the
+whole thing fits the way a real Pixelblaze works. It assumes you already understand
 Pixelblaze concepts (patterns, maps, controls, fixed-point); if you don't, read the
-**Pixelblaze Ecosystem Primer** first. It says nothing about how the IDE is *built* —
-for that, see the **IDE Technical Reference**.
+**Pixelblaze Ecosystem Primer** first. It says nothing about how PXLBLZ is *built* —
+for that, see the **PXLBLZ Technical Reference**.
 
 ---
 
@@ -15,13 +15,13 @@ A browser-based pattern editor for Pixelblaze that lets you **write, preview, an
 tune patterns entirely offline** — no controller, no network, no install — and then
 paste or download the result straight onto your device.
 
-**[Open the IDE →](https://jon-whiteroomsoftware.github.io/pixelblaze-v2/)**
+**[Open PXLBLZ →](https://jon-whiteroomsoftware.github.io/pixelblaze-v2/)**
 
 ---
 
 ## Why you'd use it instead of the on-device editor
 
-The editor built into every Pixelblaze is functional but bare. This IDE exists to
+The editor built into every Pixelblaze is functional but bare. PXLBLZ exists to
 fix three specific limitations:
 
 1. **It needs no hardware.** The stock editor only works with a controller powered up

@@ -10,7 +10,7 @@ Pattern code is evaluated and rendered on the browser's main thread (rAF render 
 
 ## Deferred worker design (forward-looking analysis)
 
-3D rendering reopens this decision, so the future move is pre-researched here. **The conclusion stands: stay on the main thread for now.** A worker is the designated future lever — recorded so the eventual decision is not started cold. (This analysis previously lived in the now-retired Pixel Maps feature PRD; the dimensional-preview work it accompanied has shipped — see `docs/IDE Technical Reference.md` §8, §10.)
+3D rendering reopens this decision, so the future move is pre-researched here. **The conclusion stands: stay on the main thread for now.** A worker is the designated future lever — recorded so the eventual decision is not started cold. (This analysis previously lived in the now-retired Pixel Maps feature PRD; the dimensional-preview work it accompanied has shipped — see `docs/PXLBLZ Technical Reference.md` §8, §10.)
 
 **What a worker buys — and doesn't.** A Web Worker *relocates* pattern execution; it does **not accelerate** it (same engine, same single core, same fixed-point shim cost). So a worker is **not a 3D-throughput fix** — that remains the job of the `MAX_PIXEL_COUNT` cap and the small default 3D map. Its two real prizes are about *where* the work runs:
 

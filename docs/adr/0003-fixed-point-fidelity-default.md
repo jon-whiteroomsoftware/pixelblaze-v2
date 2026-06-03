@@ -6,9 +6,9 @@ status: accepted (supersedes ADR-0001)
 
 ADR-0001 chose to run the preview as native float64 with no fixed-point emulation, accepting the resulting hardware divergence. We are reversing that: the preview will **default to faithful 16.16 fixed-point emulation** so that what the preview shows matches what a physical Pixelblaze does, with a per-pattern **fast-preview** toggle that drops back to float64 for heavy patterns whose fidelity render is too slow to edit against.
 
-The reversal is driven by the ShaderToy/GLSL porting work (see `docs/IDE Technical Reference.md` §2/§5 and §11): porting is only valuable if a pattern that looks right in the preview actually runs on hardware, and the most common GLSL idioms (large-constant hashes such as `fract(sin(p·12.9898)·43758.5453)`) silently overflow 16.16 on hardware while looking perfect in float64. A float64-only preview cannot reveal that class of bug, which defeats the porting goal.
+The reversal is driven by the ShaderToy/GLSL porting work (see `docs/PXLBLZ Technical Reference.md` §2/§5 and §11): porting is only valuable if a pattern that looks right in the preview actually runs on hardware, and the most common GLSL idioms (large-constant hashes such as `fract(sin(p·12.9898)·43758.5453)`) silently overflow 16.16 on hardware while looking perfect in float64. A float64-only preview cannot reveal that class of bug, which defeats the porting goal.
 
-## How (summary; full as-built detail in `docs/IDE Technical Reference.md` §5)
+## How (summary; full as-built detail in `docs/PXLBLZ Technical Reference.md` §5)
 
 - Every pattern number is represented as its **raw int32** (value × 65536). Add/sub/compare/bitwise use native ops with `| 0` for int32-wrap; multiply uses a `Math.imul`-based exact 64-bit product shifted right 16; divide uses a sub-2⁵³ float intermediate. This is bit-faithful for arithmetic and overflow.
 - **Transcendentals** (`sin`, `cos`, `sqrt`, `pow`, …) are computed in float64 and quantized to 16.16 behind an `fx.*` seam — a small, documented precision divergence, upgradable to firmware-matched LUTs only if a hardware divergence harness shows a visible difference.
@@ -18,7 +18,7 @@ The reversal is driven by the ShaderToy/GLSL porting work (see `docs/IDE Technic
 ## Considered alternatives
 
 - **Keep float64 only (ADR-0001).** Rejected: cannot surface overflow/precision bugs, so ported patterns can pass preview and fail on hardware.
-- **Float64 default + opt-in "verify" mode.** Rejected: makes hardware truth opt-in and easy to forget; the project's goal is WYSIWYG-on-hardware, so truth should be the default.
+- **Float64 default + opt-in "verify" mode.** Rejected: makes hardware truth opt-in and easy to forget; PXLBLZ's goal is WYSIWYG-on-hardware, so truth should be the default.
 - **Lint-only (detect overflow, don't reproduce it).** Rejected: warns but doesn't show the actual hardware image, so the designer still can't trust the preview.
 - **Bit-exact everything incl. firmware perlin/prng/LUTs.** Deferred: high effort, partially blocked by closed-source firmware, and unnecessary for the numeric bugs that actually break ports.
 

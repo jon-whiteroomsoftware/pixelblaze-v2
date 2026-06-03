@@ -1,9 +1,9 @@
 # Feature PRD — Hardware Connectivity
 
-**Status:** **Phases 1–2 shipped** — the isomorphic comms layer + manual divergence harness (#106/#107) and the Phase 2 capability spike, including the undocumented binary pattern-push path (#108/#112), are in. The **UI arc (Phase 3) remains deferred and undesigned.** For *how the shipped layer works* see **`docs/IDE Technical Reference.md`** §13. This PRD is retained for the **why** — the hard browser→device constraint that shapes the whole feature — and the Phase 3 vision + open questions.
+**Status:** **Phases 1–2 shipped** — the isomorphic comms layer + manual divergence harness (#106/#107) and the Phase 2 capability spike, including the undocumented binary pattern-push path (#108/#112), are in. The **UI arc (Phase 3) remains deferred and undesigned.** For *how the shipped layer works* see **`docs/PXLBLZ Technical Reference.md`** §13. This PRD is retained for the **why** — the hard browser→device constraint that shapes the whole feature — and the Phase 3 vision + open questions.
 **Type:** Feature PRD (companion to `Pixelblaze IDE v2 PRD.md`)
 **Supersedes:** the main PRD's deferred "Hardware upload" bullet
-**Related:** ADR-0003 + `docs/IDE Technical Reference.md` §2/§5 (the hardware-fidelity engine — this feature unblocked its divergence harness); ADR-0002 (main-thread execution); **ADR-0004 (local bridge for hardware connectivity — to be written when Phase 3 is greenlit)**
+**Related:** ADR-0003 + `docs/PXLBLZ Technical Reference.md` §2/§5 (the hardware-fidelity engine — this feature unblocked its divergence harness); ADR-0002 (main-thread execution); **ADR-0004 (local bridge for hardware connectivity — to be written when Phase 3 is greenlit)**
 
 ---
 
@@ -17,7 +17,7 @@ It is sequenced as **validate → discover → decide UI**, deliberately refusin
 2. **Phase 2 — Capability exploration spike.** **Shipped** — established empirically how far the protocol goes, including the *undocumented* binary pattern-push path; the committed capability report records a bytecode-push GO on a proven path (#112).
 3. **Phase 3+ — Local bridge + IDE integration (UI).** **Deferred and undesigned.** Recorded below as vision and open questions.
 
-The shipped transport — the framework-free, isomorphic `PixelblazeConnection` (injected WebSocket factory: browser `WebSocket` or Node `ws`), the documented JSON API, the binary-frame protocol, and both committed reports — is described in `docs/IDE Technical Reference.md` §13.
+The shipped transport — the framework-free, isomorphic `PixelblazeConnection` (injected WebSocket factory: browser `WebSocket` or Node `ws`), the documented JSON API, the binary-frame protocol, and both committed reports — is described in `docs/PXLBLZ Technical Reference.md` §13.
 
 ---
 
@@ -54,10 +54,10 @@ Not designed. Recorded as direction:
 
 - **Local bridge** — a small Node process the user runs (à la Firestorm). IDE ↔ bridge over `ws://127.0.0.1`; bridge ↔ controller over `ws://LAN:81`; bridge also does discovery (cloud `/discover` and/or UDP beacons). Optional, local-only, additive. The web page never launches it — the user runs it and the IDE *detects* it.
 - **IDE integration (UI)** — paradigm undecided (see Open questions).
-- **Pixel-map push / pull** *(rehomed from the retired Pixel Maps feature PRD; the offline map model it rode on has shipped — `docs/IDE Technical Reference.md` §8)*. Make a workspace map deployable to, and readable from, a real device, as a **deliberate device-configuration action — never part of routine pattern deploy**. On hardware a Pixelblaze stores **one map per device**, shared by every pattern and set once when the installation is built; so overwriting it with a preview default is destructive and must be explicit and guarded.
+- **Pixel-map push / pull** *(rehomed from the retired Pixel Maps feature PRD; the offline map model it rode on has shipped — `docs/PXLBLZ Technical Reference.md` §8)*. Make a workspace map deployable to, and readable from, a real device, as a **deliberate device-configuration action — never part of routine pattern deploy**. On hardware a Pixelblaze stores **one map per device**, shared by every pattern and set once when the installation is built; so overwriting it with a preview default is destructive and must be explicit and guarded.
   - **Push** — write a selected map to the device's single map slot. Guarded and explicit, framed as "this configures the *installation*, not the pattern."
   - **Pull / read-back** — import the device's current map into the IDE so the preview reflects what's actually deployed. The safer, more useful first direction.
-  - **Transport** — reuses `PixelblazeConnection` and the same local bridge; no new transport. Map read/write protocol support is a capability to confirm in the Phase 2 spike's spirit (the binary-frame work, `docs/IDE Technical Reference.md` §13) before any UI.
+  - **Transport** — reuses `PixelblazeConnection` and the same local bridge; no new transport. Map read/write protocol support is a capability to confirm in the Phase 2 spike's spirit (the binary-frame work, `docs/PXLBLZ Technical Reference.md` §13) before any UI.
 
 ### Open questions (captured, not yet decided)
 

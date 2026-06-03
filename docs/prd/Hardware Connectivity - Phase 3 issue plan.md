@@ -2,7 +2,7 @@
 
 Phased implementation plan for connecting the IDE to a live Controller, derived from
 the design conversation of 2026-06-02. Companion to `Feature - Hardware Connectivity.md`
-(the why) and `IDE Technical Reference.md` §13 (the shipped comms layer). New canonical
+(the why) and `PXLBLZ Technical Reference.md` §13 (the shipped comms layer). New canonical
 terms (**Controller panel**, **Send to Controller**) are in `CONTEXT.md`.
 
 **Tracker:** epic [#208](https://github.com/jon-whiteroomsoftware/pixelblaze-v2/issues/208).

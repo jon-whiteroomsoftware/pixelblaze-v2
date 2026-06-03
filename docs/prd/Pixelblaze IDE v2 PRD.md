@@ -1,7 +1,7 @@
 # Pixelblaze IDE v2 — Product Requirements Document
 
 > **Status — mostly built.** The core IDE described here is shipped. For *what the
-> system is and how it works as built*, read **`docs/IDE Technical Reference.md`** —
+> system is and how it works as built*, read **`docs/PXLBLZ Technical Reference.md`** —
 > it is the authoritative description of the current implementation. This PRD now serves a
 > narrower purpose: the **why** (the motivation and the decisions behind the product)
 > and the **genuinely-deferred** direction that has not been built. Sequencing,
@@ -37,7 +37,7 @@ The IDE exists to remove all three: a real editor, a hardware-faithful preview t
 
 A **Vite + React single-page application**, served statically with no backend. All computation runs in the browser. There are no server-side APIs, no remote storage, and no network requirements during normal use — the server's only role is serving the static app files. (The one deliberate exception, the optional out-of-band hardware connectivity layer, is specified in its own feature PRD and is purely additive — see below.)
 
-The shipped feature set — engine/UI boundary, transpiler/bundler, Pixelblaze-dialect validator, runtime shim, hardware-fidelity fixed-point preview, pixel maps & 1D/2D/3D preview, Monaco editor, pattern storage, UI controls + var watcher, libraries & demos, and export — is described in full in **`docs/IDE Technical Reference.md`** (and, for the user-facing view, `docs/IDE Feature Guide.md`).
+The shipped feature set — engine/UI boundary, transpiler/bundler, Pixelblaze-dialect validator, runtime shim, hardware-fidelity fixed-point preview, pixel maps & 1D/2D/3D preview, Monaco editor, pattern storage, UI controls + var watcher, libraries & demos, and export — is described in full in **`docs/PXLBLZ Technical Reference.md`** (and, for the user-facing view, `docs/PXLBLZ Feature Guide.md`).
 
 ---
 
@@ -49,15 +49,15 @@ The "why" behind the shape of the product. Mechanics are in the reference; ratio
 - **Hard engine/UI boundary.** All logic that can be separated from React is a pure TypeScript module (`src/engine/`, zero React imports); components are thin wrappers. This is what makes the tricky math (fixed-point ops, camera projection, dependency resolution) unit-testable without a DOM, and it is non-negotiable for new work.
 - **Single flat artifact.** `bundle()` returns `{ code, … }`; `code` is the one file used for *both* browser preview and hardware upload, with function-level tree-shaking so only referenced library functions are inlined (critical for the device's memory limits). Preview-only companions (metadata, the fixed-point emit) never reach the hardware file.
 - **Libraries are Pixelblaze-dialect `.js`, namespaced by filename.** Acorn parses them directly and the bundled artifact must be valid Pixelblaze code; the filename is the namespace (`SDF.js` → `SDF.*`).
-- **Fixed-point fidelity by default** (ADR-0003, superseding ADR-0001's float64-only stance): the preview defaults to faithful 16.16 emulation so what you see survives upload, with a "Fast" float64 escape hatch. The fidelity engine and the ShaderToy porting toolkit built on it shipped in full — see ADR-0003 and `docs/IDE Technical Reference.md` §2/§5 (fixed-point engine) and §11 (porting toolkit).
+- **Fixed-point fidelity by default** (ADR-0003, superseding ADR-0001's float64-only stance): the preview defaults to faithful 16.16 emulation so what you see survives upload, with a "Fast" float64 escape hatch. The fidelity engine and the ShaderToy porting toolkit built on it shipped in full — see ADR-0003 and `docs/PXLBLZ Technical Reference.md` §2/§5 (fixed-point engine) and §11 (porting toolkit).
 - **Main-thread execution** (ADR-0002): patterns run on the main thread via `new Function()` + rAF. A syntactically valid infinite loop can still freeze the tab — there is no watchdog. Accepted; a worker is the designated future lever (analysed in ADR-0002).
-- **The pixel map is a first-class, workspace-owned entity** (ADR-0004/0005): position is decoupled from index, and the workspace — not a connected device — owns the map. The dimensional-preview feature shipped in full; see `docs/IDE Technical Reference.md` §8.
+- **The pixel map is a first-class, workspace-owned entity** (ADR-0004/0005): position is decoupled from index, and the workspace — not a connected device — owns the map. The dimensional-preview feature shipped in full; see `docs/PXLBLZ Technical Reference.md` §8.
 
 ---
 
 ## Testing philosophy
 
-Unchanged and load-bearing: pure functions are the primary test target; the engine layer carries heavy coverage, React components get smoke tests only; a Husky pre-commit gate runs `npm run lint && npm test`. The live hardware tier is excluded from the gate and run out-of-band. Details and current conventions are in `CLAUDE.md` and `docs/IDE Technical Reference.md` §15.
+Unchanged and load-bearing: pure functions are the primary test target; the engine layer carries heavy coverage, React components get smoke tests only; a Husky pre-commit gate runs `npm run lint && npm test`. The live hardware tier is excluded from the gate and run out-of-band. Details and current conventions are in `CLAUDE.md` and `docs/PXLBLZ Technical Reference.md` §15.
 
 ---
 
@@ -68,7 +68,7 @@ Only genuinely-unbuilt scope remains here. Items the original PRD deferred that 
 ### Captured in feature PRDs (direction, not greenlit)
 
 - **Hardware upload & a connection UI** — `Feature - Hardware Connectivity.md`. The comms layer and capability spike have shipped; the browser extension + in-app connection UI (Phase 3) is deferred there.
-- **Device map push/pull** — `Feature - Hardware Connectivity.md` (Phase 3+). The offline map model shipped in full — stock maps + dimensional preview, source-backed plain-JS stock maps (single source of truth, ADR-0008), and the coder-first New Map / template authoring flow are all done (`docs/IDE Technical Reference.md` §8; the retired Pixel Maps feature PRD). Only **controller map push/pull** remains deferred, rehomed onto the Hardware Connectivity extension. (The two minor offline remainders — coordinate-import builder #142, stale-map cue #144 — live in the issue tracker.)
+- **Device map push/pull** — `Feature - Hardware Connectivity.md` (Phase 3+). The offline map model shipped in full — stock maps + dimensional preview, source-backed plain-JS stock maps (single source of truth, ADR-0008), and the coder-first New Map / template authoring flow are all done (`docs/PXLBLZ Technical Reference.md` §8; the retired Pixel Maps feature PRD). Only **controller map push/pull** remains deferred, rehomed onto the Hardware Connectivity extension. (The two minor offline remainders — coordinate-import builder #142, stale-map cue #144 — live in the issue tracker.)
 
 ### Still open / unfiled
 

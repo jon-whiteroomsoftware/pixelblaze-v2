@@ -1,10 +1,10 @@
-# Pixelblaze IDE v2
+# PXLBLZ
 
 A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED controllers — write, preview, and tune patterns entirely offline, then paste the result straight onto your device.
 
-**[Open the IDE →](https://jon-whiteroomsoftware.github.io/pixelblaze-v2/)**
+**[Open PXLBLZ →](https://jon-whiteroomsoftware.github.io/pixelblaze-v2/)**
 
-![Pixelblaze IDE screenshot](docs/screenshots/IDE.png)
+![PXLBLZ screenshot](docs/screenshots/IDE.png)
 
 ---
 
@@ -12,7 +12,7 @@ A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED co
 
 [Pixelblaze](https://electromage.com/) is a tiny WiFi controller that drives addressable LED strips, matrices, and 3D sculptures. It ships with a built-in code editor, but that editor only works with a controller plugged in, gives you a bare text box, and has no way to share code between patterns.
 
-This IDE fixes all three:
+PXLBLZ fixes all three:
 
 - **No hardware required.** Everything runs in your browser — editing, compiling, and a live animated preview. No device, no network, no backend.
 - **A real editor.** Monaco (the engine behind VS Code) with autocomplete, signature hints, and live error checking for the Pixelblaze dialect.
@@ -30,7 +30,7 @@ The preview isn't just a quick approximation — it's built to match the hardwar
 
 The control deck keeps the two worlds visibly separate: a **Pixelblaze group** (pixel count, brightness, Fill/Contain fit — settings that would round-trip to a device) and a **Preview group** (light size, diffusion, renderer, speed, solidity — things the IDE invents that the device never sees).
 
-This makes the IDE a comfortable home for porting GPU-style shaders (ShaderToy and friends) onto LEDs, where trusting the preview really matters. There's a `Shader` library and a [porting guide](docs/guides/Porting%20ShaderToy%20shaders%20to%20Pixelblaze.md) for exactly that.
+This makes PXLBLZ a comfortable home for porting GPU-style shaders (ShaderToy and friends) onto LEDs, where trusting the preview really matters. There's a `Shader` library and a [porting guide](docs/guides/Porting%20ShaderToy%20shaders%20to%20Pixelblaze.md) for exactly that.
 
 ## Bundled libraries
 
@@ -73,8 +73,8 @@ npm run build    # type-check + production build
 
 Three documents go deeper, each for a different reader — pick the one that matches why you're here:
 
-- **[IDE Feature Guide](docs/IDE%20Feature%20Guide.md)** — *for someone who uses Pixelblaze.* What every control on the screen does: the preview, maps, the control deck, live controls, and getting code onto hardware. Start here if you just want to use the IDE.
-- **[IDE Technical Reference](docs/IDE%20Technical%20Reference.md)** — *for someone building the IDE.* The authoritative as-built description of how it works: transpiler, validator, fixed-point engine, maps and embeddings, camera, render loop, storage. Start here to contribute.
+- **[PXLBLZ Feature Guide](docs/PXLBLZ%20Feature%20Guide.md)** — *for someone who uses Pixelblaze.* What every control on the screen does: the preview, maps, the control deck, live controls, and getting code onto hardware. Start here if you just want to use the IDE.
+- **[PXLBLZ Technical Reference](docs/PXLBLZ%20Technical%20Reference.md)** — *for someone building the IDE.* The authoritative as-built description of how it works: transpiler, validator, fixed-point engine, maps and embeddings, camera, render loop, storage. Start here to contribute.
 - **[Pixelblaze Ecosystem Primer](docs/Pixelblaze%20Ecosystem%20Primer.md)** — *for someone new to Pixelblaze itself.* The mental model the other two assume: device vs. browser, 16.16 fixed-point, the pattern and mapper dialects, the WebSocket API. Start here if "fixed-point" or "pixel map" needs unpacking.
 
 Beyond those: the **PRDs and ADRs** under [`docs/`](docs/) record the *why* behind the design and the not-yet-built direction, and the official **[Pixelblaze docs](https://electromage.com/docs/)** cover the hardware, firmware, and language itself.

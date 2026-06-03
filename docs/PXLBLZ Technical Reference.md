@@ -1,10 +1,10 @@
-# Pixelblaze IDE — Technical Reference
+# PXLBLZ — Technical Reference
 
-This document is for engineers working *on* the IDE (or evaluating how it's built).
+This document is for engineers working *on* PXLBLZ (or evaluating how it's built).
 It covers the technology choices, the architecture, the engine internals, and — in
 detail — the decisions made about how to faithfully interface with the Pixelblaze
-ecosystem. It deliberately contains nothing about *using* the IDE as a product
-(see the **IDE Feature Guide** for that) and assumes you understand Pixelblaze
+ecosystem. It deliberately contains nothing about *using* PXLBLZ as a product
+(see the **PXLBLZ Feature Guide** for that) and assumes you understand Pixelblaze
 itself (see the **Pixelblaze Ecosystem Primer**).
 
 > **Relationship to other docs.** This is the authoritative as-built description of
@@ -602,7 +602,7 @@ out-of-band.
 
 ## 17. Pointers
 
-- **Feature guide** (using the IDE) — `docs/IDE Feature Guide.md`.
+- **Feature guide** (using the IDE) — `docs/PXLBLZ Feature Guide.md`.
 - **Pixelblaze ecosystem primer** (the platform itself) — `docs/Pixelblaze Ecosystem Primer.md`.
 - **ADRs** — `docs/adr/` (0002 main-thread; 0003 fixed-point fidelity; 0004 pixelCount
   independence; 0005 sample/pos; 0006 light size + diffusion; 0007 bake-on-save; 0008
