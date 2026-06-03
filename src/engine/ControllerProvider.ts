@@ -71,6 +71,8 @@ export interface ControllerConfig {
   activeControls?: Record<string, number>
   /** The device's configured name, when it reports one — the Controller nickname. */
   name?: string
+  /** The device's configured pixel count — fixed to its wiring; shown read-only. */
+  pixelCount?: number
 }
 
 /** Live runtime metrics the device reports while running — distinct from stored

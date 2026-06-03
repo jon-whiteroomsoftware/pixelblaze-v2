@@ -287,6 +287,16 @@ hardware does (the Mapper tab's function runs in *its* browser; only the baked
 coordinate array reaches the device). Map evaluation is therefore **faithful by
 construction**, with no divergence to characterise.
 
+Hardware's Mapper accepts **two source formats** — a literal JSON array of
+`[x,y(,z)]` coordinates, or a `function(pixelCount)` returning one — and authors in
+**arbitrary real-world units** (the firmware derives the world extent from the
+coordinates' limits, then normalizes to `0..1` per §8's Fill/Contain pass). The IDE
+deliberately models **only the function flavor** (`function(pixelCount)`): it is the
+superset (a static array is a trivial function body), it is what `parseMapSource`/
+`bakeMapSource` evaluate, and every stock map is expressed that way. The raw-units
+detail is invisible downstream — normalization erases the input scale, so a map
+authored in millimetres and one in pixels with the same aspect bake identically.
+
 Every stock map (`stockCatalogue.ts`) is a self-contained `function(pixelCount)` in
 `src/engine/maps/sources/*.js` (`Math.*` and language built-ins only — pasteable into
 a real Mapper tab), read raw via `import.meta.glob(..., '?raw')` and run through a
@@ -547,10 +557,22 @@ tooling:
   `getControls`/`setControls`/`brightness`/`activeProgramId`, and the *undocumented*
   chunked pattern-push. The capability report records a bytecode-push GO on a proven
   path (#112).
-- **Phase 3+ (not built):** a browser extension + in-app connection UI, plus
-  device map push/pull, captured as direction only (`Feature - Hardware
+- **Phase 3+ (in progress):** a browser extension + in-app connection UI (epic #208),
+  plus device map push/pull, captured as direction only (`Feature - Hardware
   Connectivity.md`). On hardware a Pixelblaze stores one shared map per device, so a
   map push is a guarded device-configuration action, never part of routine deploy.
+
+Two read-back facts that shape what the live **Controller panel** can mirror:
+
+- **`pixelCount` rides in the `getConfig` settings packet** (top-level, alongside
+  `brightness`/`name`), so it is cheap read-only telemetry — surfaced as the panel's
+  `pixels` row. It is fixed to the device's wiring; the panel never offers to edit it.
+- **The Fill/Contain fit mode is *map-bound*, not a standalone settings field.** It is
+  chosen in the Mapper and saved *with the map*, so reading it back requires **map
+  read-back** — the unconfirmed capability the H13 spike (#205) gates and the H11
+  preflight (#203) defers its map-mismatch warning behind. A `fit` panel row therefore
+  cannot be shown faithfully until map read-back is proven; it is not free telemetry
+  the way `pixelCount` is.
 
 ---
 

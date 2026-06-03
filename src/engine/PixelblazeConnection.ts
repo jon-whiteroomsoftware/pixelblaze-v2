@@ -227,6 +227,12 @@ export class PixelblazeConnection {
   // in). Null until a settings frame reports one. Drives the Controller nickname.
   private _deviceName: string | null = null
 
+  // The device's configured pixel count, captured passively from the top-level
+  // `pixelCount` field of the settings packet (the same packet that carries
+  // `name` and brightness). Null until a settings frame reports one. Fixed to the
+  // device's wiring — the panel shows it read-only.
+  private _pixelCount: number | null = null
+
   /** True once the socket handshake is open and frames can flow. */
   get isConnected(): boolean {
     return this.ws != null && this.ws.readyState === OPEN
@@ -326,6 +332,7 @@ export class PixelblazeConnection {
     activeProgramId?: string
     activeControls?: Record<string, number>
     name?: string
+    pixelCount?: number
   }> {
     if (!this.isConnected) {
       return Promise.reject(new Error('Cannot send: Pixelblaze connection is not open'))
@@ -343,6 +350,7 @@ export class PixelblazeConnection {
         activeProgramId: active.activeProgramId,
         activeControls: active.controls,
         name: this._deviceName ?? undefined,
+        pixelCount: this._pixelCount ?? undefined,
       }
     })
   }
@@ -471,6 +479,8 @@ export class PixelblazeConnection {
     // Passively capture the device name from the settings packet's top-level
     // `name` (distinct from the sequencer packet's nested activeProgram.name).
     if ('name' in msg && typeof msg.name === 'string') this._deviceName = msg.name
+    // Passively capture the device's pixel count from the settings packet.
+    if ('pixelCount' in msg && typeof msg.pixelCount === 'number') this._pixelCount = msg.pixelCount
     // Resolve the first matching pending request by response field.
     if ('vars' in msg) this.fulfil('vars', msg.vars)
     if ('ack' in msg) this.fulfil('ack', msg.ack)

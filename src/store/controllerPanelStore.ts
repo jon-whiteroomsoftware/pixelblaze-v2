@@ -27,6 +27,8 @@ interface ControllerPanelState {
   programs: ProgramListEntry[]
   /** Device-reported frame rate; null until reported. */
   fps: number | null
+  /** The device's configured pixel count, read-only; null until read. */
+  pixelCount: number | null
   /** The running pattern's live controls (name → value). Seeded from the device,
    *  then slider-owned until the active pattern changes (so a scrub never fights
    *  the poll); reseeded when `activeProgramId` changes. */
@@ -52,6 +54,7 @@ export const controllerPanelInitialState = {
   activeProgramId: undefined,
   programs: [] as ProgramListEntry[],
   fps: null,
+  pixelCount: null,
   activeControls: {} as Record<string, number>,
   vars: {} as Record<string, number>,
 }
@@ -106,6 +109,9 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
           activeProgramId: config.activeProgramId,
           // Seed brightness once (?? on the existing value), then slider-owned.
           brightness: s.brightness ?? config.brightness ?? null,
+          // Pixel count is fixed to the device's wiring; refresh it whenever
+          // reported, falling back to the last known value.
+          pixelCount: config.pixelCount ?? s.pixelCount,
           activeControls: reseed ? config.activeControls ?? {} : s.activeControls,
         }
       })

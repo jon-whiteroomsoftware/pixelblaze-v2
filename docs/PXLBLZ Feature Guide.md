@@ -72,7 +72,11 @@ decoupled from its order in the chain. You choose what your pattern previews aga
   `function(pixelCount)`, *exactly* the thing a real Pixelblaze Mapper tab evaluates.
   Write the geometry of your actual tree, sphere, or sculpture and preview your
   pattern against it. (Because it's the real Mapper dialect, it's full JavaScript with
-  `Math.*` — not the pattern dialect. The IDE handles the difference.)
+  `Math.*` — not the pattern dialect. The IDE handles the difference.) Author in
+  whatever units fit the build — inches, millimetres, raw pixels — and it scales
+  itself; the firmware derives the world's extent from your coordinates' limits and
+  normalizes to `0..1`. (Hardware's Mapper also accepts a hand-written JSON array of
+  coordinates for irregular layouts; the IDE's editor is the function flavor.)
 - **Templates** — every stock map is real, pasteable Mapper code with no hidden magic.
   Use "Load template" in the New Map editor to start a custom map from any stock one.
 

@@ -275,6 +275,26 @@ syntax, two genuinely different execution models:
 So: in a mapper you write `Math.floor(x)`; in a pattern you write `floor(x)`. Don't
 mix them up.
 
+### Two ways to author a map — in any units you like
+
+The function above is the *generative* form, but the Mapper tab actually accepts
+**either** of two formats:
+
+- **A plain JSON array of coordinates** — one entry per pixel, each a `[x, y]` pair
+  (2D) or `[x, y, z]` triplet (3D). A 4-pixel box is literally
+  `[[0,0],[100,0],[100,100],[0,100]]`. Good for hand-placed or irregular layouts.
+- **A JavaScript `function(pixelCount)`** that *returns* such an array — the
+  generative form, good for repetitive or parametric structures (matrices, rings,
+  helices). Either way the browser ends up with a coordinate array and uploads only
+  that array.
+
+Crucially, **you author in whatever real-world units suit the build** — inches,
+millimetres, pixels, arbitrary grid steps. The firmware computes the world's extent
+from the *limits* of the coordinates you gave it, then scales everything into the
+`0..1` "world units" patterns actually see. So you never hard-code a magic scale: lay
+out a 1500 mm tree in millimetres and it normalizes itself. (How the scaling handles
+non-square extents is the Fill/Contain choice, next.)
+
 ### Fill vs. Contain — map coordinate normalization
 
 After the mapper produces raw coordinates, the firmware **normalizes** them into a

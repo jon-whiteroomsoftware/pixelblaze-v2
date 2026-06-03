@@ -12,6 +12,8 @@ export interface ControllerPanelTelemetry {
   programs: ProgramListEntry[]
   /** Device-reported frame rate; `null` until a frame rate has been reported. */
   fps: number | null
+  /** The device's configured pixel count; `null`/absent until read. Read-only. */
+  pixelCount?: number | null
 }
 
 export interface ControllerPanelView {
@@ -19,6 +21,8 @@ export interface ControllerPanelView {
   patternName: string
   /** FPS to one decimal, or '—' when not yet reported. */
   fpsLabel: string
+  /** Pixel count as an integer string, or '—' when not yet read. */
+  pixelsLabel: string
 }
 
 const PLACEHOLDER = '—'
@@ -28,13 +32,15 @@ export function describeControllerPanel({
   activeProgramId,
   programs,
   fps,
+  pixelCount,
 }: ControllerPanelTelemetry): ControllerPanelView {
   const match = activeProgramId
     ? programs.find((p) => p.id === activeProgramId)
     : undefined
   const patternName = match?.name ?? activeProgramId ?? PLACEHOLDER
   const fpsLabel = fps === null ? PLACEHOLDER : fps.toFixed(1)
-  return { patternName, fpsLabel }
+  const pixelsLabel = pixelCount == null ? PLACEHOLDER : String(pixelCount)
+  return { patternName, fpsLabel, pixelsLabel }
 }
 
 // ── live controls + watched vars (H7, issue #199) ────────────────────────────

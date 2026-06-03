@@ -33,6 +33,14 @@ describe('describeControllerPanel', () => {
   it('shows an em-dash placeholder when fps has not been reported', () => {
     expect(describeControllerPanel({ programs, fps: null }).fpsLabel).toBe('—')
   })
+
+  it('renders the pixel count as an integer string', () => {
+    expect(describeControllerPanel({ programs, fps: null, pixelCount: 256 }).pixelsLabel).toBe('256')
+  })
+
+  it('shows an em-dash placeholder when pixel count has not been read', () => {
+    expect(describeControllerPanel({ programs, fps: null }).pixelsLabel).toBe('—')
+  })
 })
 
 describe('shapeControllerControls', () => {

@@ -26,6 +26,7 @@ const PANEL_HINT = (
     items={[
       ['pattern', 'the pattern the Controller is currently running'],
       ['fps', 'frame rate the device reports'],
+      ['pixels', 'pixel count configured on the device — fixed to its wiring'],
       ['brightness', 'master output level on the device — applied live'],
     ]}
   />
@@ -74,6 +75,7 @@ export function ControllerPanel() {
   const activeProgramId = useControllerPanelStore((s) => s.activeProgramId)
   const programs = useControllerPanelStore((s) => s.programs)
   const fps = useControllerPanelStore((s) => s.fps)
+  const pixelCount = useControllerPanelStore((s) => s.pixelCount)
   const activeControls = useControllerPanelStore((s) => s.activeControls)
   const vars = useControllerPanelStore((s) => s.vars)
   const setBrightness = useControllerPanelStore((s) => s.setBrightness)
@@ -81,7 +83,12 @@ export function ControllerPanel() {
 
   if (!connected) return null
 
-  const { patternName, fpsLabel } = describeControllerPanel({ activeProgramId, programs, fps })
+  const { patternName, fpsLabel, pixelsLabel } = describeControllerPanel({
+    activeProgramId,
+    programs,
+    fps,
+    pixelCount,
+  })
   const controls = shapeControllerControls(activeControls)
   const watchedVars = describeControllerVars(vars)
   // The section header carries the Controller's identity (device name, else its address).
@@ -93,6 +100,7 @@ export function ControllerPanel() {
         <DeckGrid gapY="gap-y-1" className="mb-2">
           <DeckTelemetry label="pattern" value={patternName} />
           <DeckTelemetry label="fps" value={fpsLabel} />
+          <DeckTelemetry label="pixels" value={pixelsLabel} />
         </DeckGrid>
         <DeckGrid>
           <DeckSlider

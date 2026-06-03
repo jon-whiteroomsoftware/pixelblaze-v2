@@ -417,6 +417,7 @@ describe('PixelblazeConnection', () => {
         activeProgramId: 'pat1',
         activeControls: { sliderA: 0.7 },
         name: 'pb',
+        pixelCount: 256,
       })
     })
 
