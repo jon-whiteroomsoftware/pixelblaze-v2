@@ -25,6 +25,7 @@ import { resolveLayout } from '@/engine/layout'
 import { resolvePole, type ShapeId } from '@/engine/shapes'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
+import { withControlDescriptions } from '@/pixelblaze/controlDescriptions'
 
 // Square 3D viewport size (CSS px): fill the available pane edge-to-edge (the
 // smaller of its two sides), so the 3D canvas is exactly as tall as a square 2D
@@ -199,7 +200,7 @@ export function Preview() {
       handle = loadPattern(fidelity === 'fast' ? code : fxCode, metadata, shim.builtins)
       handleRef.current = handle
       useEditorStore.getState().setPatternVars(metadata.patternVars)
-      useEditorStore.getState().setControls(metadata.controls)
+      useEditorStore.getState().setControls(withControlDescriptions(activeDemoName, metadata.controls))
       // Seed control UI from the pattern's own initialised vars so swatches and
       // sliders show the real starting values on mount. The vars already ran via
       // the pattern's own initialiser, so we read them rather than invoking the

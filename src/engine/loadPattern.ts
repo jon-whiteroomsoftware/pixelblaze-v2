@@ -14,6 +14,11 @@ export interface PatternMetadata {
     exportName: string
     kind: string
     label: string
+    // Curated, end-user-facing description of what the control does. Filled in
+    // for demo controls by withControlDescriptions() at the demo-loading layer
+    // (issue #190); bundle() never sets it, so user/imported patterns fall back
+    // to the humanized label.
+    description?: string
     // For pickers only: the top-level vars backing each arg (h,s,v or r,g,b),
     // in arg order. Lets the UI seed the swatch from the pattern's init values.
     pickerVars?: string[]
