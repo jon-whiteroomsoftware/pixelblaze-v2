@@ -67,8 +67,8 @@ Only genuinely-unbuilt scope remains here. Items the original PRD deferred that 
 
 ### Captured in feature PRDs (direction, not greenlit)
 
-- **Hardware upload & a connection UI** — `Feature - Hardware Connectivity.md`. The Node comms layer and capability spike have shipped; the local bridge + in-app connection UI (Phase 3) is deferred there.
-- **Device map push/pull** — `Feature - Hardware Connectivity.md` (Phase 3+). The offline map model shipped in full — stock maps + dimensional preview, source-backed plain-JS stock maps (single source of truth, ADR-0008), and the coder-first New Map / template authoring flow are all done (`docs/IDE Technical Reference.md` §8; the retired Pixel Maps feature PRD). Only **controller map push/pull** remains deferred, rehomed onto the Hardware Connectivity bridge. (The two minor offline remainders — coordinate-import builder #142, stale-map cue #144 — live in the issue tracker.)
+- **Hardware upload & a connection UI** — `Feature - Hardware Connectivity.md`. The comms layer and capability spike have shipped; the browser extension + in-app connection UI (Phase 3) is deferred there.
+- **Device map push/pull** — `Feature - Hardware Connectivity.md` (Phase 3+). The offline map model shipped in full — stock maps + dimensional preview, source-backed plain-JS stock maps (single source of truth, ADR-0008), and the coder-first New Map / template authoring flow are all done (`docs/IDE Technical Reference.md` §8; the retired Pixel Maps feature PRD). Only **controller map push/pull** remains deferred, rehomed onto the Hardware Connectivity extension. (The two minor offline remainders — coordinate-import builder #142, stale-map cue #144 — live in the issue tracker.)
 
 ### Still open / unfiled
 

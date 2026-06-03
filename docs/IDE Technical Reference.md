@@ -547,7 +547,7 @@ tooling:
   `getControls`/`setControls`/`brightness`/`activeProgramId`, and the *undocumented*
   chunked pattern-push. The capability report records a bytecode-push GO on a proven
   path (#112).
-- **Phase 3+ (not built):** a local bridge process + in-app connection UI, plus
+- **Phase 3+ (not built):** a browser extension + in-app connection UI, plus
   device map push/pull, captured as direction only (`Feature - Hardware
   Connectivity.md`). On hardware a Pixelblaze stores one shared map per device, so a
   map push is a guarded device-configuration action, never part of routine deploy.
