@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Pixelblaze H1 LAN-relay spike",
+  "version": "0.0.1",
+  "description": "Throwaway spike (#193): relay ws://<Controller IP>:81 to the deployed https page. Not product code.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": ["ws://192.168.8.224/*", "http://192.168.8.224/*"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://jon-whiteroomsoftware.github.io/pixelblaze-v2/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["relay.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pixelblaze H1 relay spike</title>
+    <style>
+      body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      button {
+        font: inherit;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 1rem;
+      }
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      .ok {
+        color: #0a7d28;
+      }
+      .err {
+        color: #b00020;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Pixelblaze H1 relay spike</h1>
+    <p>
+      Optional deployable version of the acceptance test. To use it, copy this
+      <code>page/</code> folder into <code>public/h1-spike/</code> and deploy, then open
+      <code>/pixelblaze-v2/h1-spike/</code> on the github.io origin with the spike extension
+      loaded. (The console snippet does the same thing with zero deploy.)
+    </p>
+    <p>Extension detected: <strong id="present">no</strong></p>
+    <button id="read" disabled>Run brightness round-trip</button>
+    <div id="status"></div>
+    <pre id="out"></pre>
+    <script src="page.js"></script>
+  </body>
+</html>
