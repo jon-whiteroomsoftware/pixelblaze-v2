@@ -3,3 +3,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+e2e/screenshots/
