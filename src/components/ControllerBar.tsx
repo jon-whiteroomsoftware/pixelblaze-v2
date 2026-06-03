@@ -3,14 +3,19 @@ import { useControllerStore } from '@/store/controllerStore'
 import { describeControllerPill, type ControllerPhase } from '@/engine/controllerPillView'
 import type { ControllerStatusTone } from '@/engine/controllerStatusView'
 import { StatusDot, type StatusTone } from './StatusDot'
+import { ControllerPanel } from './ControllerPanel'
 
 // The consolidated top-right Controller surface (#210). Supersedes the always-on
 // header IP input (ControllerConnect) and the standalone status dot
 // (ConnectionStatus): one row of interactive pills (one per connected Controller)
 // plus a single adaptive entry affordance whose dropdown adapts to extension
 // presence. The status indicator now lives *inside* each pill — there is no
-// standalone dot. Thin shell over the keyed store + the pure pill view; the
-// per-Controller panel relocation into the pill popover is Slice 2 (#211).
+// standalone dot. Thin shell over the keyed store + the pure pill view.
+//
+// Clicking a pill activates that Controller and opens its live panel as a pinned
+// popover anchored under the pill (#211): pinned so the brightness slider and live
+// controls survive being dragged. Disconnect lives in the popover header beside
+// the nickname/IP — there is no longer an inline remove affordance on the pill.
 
 // Bridge the pill's status tone vocabulary to the shared StatusDot tones, so a
 // connected Controller reads with the same amber `live` accent as a "good"
@@ -40,6 +45,7 @@ function ControllerPillButton({
   nickname,
   phase,
   active,
+  panelOpen,
   onActivate,
   onRemove,
 }: {
@@ -47,38 +53,63 @@ function ControllerPillButton({
   nickname?: string
   phase: ControllerPhase
   active: boolean
+  panelOpen: boolean
   onActivate: () => void
   onRemove: () => void
 }) {
-  const { label, tooltip, tone, showDot } = describeControllerPill({ ip, nickname, phase })
+  const { label, tone, showDot } = describeControllerPill({ ip, nickname, phase })
   return (
-    <span
-      data-testid="controller-pill"
-      data-active={active}
-      data-phase={phase}
-      title={tooltip}
-      className={`group inline-flex items-center gap-1.5 h-6 rounded border pl-2 pr-1.5 font-mono text-xs transition-colors cursor-pointer select-none ${
-        active
-          ? 'border-zinc-400 bg-zinc-800 text-zinc-100'
-          : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100'
-      }`}
-    >
-      <button type="button" onClick={onActivate} aria-label={`Activate ${label}`} aria-pressed={active} className="inline-flex items-center gap-1.5 focus:outline-none">
+    <span className="relative inline-flex">
+      {/* The whole pill is one toggle target — clicking anywhere on it (chip,
+          label, or status dot) opens/closes that Controller's panel. The IP is
+          shown in the open panel's header, so the pill carries no hover tooltip. */}
+      <button
+        type="button"
+        onClick={onActivate}
+        aria-label={`Toggle ${label} panel`}
+        aria-pressed={active}
+        aria-expanded={panelOpen}
+        data-testid="controller-pill"
+        data-active={active}
+        data-phase={phase}
+        className={`group inline-flex items-center gap-1.5 h-6 rounded border px-2 font-mono text-xs transition-colors select-none focus:outline-none ${
+          active
+            ? 'border-zinc-400 bg-zinc-800 text-zinc-100'
+            : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100'
+        }`}
+      >
         <span className="text-zinc-400 group-hover:text-zinc-300">
           <ChipGlyph />
         </span>
         <span className="max-w-[10rem] truncate">{label}</span>
         {showDot && tone && <StatusDot tone={PILL_TONE[tone]} testId="controller-pill-dot" />}
       </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Disconnect ${label}`}
-        data-testid="controller-pill-remove"
-        className="shrink-0 rounded text-zinc-600 opacity-0 group-hover:opacity-100 hover:text-zinc-200 focus:opacity-100 focus:outline-none leading-none px-0.5"
-      >
-        ×
-      </button>
+
+      {panelOpen && (
+        <div
+          data-testid="controller-panel-popover"
+          className="absolute right-0 top-8 z-50 w-80 rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl font-mono text-xs text-zinc-300"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-seam px-3 py-2">
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="truncate text-zinc-200">{nickname ?? ip}</span>
+              {nickname && <span className="shrink-0 text-zinc-500">{ip}</span>}
+            </span>
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`Disconnect ${label}`}
+              data-testid="controller-pill-remove"
+              className="shrink-0 rounded border border-zinc-700 px-2 py-0.5 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 focus:outline-none"
+            >
+              Disconnect
+            </button>
+          </div>
+          <div className="py-2 pr-3">
+            <ControllerPanel />
+          </div>
+        </div>
+      )}
     </span>
   )
 }
@@ -93,26 +124,45 @@ export function ControllerBar() {
   const setActive = useControllerStore((s) => s.setActive)
 
   const [open, setOpen] = useState(false)
+  const [panelOpenIp, setPanelOpenIp] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
 
   const ips = Object.keys(controllers)
   const hasPills = ips.length > 0
 
-  // Close the dropdown on an outside click.
+  // Close the entry dropdown and any pinned panel popover on an outside click —
+  // "pinned" means they survive interaction within the bar but dismiss on click-away.
   useEffect(() => {
-    if (!open) return
+    if (!open && panelOpenIp === null) return
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setPanelOpenIp(null)
+      }
     }
     window.addEventListener('mousedown', onDown)
     return () => window.removeEventListener('mousedown', onDown)
-  }, [open])
+  }, [open, panelOpenIp])
+
+  // Clicking a pill activates that Controller and toggles its panel popover; the
+  // panel is bound to the active Controller, so opening one closes any other.
+  const onPillClick = (ip: string) => {
+    setActive(ip)
+    setOpen(false)
+    setPanelOpenIp((prev) => (prev === ip ? null : ip))
+  }
+
+  const onPillRemove = (ip: string) => {
+    setPanelOpenIp((prev) => (prev === ip ? null : prev))
+    void removeController(ip)
+  }
 
   const openDropdown = () => {
     // Re-probe presence each time the affordance opens, so installing the
     // extension mid-session flips the dropdown from pitch to IP form.
     void detectExtension()
+    setPanelOpenIp(null)
     setOpen(true)
   }
 
@@ -133,22 +183,26 @@ export function ControllerBar() {
           nickname={controllers[ip].nickname}
           phase={controllers[ip].phase}
           active={ip === activeIp}
-          onActivate={() => setActive(ip)}
-          onRemove={() => void removeController(ip)}
+          panelOpen={ip === panelOpenIp}
+          onActivate={() => onPillClick(ip)}
+          onRemove={() => onPillRemove(ip)}
         />
       ))}
 
       <button
         type="button"
         data-testid="controller-entry-button"
-        aria-label={hasPills ? 'Add a Controller' : extensionPresent ? 'Connect a Controller' : 'Install the Controller extension'}
+        aria-label={hasPills ? 'Add a Controller' : 'Connect a Controller'}
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : openDropdown())}
         className={`inline-flex items-center justify-center h-6 rounded border border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 transition-colors focus:outline-none ${
-          hasPills ? 'w-6 text-base leading-none' : 'gap-1.5 px-2.5 text-xs font-mono'
+          hasPills ? 'w-6 text-base leading-none' : 'px-2.5 text-xs font-mono'
         }`}
       >
-        {hasPills ? '+' : extensionPresent ? 'Connect Controller' : 'Install extension'}
+        {/* "Connect to Controller" until a Controller is live, when it collapses
+            to a bare +. The dropdown — install pitch vs IP form — adapts to
+            extension presence; the entry label does not (#211). */}
+        {hasPills ? '+' : 'Connect to Controller'}
       </button>
 
       {open && (

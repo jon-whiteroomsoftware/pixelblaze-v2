@@ -7,7 +7,6 @@ import { Preview } from '@/components/Preview'
 import { PaneHeader } from '@/components/PaneHeader'
 import { ControllerBar } from '@/components/ControllerBar'
 import { SendToController } from '@/components/SendToController'
-import { ControllerPanel } from '@/components/ControllerPanel'
 import { useControllerStore } from '@/store/controllerStore'
 import { MapModeHeader } from '@/components/MapModeHeader'
 import { usePatternStore, PatternRecord } from '@/store/patternStore'
@@ -172,12 +171,8 @@ export default function App() {
           <div className="flex-1 overflow-y-auto">
             <PatternList />
           </div>
-          {/* The live Controller dashboard sits below the pattern list; it renders
-              only while a Controller is connected (otherwise null), so the pane is
-              unchanged until a helper backend (H3) lands and a connection is made. */}
-          <div className="shrink-0 border-t border-seam py-2 empty:border-0 empty:py-0">
-            <ControllerPanel />
-          </div>
+          {/* The live Controller dashboard moved out of this slot (#211): it now
+              opens as a pinned popover anchored under its pill in the header. */}
         </aside>
         <Splitter onDrag={handleLeftDrag} />
         <main data-testid="editor-pane" className="flex-1 min-w-0 flex flex-col overflow-hidden">
