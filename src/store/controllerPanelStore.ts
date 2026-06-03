@@ -27,15 +27,24 @@ interface ControllerPanelState {
   programs: ProgramListEntry[]
   /** Device-reported frame rate; null until reported. */
   fps: number | null
+  /** The running pattern's live controls (name → value). Seeded from the device,
+   *  then slider-owned until the active pattern changes (so a scrub never fights
+   *  the poll); reseeded when `activeProgramId` changes. */
+  activeControls: Record<string, number>
+  /** The running pattern's exported variables (name → value), read-only. Refreshed
+   *  every poll. */
+  vars: Record<string, number>
   /** Begin polling (idempotent). Fetches the program list once, then polls config
-   *  + telemetry on the interval. */
+   *  + telemetry + vars on the interval. */
   start: () => void
   /** Stop polling and reset to the disconnected baseline. */
   stop: () => void
-  /** One poll tick: read config + telemetry, tolerating transient failures. */
+  /** One poll tick: read config + telemetry + vars, tolerating transient failures. */
   poll: () => Promise<void>
   /** Set brightness on the device — volatile, never `save:true`. Optimistic local. */
   setBrightness: (value: number) => void
+  /** Set one control value on the device — volatile, never `save:true`. Optimistic. */
+  setControl: (name: string, value: number) => void
 }
 
 export const controllerPanelInitialState = {
@@ -43,17 +52,25 @@ export const controllerPanelInitialState = {
   activeProgramId: undefined,
   programs: [] as ProgramListEntry[],
   fps: null,
+  activeControls: {} as Record<string, number>,
+  vars: {} as Record<string, number>,
 }
 
 // Interval handle kept module-local (not in store state) so it never serializes
 // and a stale render never holds a timer reference.
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
+// Which program's controls the local `activeControls` currently belong to. Kept
+// module-local (bookkeeping, not rendered): the poll adopts the device's controls
+// when this differs from the reported active program, then leaves them slider-owned.
+let controlsSeededFor: string | undefined
+
 export const useControllerPanelStore = create<ControllerPanelState>()((set, get) => ({
   ...controllerPanelInitialState,
 
   start: () => {
     if (pollTimer !== null) return
+    controlsSeededFor = undefined
     // Program names rarely change; fetch the list once and tolerate failure.
     getControllerProvider()
       .listPrograms()
@@ -68,29 +85,46 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
       clearInterval(pollTimer)
       pollTimer = null
     }
+    controlsSeededFor = undefined
     set(controllerPanelInitialState)
   },
 
   poll: async () => {
     const provider = getControllerProvider()
-    const [config, telemetry] = await Promise.all([
+    const [config, telemetry, vars] = await Promise.all([
       provider.getConfig().catch(() => null),
       provider.getTelemetry().catch(() => null),
+      provider.getVars().catch(() => null),
     ])
     if (config) {
-      // Seed brightness once (?? on the existing value), then leave it slider-owned.
-      set((s) => ({
-        activeProgramId: config.activeProgramId,
-        brightness: s.brightness ?? config.brightness ?? null,
-      }))
+      set((s) => {
+        // Reseed the controls only when the device's active pattern changes; in
+        // between, the slider owns them so a scrub never fights the poll.
+        const reseed = config.activeProgramId !== controlsSeededFor
+        if (reseed) controlsSeededFor = config.activeProgramId
+        return {
+          activeProgramId: config.activeProgramId,
+          // Seed brightness once (?? on the existing value), then slider-owned.
+          brightness: s.brightness ?? config.brightness ?? null,
+          activeControls: reseed ? config.activeControls ?? {} : s.activeControls,
+        }
+      })
     }
     if (telemetry) set({ fps: telemetry.fps })
+    if (vars) set({ vars })
   },
 
   setBrightness: (value) => {
     set({ brightness: value })
     void getControllerProvider()
       .setBrightness(value, false)
+      .catch(() => {})
+  },
+
+  setControl: (name, value) => {
+    set((s) => ({ activeControls: { ...s.activeControls, [name]: value } }))
+    void getControllerProvider()
+      .setControls({ [name]: value }, false)
       .catch(() => {})
   },
 }))

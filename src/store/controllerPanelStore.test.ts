@@ -19,7 +19,9 @@ class FakeProvider extends NullControllerProvider {
     { id: 'abc', name: 'Aurora' },
     { id: 'def', name: 'Nebula' },
   ]
+  vars: Record<string, number> = { phase: 0.5 }
   brightnessWrites: Array<{ value: number; save: boolean }> = []
+  controlWrites: Array<{ controls: Record<string, number>; save: boolean }> = []
 
   getConfig(): Promise<ControllerConfig> {
     return Promise.resolve(this.config)
@@ -30,8 +32,15 @@ class FakeProvider extends NullControllerProvider {
   listPrograms(): Promise<ProgramListEntry[]> {
     return Promise.resolve(this.programs)
   }
+  getVars(): Promise<Record<string, number>> {
+    return Promise.resolve(this.vars)
+  }
   setBrightness(value: number, save = false): Promise<void> {
     this.brightnessWrites.push({ value, save })
+    return Promise.resolve()
+  }
+  setControls(controls: Record<string, number>, save = false): Promise<void> {
+    this.controlWrites.push({ controls, save })
     return Promise.resolve()
   }
 }
@@ -81,6 +90,52 @@ describe('controllerPanelStore', () => {
     provider.config = { brightness: 0.9, activeProgramId: 'def' }
     await vi.advanceTimersByTimeAsync(CONTROLLER_POLL_INTERVAL_MS)
     expect(useControllerPanelStore.getState().brightness).toBe(0.5)
+  })
+
+  it('polls the running pattern controls and watched vars', async () => {
+    provider.config = {
+      brightness: 0.5,
+      activeProgramId: 'def',
+      activeControls: { sliderSpeed: 0.3 },
+    }
+    useControllerPanelStore.getState().start()
+    await flush()
+    const s = useControllerPanelStore.getState()
+    expect(s.activeControls).toEqual({ sliderSpeed: 0.3 })
+    expect(s.vars).toEqual({ phase: 0.5 })
+  })
+
+  it('keeps controls slider-owned until the active pattern changes', async () => {
+    provider.config = {
+      brightness: 0.5,
+      activeProgramId: 'def',
+      activeControls: { sliderSpeed: 0.3 },
+    }
+    useControllerPanelStore.getState().start()
+    await flush()
+    // Local edit; later poll for the SAME pattern must not clobber it.
+    useControllerPanelStore.getState().setControl('sliderSpeed', 0.8)
+    provider.config = {
+      brightness: 0.5,
+      activeProgramId: 'def',
+      activeControls: { sliderSpeed: 0.3 },
+    }
+    await vi.advanceTimersByTimeAsync(CONTROLLER_POLL_INTERVAL_MS)
+    expect(useControllerPanelStore.getState().activeControls).toEqual({ sliderSpeed: 0.8 })
+    // A pattern switch reseeds from the device.
+    provider.config = {
+      brightness: 0.5,
+      activeProgramId: 'abc',
+      activeControls: { sliderHue: 0.1 },
+    }
+    await vi.advanceTimersByTimeAsync(CONTROLLER_POLL_INTERVAL_MS)
+    expect(useControllerPanelStore.getState().activeControls).toEqual({ sliderHue: 0.1 })
+  })
+
+  it('setControl writes through volatile (never save:true) and updates locally', () => {
+    useControllerPanelStore.getState().setControl('sliderSpeed', 0.7)
+    expect(useControllerPanelStore.getState().activeControls).toEqual({ sliderSpeed: 0.7 })
+    expect(provider.controlWrites).toEqual([{ controls: { sliderSpeed: 0.7 }, save: false }])
   })
 
   it('setBrightness writes through volatile (never save:true) and updates locally', () => {

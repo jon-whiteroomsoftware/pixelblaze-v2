@@ -1,8 +1,12 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { useControllerPanelStore } from '@/store/controllerPanelStore'
-import { describeControllerPanel } from '@/engine/controllerPanelView'
-import { DeckSection, DeckSectionHint, DeckGrid, DeckTelemetry } from '@/components/Deck'
+import {
+  describeControllerPanel,
+  shapeControllerControls,
+  describeControllerVars,
+} from '@/engine/controllerPanelView'
+import { DeckSection, DeckSectionHint, DeckGrid, DeckCell, DeckTelemetry } from '@/components/Deck'
 import { DeckSlider } from '@/components/DeckSlider'
 
 // The live Controller panel (H6, issue #198). A dashboard built from the *same*
@@ -23,6 +27,23 @@ const PANEL_HINT = (
       ['fps', 'frame rate the device reports'],
       ['brightness', 'master output level on the device — applied live'],
     ]}
+  />
+)
+
+const CONTROLS_HINT = (
+  <DeckSectionHint
+    intro="The running pattern's UI controls, read live from the device. Changes are sent to the Controller immediately and are not persisted to flash."
+    items={[
+      ['sliders', 'continuous values the pattern exposes — applied live'],
+      ['toggles', 'on/off switches the pattern exposes — applied live'],
+    ]}
+  />
+)
+
+const VARS_HINT = (
+  <DeckSectionHint
+    intro="The running pattern's exported variables, read live from the device. Read-only — a watch window, not an editor."
+    items={[['value', 'the variable’s current value on the device']]}
   />
 )
 
@@ -47,11 +68,16 @@ export function ControllerPanel() {
   const activeProgramId = useControllerPanelStore((s) => s.activeProgramId)
   const programs = useControllerPanelStore((s) => s.programs)
   const fps = useControllerPanelStore((s) => s.fps)
+  const activeControls = useControllerPanelStore((s) => s.activeControls)
+  const vars = useControllerPanelStore((s) => s.vars)
   const setBrightness = useControllerPanelStore((s) => s.setBrightness)
+  const setControl = useControllerPanelStore((s) => s.setControl)
 
   if (!connected) return null
 
   const { patternName, fpsLabel } = describeControllerPanel({ activeProgramId, programs, fps })
+  const controls = shapeControllerControls(activeControls)
+  const watchedVars = describeControllerVars(vars)
   // The section header carries the Controller's identity (device name, else its address).
   const label = status.controller.name ?? status.controller.address
 
@@ -74,6 +100,47 @@ export function ControllerPanel() {
           />
         </DeckGrid>
       </DeckSection>
+
+      {controls.length > 0 && (
+        <DeckSection label="controls" hint={CONTROLS_HINT}>
+          <DeckGrid>
+            {controls.map((c) =>
+              c.kind === 'toggle' ? (
+                <DeckCell key={c.name} label={c.label.toLowerCase()}>
+                  <input
+                    type="checkbox"
+                    aria-label={c.name}
+                    checked={c.value === 1}
+                    onChange={(e) => setControl(c.name, e.target.checked ? 1 : 0)}
+                    className="accent-live shrink-0"
+                  />
+                </DeckCell>
+              ) : (
+                <DeckSlider
+                  key={c.name}
+                  label={c.label.toLowerCase()}
+                  ariaLabel={c.name}
+                  value={c.value}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onChange={(v) => setControl(c.name, v)}
+                />
+              ),
+            )}
+          </DeckGrid>
+        </DeckSection>
+      )}
+
+      {watchedVars.length > 0 && (
+        <DeckSection label="variables" hint={VARS_HINT}>
+          <DeckGrid gapY="gap-y-1">
+            {watchedVars.map((v) => (
+              <DeckTelemetry key={v.name} label={v.name} value={v.value} />
+            ))}
+          </DeckGrid>
+        </DeckSection>
+      )}
     </div>
   )
 }

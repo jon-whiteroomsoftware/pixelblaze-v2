@@ -63,6 +63,7 @@ describe('NullControllerProvider', () => {
     await expect(p.getConfig()).rejects.toThrow(/not connected/i)
     await expect(p.getTelemetry()).rejects.toThrow(/not connected/i)
     await expect(p.listPrograms()).rejects.toThrow(/not connected/i)
+    await expect(p.getVars()).rejects.toThrow(/not connected/i)
     await expect(p.setControls({ sliderX: 0.5 })).rejects.toThrow(/not connected/i)
     await expect(p.setBrightness(0.66)).rejects.toThrow(/not connected/i)
   })

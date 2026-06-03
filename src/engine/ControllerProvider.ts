@@ -119,6 +119,10 @@ export interface ControllerProvider {
   /** List the patterns stored on the Controller. */
   listPrograms(): Promise<ProgramListEntry[]>
 
+  /** Read the running pattern's live exported variables (name → value). The panel
+   *  watches these read-only; backend-forwarded from the documented `getVars`. */
+  getVars(): Promise<Record<string, number>>
+
   /** Set UI control values on the active pattern. `save` persists to flash
    *  (wear cost) — default false. Resolves once the command is sent. */
   setControls(controls: Record<string, number>, save?: boolean): Promise<void>
@@ -172,6 +176,10 @@ export class NullControllerProvider implements ControllerProvider {
   }
 
   listPrograms(): Promise<ProgramListEntry[]> {
+    return Promise.reject(new Error('Not connected to a Controller'))
+  }
+
+  getVars(): Promise<Record<string, number>> {
     return Promise.reject(new Error('Not connected to a Controller'))
   }
 
