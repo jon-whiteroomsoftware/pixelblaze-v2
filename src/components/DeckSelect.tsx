@@ -50,7 +50,7 @@ export function DeckSelect<T extends string | number>({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((o) => !o)}
-        className="flex items-center gap-0.5 h-6 pl-1.5 pr-0.5 shrink-0 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 hover:border-zinc-500 hover:text-amber-400/80 transition-colors"
+        className="flex items-center gap-0.5 h-5 pl-1 pr-0.5 shrink-0 rounded border border-zinc-500 text-[11px] tabular-nums text-zinc-300 hover:border-zinc-400 hover:text-amber-400/80 transition-colors"
       >
         <span className="whitespace-nowrap">{current?.label}</span>
         {current?.badge && (

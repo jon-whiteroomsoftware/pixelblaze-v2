@@ -41,11 +41,40 @@ function PrimaryBand() {
   const toggle = usePreviewStore((s) => s.toggle)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
 
+  // The layer-1 reset affordance (ADR-0013, #63): a rewind icon sitting immediately to
+  // the right of the pattern name in the primary nav — findable, and clearly scoped to
+  // the whole preview rather than buried mid-deck below the controls it resets. It pops
+  // in only when the active pattern/demo carries overrides to clear (so it's never a
+  // no-op) — a demo reverts to its developer recommendation, a user pattern to the app
+  // defaults (resetActiveSettings picks the floor). We subscribe to the override sources
+  // so it appears/disappears live as controls are touched; the divergence check itself is
+  // `hasActiveOverrides()`. Clicking resets and the icon disappears.
+  usePatternStore((s) => s.activePatternId)
+  usePatternStore((s) => s.activeDemoName)
+  usePatternStore((s) => s.userPatterns)
+  usePatternStore((s) => s.demoOverrides)
+  const showReset = hasActiveOverrides()
+
+  // The name truncates first; LayoutSelector and play/pause never do (both `shrink-0`),
+  // so the controls stay fully readable and only the title gives up space (#63).
   return (
     <div className="flex items-center gap-3 py-2 pr-3 border-b border-zinc-800">
-      <span className="flex-1 min-w-0 text-sm text-zinc-200 truncate">
-        {previewPatternName || '—'}
-      </span>
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <span className="min-w-0 truncate text-sm text-zinc-200">
+          {previewPatternName || '—'}
+        </span>
+        {showReset && (
+          <button
+            type="button"
+            aria-label="Reset preview"
+            title="Reset preview"
+            onClick={() => void resetActiveSettings()}
+            className="flex items-center justify-center h-5 w-5 shrink-0 rounded text-zinc-500 hover:text-amber-400 hover:bg-zinc-800/80 transition-colors"
+          >
+            <RotateCcw size={14} />
+          </button>
+        )}
+      </div>
       <LayoutSelector />
       <button
         aria-label={isRunning ? 'Pause' : 'Run'}
@@ -104,7 +133,7 @@ function PixelCountInput() {
       onChange={(e) => setDraftCount(e.target.value.replace(/\D/g, ''))}
       onKeyDown={(e) => e.key === 'Enter' && commit()}
       onBlur={commit}
-      className="w-12 h-6 px-0.5 rounded border border-zinc-700 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-500 focus:outline-none focus:border-live"
+      className="w-[42px] h-5 px-0.5 rounded border border-zinc-500 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-400 focus:outline-none focus:border-live"
     />
   )
 }
@@ -140,17 +169,6 @@ function SecondaryBand() {
   const solidEligible = useEditorStore((s) => s.solidEligible)
   const solidity = useMapStore((s) => s.activeSolidity)
   const setSolidity = useMapStore((s) => s.setActiveSolidity)
-  // The layer-1 reset affordance (ADR-0013): a rewind icon by the Preview header that
-  // pops in only when the active pattern/demo carries overrides to clear (so it's never
-  // a no-op). One "Reset preview" action for both — a demo reverts to its developer
-  // recommendation, a user pattern to the app defaults (resetActiveSettings picks the
-  // floor). We subscribe to the override sources so it appears/disappears live as
-  // controls are touched; the divergence check itself is `hasActiveOverrides()`.
-  usePatternStore((s) => s.activePatternId)
-  usePatternStore((s) => s.activeDemoName)
-  usePatternStore((s) => s.userPatterns)
-  usePatternStore((s) => s.demoOverrides)
-  const showReset = hasActiveOverrides()
 
   return (
     <div className="text-xs pr-3">
@@ -189,47 +207,10 @@ function SecondaryBand() {
           />
         </Grid>
       </Section>
-      <Section
-        label="Preview"
-        action={
-          showReset && (
-            <button
-              type="button"
-              aria-label="Reset preview"
-              title="Reset preview"
-              onClick={() => void resetActiveSettings()}
-              className="flex items-center justify-center h-5 w-5 rounded text-zinc-500 hover:text-amber-400 hover:bg-zinc-800/80 transition-colors translate-y-[1.5px]"
-            >
-              <RotateCcw size={14} />
-            </button>
-          )
-        }
-      >
-        {/* Read-only telemetry on top, then renderer/speed, then all three sliders at
-            the bottom of the section (#150 follow-up). */}
-        <Grid gapY="gap-y-1" className="mb-2">
-          <Telemetry label="fps" value={fps === null ? '—' : fps.toFixed(1)} />
-          <Telemetry label="elapsed" value={elapsed === null ? '—' : `${(elapsed / 1000).toFixed(1)}s`} />
-          {layoutLabel && <Telemetry label="layout" value={layoutLabel} />}
-        </Grid>
-        <Grid gapY="gap-y-1" className="mb-2">
-          <Cell label="renderer">
-            <DeckSelect
-              ariaLabel="Renderer"
-              value={fidelity}
-              options={[
-                { value: 'fast', label: 'Fast', title: 'Fast (float64, plain JS preview)' },
-                { value: 'fidelity', label: 'Precise', title: 'Precise (16.16 fixed-point, hardware-accurate)' },
-              ]}
-              onChange={setFidelity}
-              menuWidthClass="w-28"
-            />
-          </Cell>
-          <Cell label="speed">
-            <SpeedSelector />
-          </Cell>
-        </Grid>
-        <Grid>
+      <Section label="Preview">
+        {/* Sliders on top, then renderer/speed dropdowns, then read-only telemetry at
+            the bottom of the section (#63). */}
+        <Grid className="mb-2">
           <DeckSlider
             label="light size"
             ariaLabel="Light size"
@@ -269,6 +250,34 @@ function SecondaryBand() {
             />
           )}
         </Grid>
+        <Grid gapY="gap-y-1" className="mb-2">
+          <Cell label="renderer">
+            <DeckSelect
+              ariaLabel="Renderer"
+              value={fidelity}
+              options={[
+                { value: 'fast', label: 'Fast', title: 'Fast (float64, plain JS preview)' },
+                { value: 'fidelity', label: 'Precise', title: 'Precise (16.16 fixed-point, hardware-accurate)' },
+              ]}
+              onChange={setFidelity}
+              menuWidthClass="w-28"
+            />
+          </Cell>
+          <Cell label="speed">
+            <SpeedSelector />
+          </Cell>
+        </Grid>
+        {/* Pull the telemetry text up (#63): the dropdown row above is 20px tall (text
+            vertically centered), so without this the renderer→fps text baselines sit
+            farther apart than the pure-text telemetry rows below. The negative top
+            margin cancels the prior grid's mb-2 plus the dropdown's centering slack, so
+            the fps baseline lands the same distance below renderer as elapsed/layout is
+            below fps — keeping the text-line rhythm even. */}
+        <Grid gapY="gap-y-1" className="mb-2 -mt-1.5">
+          <Telemetry label="fps" value={fps === null ? '—' : fps.toFixed(1)} />
+          <Telemetry label="elapsed" value={elapsed === null ? '—' : `${(elapsed / 1000).toFixed(1)}s`} />
+          {layoutLabel && <Telemetry label="layout" value={layoutLabel} />}
+        </Grid>
       </Section>
     </div>
   )
@@ -279,22 +288,17 @@ function SecondaryBand() {
 // columns.
 function Section({
   label,
-  action,
   children,
 }: {
   label: string
-  action?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="mt-1 pt-1.5 pb-2">
-      {/* Fixed header height (h-5) so an action icon that pops in/out (the reset
-          rewind) never reflows the rows below it — the slot is always reserved. */}
       <div className="flex items-center gap-1.5 mb-1.5 h-5">
         <h4 className="text-[11px] font-semibold text-structural uppercase tracking-wider">
           {label}
         </h4>
-        {action}
       </div>
       {children}
     </div>

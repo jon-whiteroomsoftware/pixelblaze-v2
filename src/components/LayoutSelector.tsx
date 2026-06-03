@@ -68,7 +68,7 @@ export function LayoutSelector() {
   if (maps.length === 0 && !showEmbedding) return null
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 shrink-0">
       {maps.length > 0 && (
         <DeckSelect
           ariaLabel="Map"

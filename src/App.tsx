@@ -112,6 +112,7 @@ export default function App() {
 
   const [leftWidth, setLeftWidth] = useState(224)
   const [rightWidth, setRightWidth] = useState(320)
+  const MIN_PREVIEW_WIDTH = 300
 
   const activeFileName =
     activeLibraryName ?? activeDemoName ?? userPatterns.find((p) => p.id === activePatternId)?.name ?? '—'
@@ -120,8 +121,10 @@ export default function App() {
     setLeftWidth((w) => Math.max(120, w + dx))
   }, [])
 
+  // Floor wide enough that the preview's primary nav row (layout map picker + play/pause,
+  // both non-truncating) stays comfortable; only the pattern name gives up space (#63).
   const handleRightDrag = useCallback((dx: number) => {
-    setRightWidth((w) => Math.max(200, w - dx))
+    setRightWidth((w) => Math.max(MIN_PREVIEW_WIDTH, w - dx))
   }, [])
 
   return (
@@ -208,7 +211,7 @@ export default function App() {
         <Splitter onDrag={handleRightDrag} />
         {/* The preview is an output/instrument surface (#150): no header strip — the
             canvas sits flush at the top and all controls live in the deck below it. */}
-        <aside data-testid="preview-pane" className="shrink-0 flex flex-col min-h-0" style={{ width: rightWidth }}>
+        <aside data-testid="preview-pane" className="shrink-0 flex flex-col min-h-0" style={{ width: rightWidth, minWidth: MIN_PREVIEW_WIDTH }}>
           <Preview />
         </aside>
       </div>
