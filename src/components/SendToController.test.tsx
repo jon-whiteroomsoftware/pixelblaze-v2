@@ -55,18 +55,34 @@ describe('SendToController', () => {
     expect(button).toHaveAttribute('title', expect.stringMatching(/2D.*1D/))
   })
 
-  it('calls pushActivePattern on click when enabled', () => {
+  it('runs the preflight (requestPush) on click when enabled', () => {
     setControllerProvider(new ConnectedProvider())
     useEditorStore.setState({ nativeDim: 2 })
-    const pushActivePattern = vi.fn()
+    const requestPush = vi.fn()
     useControllerStore.setState({
       activeIp: '10.0.0.9',
       controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 2 } },
-      pushActivePattern,
+      requestPush,
     })
     render(<SendToController />)
     fireEvent.click(screen.getByTestId('send-to-controller'))
-    expect(pushActivePattern).toHaveBeenCalledOnce()
+    expect(requestPush).toHaveBeenCalledOnce()
+  })
+
+  it('renders the preflight dialog with its warnings, confirming proceeds', () => {
+    setControllerProvider(new ConnectedProvider())
+    useEditorStore.setState({ nativeDim: 2 })
+    const confirmPush = vi.fn()
+    useControllerStore.setState({
+      activeIp: '10.0.0.9',
+      controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 2 } },
+      confirmPush,
+      preflight: [{ kind: 'fewer-than-device', message: 'Only 100 of the Controller’s 256 pixels will light up.' }],
+    })
+    render(<SendToController />)
+    expect(screen.getByText(/only 100 of the controller/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/send anyway/i))
+    expect(confirmPush).toHaveBeenCalledOnce()
   })
 
   it('keeps the full label and disables while a push is in flight', () => {

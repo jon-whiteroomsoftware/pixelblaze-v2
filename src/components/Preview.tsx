@@ -177,6 +177,9 @@ export function Preview() {
 
     useEditorStore.getState().setDisplayDim(layout.displayDim)
     useEditorStore.getState().setLayoutLabel(layout.layoutLabel)
+    // Publish the realized point count so the Send-to-Controller preflight (#203)
+    // can reconcile it against the Controller's fixed pixel count.
+    useEditorStore.getState().setPreviewPixelCount(pixelCount)
     // A normal array is fed exactly for a solid-eligible embedding (Pole, Cylinder,
     // Sphere shell, Cube shell), so its presence IS the eligibility the deck's
     // solidity slider keys on (ADR-0011).

@@ -8,6 +8,7 @@ import {
 } from '@/engine/controllerProviderRegistry'
 import { NullControllerProvider, type ControllerProvider, type ControllerStatus } from '@/engine/ControllerProvider'
 import { mapDimension, type MapDimension } from '@/engine/sendToController'
+import { describePreflight, type PreflightWarning } from '@/engine/preflight'
 import type { ControllerPhase } from '@/engine/controllerPillView'
 import { pushPattern } from '@/engine/pushPattern'
 import { getControllerBindings, setControllerBindings } from '@/engine/storage'
@@ -64,6 +65,11 @@ interface ControllerConnectionState {
    *  Drives the dirty gate: Send is inert until the source differs from this. Not
    *  persisted — a fresh session re-enables a push (the device may have changed). */
   lastPushedSource: Record<string, Record<string, string>>
+  /** Pending preflight warnings (#203): non-null opens the reconciliation dialog,
+   *  which Send must clear (confirm or cancel) before the push proceeds. `null` =
+   *  no dialog. An empty array never appears here — a clean preflight pushes
+   *  straight through. */
+  preflight: PreflightWarning[] | null
 
   /** Probe extension presence and record it (global). */
   detectExtension: () => Promise<boolean>
@@ -82,6 +88,15 @@ interface ControllerConnectionState {
    *  (#202). Reads the last-clean preview source and active pattern id; a no-op when
    *  nothing is active. Sets `pushing`/`pushResult` for the button to reflect. */
   pushActivePattern: () => Promise<void>
+  /** Run the Send-to-Controller preflight (#203): reconcile the open pattern's
+   *  modeled pixel count against the Controller's fixed count. A clean preflight
+   *  pushes straight through (preserving the one-click path); any warning opens the
+   *  reconciliation dialog (`preflight`) instead, deferring the push to confirmPush. */
+  requestPush: () => Promise<void>
+  /** Acknowledge the preflight dialog and proceed with the push. */
+  confirmPush: () => Promise<void>
+  /** Dismiss the preflight dialog without pushing. */
+  cancelPush: () => void
   /** Clear the transient push result (e.g. after the toast/badge times out). */
   clearPushResult: () => void
 }
@@ -99,6 +114,7 @@ export const controllerInitialState = {
   pushing: false,
   pushResult: null as PushResult | null,
   lastPushedSource: {} as Record<string, Record<string, string>>,
+  preflight: null as PreflightWarning[] | null,
 }
 
 // Live provider per Controller IP, plus each one's status unsubscribe. Kept
@@ -230,6 +246,39 @@ export const useControllerStore = create<ControllerConnectionState>()(
         },
 
         clearPushResult: () => set({ pushResult: null }),
+
+        requestPush: async () => {
+          const controllerId = get().activeIp
+          const patternId = usePatternStore.getState().activePatternId
+          const { previewSource, previewPixelCount } = useEditorStore.getState()
+          // Mirror pushActivePattern's no-op guard: nothing active → nothing to do.
+          if (!controllerId || !patternId || !previewSource) return
+
+          // The Controller's fixed pixel count is read fresh (best-effort) so the
+          // reconciliation reflects the device as wired now; a read failure leaves it
+          // unknown and the fit warnings are simply suppressed (engine handles null).
+          const config = await getControllerProvider().getConfig().catch(() => null)
+          const { warnings } = describePreflight({
+            localPixelCount: previewPixelCount,
+            devicePixelCount: config?.pixelCount ?? null,
+            // Map upload isn't wired yet (H10/H11 push pattern bytecode only); the
+            // device keeps its own map, so there's nothing to overwrite.
+            pushingMap: false,
+          })
+          // Clean preflight → keep the one-click path. Any warning → open the dialog.
+          if (warnings.length === 0) {
+            await get().pushActivePattern()
+            return
+          }
+          set({ preflight: warnings })
+        },
+
+        confirmPush: async () => {
+          set({ preflight: null })
+          await get().pushActivePattern()
+        },
+
+        cancelPush: () => set({ preflight: null }),
 
         pushActivePattern: async () => {
           const controllerId = get().activeIp

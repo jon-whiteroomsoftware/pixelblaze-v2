@@ -6,17 +6,26 @@ import { useControllerStore } from '@/store/controllerStore'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore } from '@/store/patternStore'
 import { describeSendToController } from '@/engine/sendToController'
+import {
+  AlertDialogRoot,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
 
-// The editor-header "Send to Controller" action (H9 #201 → H10 #202). One verb that
-// runs *and* stores the open pattern on the connected Controller, overwrite-in-place:
-// the extension compiles the bundled artifact to bytecode, the page frames it and
-// pushes it over the existing socket (save + run), and the per-Controller binding is
-// remembered so the next push overwrites the same program in place.
+// The editor-header "Send to Controller" action (H9 #201 → H10 #202 → H11 #203). One
+// verb that runs *and* stores the open pattern on the connected Controller,
+// overwrite-in-place: the extension compiles the bundled artifact to bytecode, the
+// page frames it and pushes it over the existing socket (save + run), and the
+// per-Controller binding is remembered so the next push overwrites the same program.
 //
-// A thin shell over the pure `describeSendToController` gate and the
-// `controllerStore.pushActivePattern` orchestrator: enabled exactly when a Controller
-// is connected AND the pattern's dimensionality matches the installed map; otherwise
-// disabled with a tooltip explaining why.
+// A thin shell over the pure gates: `describeSendToController` decides enablement;
+// `requestPush` runs the #203 preflight (pixel-count reconciliation) and either
+// pushes straight through (clean) or opens the reconciliation dialog (any warning),
+// deferring the push to `confirmPush`. The store's `preflight` slice drives the dialog.
 
 export function SendToController() {
   const provider = getControllerProvider()
@@ -35,7 +44,10 @@ export function SendToController() {
   const pushing = useControllerStore((s) => s.pushing)
   const pushResult = useControllerStore((s) => s.pushResult)
   const lastPushedSource = useControllerStore((s) => s.lastPushedSource)
-  const pushActivePattern = useControllerStore((s) => s.pushActivePattern)
+  const requestPush = useControllerStore((s) => s.requestPush)
+  const confirmPush = useControllerStore((s) => s.confirmPush)
+  const cancelPush = useControllerStore((s) => s.cancelPush)
+  const preflight = useControllerStore((s) => s.preflight)
   const clearPushResult = useControllerStore((s) => s.clearPushResult)
 
   // Hold the just-pushed check on screen (button inert) for a few seconds, then let
@@ -100,16 +112,45 @@ export function SendToController() {
   const dimClass = working ? 'opacity-95' : 'disabled:opacity-30'
 
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      className={`text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300 ${dimClass}`}
-      disabled={!enabled || working}
-      title={title}
-      onClick={() => void pushActivePattern()}
-      data-testid="send-to-controller"
-    >
-      {content}
-    </Button>
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        className={`text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300 ${dimClass}`}
+        disabled={!enabled || working}
+        title={title}
+        onClick={() => void requestPush()}
+        data-testid="send-to-controller"
+      >
+        {content}
+      </Button>
+
+      {/* Preflight reconciliation (#203): only mounted when the push surfaced a
+          warning. Closing it any way (Cancel, Escape, overlay) cancels the push;
+          only the explicit action proceeds. */}
+      <AlertDialogRoot
+        open={preflight !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelPush()
+        }}
+      >
+        <AlertDialogContent data-testid="preflight-dialog">
+          <AlertDialogTitle>Send to {name}?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <ul className="mt-1 space-y-1.5">
+              {(preflight ?? []).map((w) => (
+                <li key={w.kind} className="text-sm text-zinc-400">
+                  {w.message}
+                </li>
+              ))}
+            </ul>
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmPush()}>Send anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogRoot>
+    </>
   )
 }

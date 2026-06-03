@@ -37,6 +37,10 @@ interface EditorState {
   // by Preview from the resolved layout (true exactly when a normal array is fed
   // to the renderer); the slider appears/disappears as a unit with it.
   solidEligible: boolean
+  // The realized pixel count of the active layout (its modeled "map points"),
+  // published by Preview from the resolved layout. Drives the Send-to-Controller
+  // preflight (#203), which reconciles it against the Controller's fixed pixel count.
+  previewPixelCount: number
   setCompileStatus: (status: CompileStatus) => void
   setEditorFlavor: (flavor: EditorFlavor) => void
   setSource: (source: string) => void
@@ -49,6 +53,7 @@ interface EditorState {
   setDisplayDim: (dim: 1 | 2 | 3) => void
   setLayoutLabel: (label: string | null) => void
   setSolidEligible: (value: boolean) => void
+  setPreviewPixelCount: (count: number) => void
 }
 
 export const editorInitialState = {
@@ -64,6 +69,7 @@ export const editorInitialState = {
   displayDim: 2 as 1 | 2 | 3,
   layoutLabel: null as string | null,
   solidEligible: false,
+  previewPixelCount: 0,
 }
 
 export const useEditorStore = create<EditorState>()((set) => ({
@@ -80,4 +86,5 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setDisplayDim: (displayDim) => set({ displayDim }),
   setLayoutLabel: (layoutLabel) => set({ layoutLabel }),
   setSolidEligible: (solidEligible) => set({ solidEligible }),
+  setPreviewPixelCount: (previewPixelCount) => set({ previewPixelCount }),
 }))

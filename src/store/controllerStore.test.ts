@@ -28,6 +28,7 @@ class FakeProvider extends NullControllerProvider {
   subs = new Set<(s: ControllerStatus) => void>()
   shouldFailConnect = false
   name: string | undefined = 'pixel-1'
+  pixelCount: number | undefined = undefined
   pixelMap: number[][] | null = [
     [0, 0],
     [1, 1],
@@ -65,7 +66,7 @@ class FakeProvider extends NullControllerProvider {
     return Promise.resolve()
   }
   getConfig(): Promise<ControllerConfig> {
-    return Promise.resolve({ name: this.name })
+    return Promise.resolve({ name: this.name, pixelCount: this.pixelCount })
   }
   getPixelMap(): Promise<number[][] | null> {
     return Promise.resolve(this.pixelMap)
@@ -261,6 +262,62 @@ describe('controllerStore (keyed)', () => {
       expect(created.get('10.0.0.5')!.pushed).toHaveLength(0)
       expect(store().pushing).toBe(false)
       expect(store().pushResult).toEqual({ ok: false, message: 'compiler offline' })
+    })
+  })
+
+  describe('requestPush preflight (#203)', () => {
+    const PATTERN_SRC = 'export function render(index) {\n  hsv(index, 1, 1)\n}\n'
+
+    async function arm(devicePixelCount: number | undefined, localPixelCount: number) {
+      await store().addController('10.0.0.5')
+      created.get('10.0.0.5')!.pixelCount = devicePixelCount
+      usePatternStore.setState({ activePatternId: 'pat-1' })
+      useEditorStore.setState({
+        previewSource: PATTERN_SRC,
+        previewPatternName: 'Twinkle',
+        previewPixelCount: localPixelCount,
+      })
+    }
+
+    it('pushes straight through when the counts match (no dialog)', async () => {
+      await arm(256, 256)
+      await store().requestPush()
+      expect(store().preflight).toBeNull()
+      expect(created.get('10.0.0.5')!.pushed).toHaveLength(1)
+    })
+
+    it('opens the dialog and defers the push on a count mismatch', async () => {
+      await arm(256, 100)
+      await store().requestPush()
+      expect(store().preflight?.map((w) => w.kind)).toEqual(['fewer-than-device'])
+      // The push has NOT happened yet — it waits on confirmPush.
+      expect(created.get('10.0.0.5')!.pushed).toHaveLength(0)
+    })
+
+    it('confirmPush clears the dialog and completes the push', async () => {
+      await arm(256, 400)
+      await store().requestPush()
+      expect(store().preflight).not.toBeNull()
+
+      await store().confirmPush()
+      expect(store().preflight).toBeNull()
+      expect(created.get('10.0.0.5')!.pushed).toHaveLength(1)
+      expect(store().pushResult).toEqual({ ok: true, created: true })
+    })
+
+    it('cancelPush dismisses the dialog without pushing', async () => {
+      await arm(256, 100)
+      await store().requestPush()
+      store().cancelPush()
+      expect(store().preflight).toBeNull()
+      expect(created.get('10.0.0.5')!.pushed).toHaveLength(0)
+    })
+
+    it('pushes through when the device count is unknown', async () => {
+      await arm(undefined, 100)
+      await store().requestPush()
+      expect(store().preflight).toBeNull()
+      expect(created.get('10.0.0.5')!.pushed).toHaveLength(1)
     })
   })
 })
