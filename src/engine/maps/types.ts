@@ -32,7 +32,7 @@ export interface GridDims {
 // `normalize(pos − centroid)` for a convex shell, e.g. the Sphere). Its PRESENCE
 // is the provenance gate that makes the map solid-eligible (ADR-0011) — absent for
 // volumes and irregular clouds, which never offer the solidity slider.
-export type NormalRecipe = 'face' | 'star' | 'centroid'
+export type NormalRecipe = 'face' | 'star' | 'tetra' | 'centroid'
 
 export interface PixelMap {
   id: string

@@ -44,6 +44,13 @@ export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   // the ball. A volume has no per-point boundary normal, so it is NOT solid-
   // eligible — it relies on the renderer's depth-tested opaque cores instead.
   { id: 'sphere-volume', name: 'Sphere - volume', dim: 3, source: source('sphere-volume') },
+  // The Tetrahedron (a four-sided die / d4) joins the ADR-0012 shell/volume scheme
+  // as the simplest faceted case: 4 triangular faces. The shell scatters cell-
+  // centre points over the four faces and is solid-eligible via per-face normals
+  // the preview derives (tetraShellNormals); the volume fills the convex solid and
+  // has no per-point normal.
+  { id: 'tetra-shell', name: 'Tetra - shell', dim: 3, source: source('tetra-shell'), normals: 'tetra' },
+  { id: 'tetra-volume', name: 'Tetra - volume', dim: 3, source: source('tetra-volume') },
   { id: 'seed-ring-2d', name: 'Ring', dim: 2, source: source('ring') },
 ]
 

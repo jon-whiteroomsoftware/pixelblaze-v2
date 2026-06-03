@@ -26,6 +26,7 @@ import { cylinderSurfacePositions, cylinderSurfaceNormals } from './surfaces'
 import { clampPixelCount, cubeSideForCount } from './camera'
 import { centroidNormals, faceNormals } from './centroidNormals'
 import { starShellNormals } from './maps/starGeometry'
+import { tetraShellNormals } from './maps/tetraGeometry'
 
 // The map a NormalRecipe tag resolves to its derivation (ADR-0011/0012): the
 // catalogue declares the recipe NAME; the resolver owns the function lookup, so
@@ -33,6 +34,7 @@ import { starShellNormals } from './maps/starGeometry'
 const NORMAL_FNS: Record<NormalRecipe, (positions: [number, number, number][]) => [number, number, number][]> = {
   face: faceNormals,
   star: starShellNormals,
+  tetra: tetraShellNormals,
   centroid: centroidNormals,
 }
 

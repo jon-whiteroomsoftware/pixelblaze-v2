@@ -20,6 +20,8 @@ describe('stock catalogue', () => {
       'star-volume',
       'seed-sphere-3d',
       'sphere-volume',
+      'tetra-shell',
+      'tetra-volume',
       'seed-ring-2d',
     ])
     for (const s of STOCK_MAP_SPECS) {
@@ -56,6 +58,9 @@ describe('stock catalogue', () => {
     // never solid-eligible — it leans on the renderer's depth-tested opaque cores.
     expect(mapById('sphere-volume').normals).toBeUndefined()
     expect(mapById('star-volume').normals).toBeUndefined()
+    // The Tetra joins the scheme: shell carries per-face normals, volume does not.
+    expect(mapById('tetra-shell').normals).toBe('tetra')
+    expect(mapById('tetra-volume').normals).toBeUndefined()
   })
 
   it('derives a wrappable grid live from the count, null for everything else (ADR-0010)', () => {
