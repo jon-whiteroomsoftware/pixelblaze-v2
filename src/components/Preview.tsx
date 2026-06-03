@@ -314,7 +314,7 @@ export function Preview() {
     if (usePreviewStore.getState().isRunning) loop.start()
 
     return () => loop.stop()
-  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activeSurfaceId, activePixelCount, activeNormalizeMode])
+  }, [previewSource, viewport, fidelity, activeMapId, activeShapeId, activeSurfaceId, activePixelCount, activeNormalizeMode, activeDemoName])
 
   // Seed the live working state from the resolved settings cascade on open (ADR-0013):
   // one pass that composes per-pattern override → recommended (demos) → global-sticky
