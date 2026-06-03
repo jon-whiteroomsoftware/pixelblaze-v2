@@ -19,6 +19,11 @@
        `structural` is the cool neutral for all section/group labels and tags. */
     --color-live: #fbbf24;
     --color-structural: #71717a;
+    /* Health/traffic-light green for status dots (Controller connected, compile
+       good). Deliberately NOT the amber `live` accent: a status signal is a
+       different vocabulary from a live value readout, and "connected" wants the
+       conventional green. Paired with red (`bg-red-400`) for the error state. */
+    --color-ok: #4ade80;
     /* Atmosphere: warm-neutral seams between the three primary panes, and a
        marginally lifted panel surface so panes read as distinct. */
     --color-seam: #2e2e34;

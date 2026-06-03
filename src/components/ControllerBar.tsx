@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useControllerStore } from '@/store/controllerStore'
 import { describeControllerPill, type ControllerPhase } from '@/engine/controllerPillView'
 import type { ControllerStatusTone } from '@/engine/controllerStatusView'
+import { StatusDot, type StatusTone } from './StatusDot'
 
 // The consolidated top-right Controller surface (#210). Supersedes the always-on
 // header IP input (ControllerConnect) and the standalone status dot
@@ -11,12 +12,16 @@ import type { ControllerStatusTone } from '@/engine/controllerStatusView'
 // standalone dot. Thin shell over the keyed store + the pure pill view; the
 // per-Controller panel relocation into the pill popover is Slice 2 (#211).
 
-const TONE_DOT: Record<ControllerStatusTone, string> = {
-  absent: 'bg-zinc-700',
-  idle: 'bg-zinc-400',
-  pending: 'bg-amber-400 animate-pulse',
-  live: 'bg-live',
-  error: 'bg-red-400',
+// Bridge the pill's status tone vocabulary to the shared StatusDot tones, so a
+// connected Controller reads with the same amber `live` accent as a "good"
+// compile, and "connecting" reads as the distinct working-grey pulse (not a
+// second amber that's indistinguishable from connected).
+const PILL_TONE: Record<ControllerStatusTone, StatusTone> = {
+  absent: 'absent',
+  idle: 'idle',
+  pending: 'working',
+  live: 'ok',
+  error: 'error',
 }
 
 /** The small Controller/chip glyph carried on every pill. */
@@ -63,7 +68,7 @@ function ControllerPillButton({
           <ChipGlyph />
         </span>
         <span className="max-w-[10rem] truncate">{label}</span>
-        {showDot && tone && <span data-testid="controller-pill-dot" className={`w-2 h-2 rounded-full shrink-0 ${TONE_DOT[tone]}`} />}
+        {showDot && tone && <StatusDot tone={PILL_TONE[tone]} testId="controller-pill-dot" />}
       </button>
       <button
         type="button"

@@ -32,12 +32,23 @@ export interface ExtensionControllerProviderOptions {
   /** How long detectHelper waits for the extension's ack before deciding it is
    *  absent. Default 500ms. */
   detectTimeoutMs?: number
-  /** Keepalive ping interval for the live connection. Default 5000ms — under the
-   *  MV3 ~30s idle window, so socket traffic keeps the service worker awake. */
+  /** Keepalive ping interval for the live connection. Also the watchdog's check
+   *  cadence (it evaluates staleness on each tick), so it bounds how fast a drop
+   *  is noticed. Default 1000ms — well under the MV3 ~30s idle window, and fast
+   *  enough that idle detection lands within a few seconds. */
   pingIntervalMs?: number
   /** Per-request reply timeout passed to the connection. Default 5000ms. */
   requestTimeoutMs?: number
-  /** Reconnect attempts after an unexpected drop before giving up. Default 3. */
+  /** Liveness watchdog window passed to the connection: declare the Controller
+   *  gone after this much inbound silence (no reply/ack/fps), even with no socket
+   *  close. Default 4000ms — the device streams fps several times a second, so a
+   *  few seconds of silence unambiguously means it is gone; a transient blip just
+   *  triggers a cheap auto-reconnect. */
+  livenessTimeoutMs?: number
+  /** Reconnect attempts after an unexpected drop before giving up. Default
+   *  `Infinity` — a powered-off Controller is expected to return, so we keep
+   *  probing (status stays `connecting`) until it does or the user disconnects.
+   *  Set a finite value to cap it. */
   maxReconnectAttempts?: number
   /** Delay between reconnect attempts. Default 1000ms. */
   reconnectDelayMs?: number
@@ -62,6 +73,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
   private readonly detectTimeoutMs: number
   private readonly pingIntervalMs: number
   private readonly requestTimeoutMs: number
+  private readonly livenessTimeoutMs: number
   private readonly maxReconnectAttempts: number
   private readonly reconnectDelayMs: number
   private readonly _setTimeout: (fn: () => void, ms: number) => unknown
@@ -70,9 +82,10 @@ export class ExtensionControllerProvider implements ControllerProvider {
   constructor(options: ExtensionControllerProviderOptions) {
     this.transport = options.transport
     this.detectTimeoutMs = options.detectTimeoutMs ?? 500
-    this.pingIntervalMs = options.pingIntervalMs ?? 5000
+    this.pingIntervalMs = options.pingIntervalMs ?? 1000
     this.requestTimeoutMs = options.requestTimeoutMs ?? 5000
-    this.maxReconnectAttempts = options.maxReconnectAttempts ?? 3
+    this.livenessTimeoutMs = options.livenessTimeoutMs ?? 4000
+    this.maxReconnectAttempts = options.maxReconnectAttempts ?? Infinity
     this.reconnectDelayMs = options.reconnectDelayMs ?? 1000
     this._setTimeout = options.setTimeout ?? ((fn, ms) => setTimeout(fn, ms))
     this._clearTimeout =
@@ -138,8 +151,10 @@ export class ExtensionControllerProvider implements ControllerProvider {
       webSocketFactory: (url) => new RelayWebSocket(url, this.transport),
       pingIntervalMs: this.pingIntervalMs,
       requestTimeoutMs: this.requestTimeoutMs,
+      livenessTimeoutMs: this.livenessTimeoutMs,
     })
     conn.on('close', () => this.onSocketClosed())
+    conn.on('stale', () => this.onSocketStale())
     this.conn = conn
     try {
       await conn.connect()
@@ -163,6 +178,18 @@ export class ExtensionControllerProvider implements ControllerProvider {
   private onSocketClosed(): void {
     if (this.intentionalClose || !this.expectConnected || !this.target) return
     this.expectConnected = false
+    this.scheduleReconnect(this.maxReconnectAttempts)
+  }
+
+  /** Fires when the watchdog declares the Controller silent without a socket
+   *  close (silent power-off, evicted MV3 worker). We explicitly tear the dead
+   *  socket down — its own `close` is gated out by `expectConnected` — then enter
+   *  the same bounded reconnect loop a clean drop would. */
+  private onSocketStale(): void {
+    if (this.intentionalClose || !this.expectConnected || !this.target) return
+    this.expectConnected = false
+    this.conn?.close()
+    this.conn = null
     this.scheduleReconnect(this.maxReconnectAttempts)
   }
 

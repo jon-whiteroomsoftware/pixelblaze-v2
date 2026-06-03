@@ -235,6 +235,64 @@ describe('PixelblazeConnection', () => {
     })
   })
 
+  describe('liveness watchdog', () => {
+    it('emits "stale" when no inbound frame arrives within livenessTimeoutMs', async () => {
+      vi.useFakeTimers()
+      try {
+        const { conn, socket } = await connected({
+          pingIntervalMs: 5000,
+          livenessTimeoutMs: 12000,
+        })
+        const events: string[] = []
+        conn.on('stale', () => events.push('stale'))
+
+        // Device never answers the pings and never streams fps. The ping ticks at
+        // 5s/10s are still inside the window; the 15s tick crosses it.
+        vi.advanceTimersByTime(15000)
+        expect(events).toEqual(['stale'])
+        // Latched: a later tick must not re-emit, and pinging has stopped.
+        const sentBefore = socket.sent.length
+        vi.advanceTimersByTime(20000)
+        expect(events).toEqual(['stale'])
+        expect(socket.sent.length).toBe(sentBefore)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays alive while the device keeps streaming fps frames', async () => {
+      vi.useFakeTimers()
+      try {
+        const { conn, socket } = await connected({
+          pingIntervalMs: 5000,
+          livenessTimeoutMs: 12000,
+        })
+        const events: string[] = []
+        conn.on('stale', () => events.push('stale'))
+
+        vi.advanceTimersByTime(10000)
+        socket.simulateMessage({ fps: 60 }) // refreshes the watchdog clock
+        vi.advanceTimersByTime(10000)
+        expect(events).toEqual([])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('never emits "stale" when the watchdog is disabled (livenessTimeoutMs 0)', async () => {
+      vi.useFakeTimers()
+      try {
+        const { conn } = await connected({ pingIntervalMs: 5000 })
+        const events: string[] = []
+        conn.on('stale', () => events.push('stale'))
+        vi.advanceTimersByTime(60000)
+        expect(events).toEqual([])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   // ── Phase 2: binary + extended JSON protocol (#108) ──────────────────────
 
   describe('binary framing (pure helpers)', () => {

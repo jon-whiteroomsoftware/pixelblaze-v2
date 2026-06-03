@@ -128,7 +128,7 @@ export function decodeProgramList(payload: Uint8Array): ProgramListEntry[] {
  *  `(url) => new WebSocket(url)`; Node `(url) => new WebSocket(url)` from `ws`. */
 export type WebSocketFactory = (url: string) => WebSocketLike
 
-export type ConnectionEvent = 'open' | 'close' | 'error'
+export type ConnectionEvent = 'open' | 'close' | 'error' | 'stale'
 type EventListener = (detail?: unknown) => void
 
 export interface PixelblazeConnectionOptions {
@@ -138,6 +138,16 @@ export interface PixelblazeConnectionOptions {
   webSocketFactory: WebSocketFactory
   /** Keepalive interval in ms. 0 (or undefined) disables automatic pinging. */
   pingIntervalMs?: number
+  /** Liveness watchdog window in ms. 0 (or undefined) disables it. When >0 the
+   *  connection emits `'stale'` if no inbound frame — reply, ping `ack`, or the
+   *  device's unsolicited `fps` stream — has arrived within this window. A live
+   *  Pixelblaze streams `fps` continuously, so inbound silence means it is gone
+   *  even when the socket never fires `close` (silent power-off, evicted MV3
+   *  service worker). Requires `pingIntervalMs` > 0 to be evaluated (the watchdog
+   *  rides the ping tick); should be a small multiple of it. */
+  livenessTimeoutMs?: number
+  /** Injectable monotonic-ish clock for the watchdog; defaults to `Date.now`. */
+  now?: () => number
   /** How long a correlated request waits for its reply before rejecting. */
   requestTimeoutMs?: number
   /** Injectable timers so tests need no fake clock; default to globals. */
@@ -161,7 +171,10 @@ interface Pending {
 
 export class PixelblazeConnection {
   private readonly opts: Required<
-    Pick<PixelblazeConnectionOptions, 'pingIntervalMs' | 'requestTimeoutMs'>
+    Pick<
+      PixelblazeConnectionOptions,
+      'pingIntervalMs' | 'requestTimeoutMs' | 'livenessTimeoutMs'
+    >
   > &
     PixelblazeConnectionOptions
   private readonly url: string
@@ -177,14 +190,21 @@ export class PixelblazeConnection {
   private readonly _clearTimeout: (h: unknown) => void
   private readonly _setInterval: (fn: () => void, ms: number) => unknown
   private readonly _clearInterval: (h: unknown) => void
+  private readonly _now: () => number
+  // Wall-clock of the last inbound frame of any kind; the watchdog's heartbeat.
+  private lastInboundAt = 0
+  // Latched so the watchdog emits `'stale'` exactly once per connection.
+  private staleEmitted = false
 
   constructor(options: PixelblazeConnectionOptions) {
     this.opts = {
       port: 81,
       pingIntervalMs: 0,
       requestTimeoutMs: 5000,
+      livenessTimeoutMs: 0,
       ...options,
     }
+    this._now = options.now ?? (() => Date.now())
     this.url = `ws://${this.opts.host}:${this.opts.port ?? 81}`
     this._setTimeout =
       options.setTimeout ?? ((fn, ms) => setTimeout(fn, ms))
@@ -247,6 +267,8 @@ export class PixelblazeConnection {
 
       ws.onopen = () => {
         opened = true
+        this.lastInboundAt = this._now()
+        this.staleEmitted = false
         this.startPing()
         this.emit('open')
         resolve()
@@ -430,6 +452,9 @@ export class PixelblazeConnection {
   }
 
   private handleMessage(data: unknown): void {
+    // Any inbound frame — JSON reply, ping ack, or the device's unsolicited fps
+    // stream — proves the device is still talking. Refresh the watchdog clock.
+    this.lastInboundAt = this._now()
     if (typeof data !== 'string') {
       const bytes = toUint8Array(data)
       if (bytes) this.handleBinary(bytes)
@@ -490,10 +515,28 @@ export class PixelblazeConnection {
 
   private startPing(): void {
     if (!this.opts.pingIntervalMs) return
+    this.lastInboundAt = this._now()
     this.pingHandle = this._setInterval(() => {
+      // Before pinging again, check whether the device has gone silent. A live
+      // Pixelblaze answers pings AND streams fps, so a quiet window past the
+      // watchdog means it is gone even if the socket never closed.
+      if (this.checkStale()) return
       // Swallow keepalive failures — the lifecycle close/error path reports them.
       this.ping().catch(() => undefined)
     }, this.opts.pingIntervalMs)
+  }
+
+  /** True if the liveness window has elapsed with no inbound frame. On the first
+   *  such tick it latches, stops the keepalive, and emits `'stale'` so the owning
+   *  provider can tear the dead socket down and reconnect. */
+  private checkStale(): boolean {
+    const timeout = this.opts.livenessTimeoutMs
+    if (!timeout || this.staleEmitted) return false
+    if (this._now() - this.lastInboundAt <= timeout) return false
+    this.staleEmitted = true
+    this.stopPing()
+    this.emit('stale')
+    return true
   }
 
   private stopPing(): void {

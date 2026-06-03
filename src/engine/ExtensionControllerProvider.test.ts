@@ -18,10 +18,16 @@ function makeDeviceTransport(opts: { detectAck?: boolean; failConnect?: boolean 
   const writes: Record<string, unknown>[] = []
   let lastConnId = ''
   let openSocket = false
+  // When silent, the device stops answering frames and never emits a socket
+  // close — modelling an abrupt power-off (no FIN/RST). Only the liveness
+  // watchdog can detect this.
+  let silent = false
 
   const emit = (m: RelayMessage) => queueMicrotask(() => listeners.forEach((l) => l(m)))
-  const reply = (connId: string, obj: object) =>
+  const reply = (connId: string, obj: object) => {
+    if (silent) return
     emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'message', connId, payload: { text: JSON.stringify(obj) } })
+  }
 
   const transport: RelayTransport = {
     post(msg) {
@@ -31,7 +37,7 @@ function makeDeviceTransport(opts: { detectAck?: boolean; failConnect?: boolean 
           return
         case 'connect':
           lastConnId = msg.connId
-          if (opts.failConnect) {
+          if (opts.failConnect || silent) {
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'error', connId: msg.connId, message: 'refused' })
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: msg.connId })
           } else {
@@ -69,6 +75,12 @@ function makeDeviceTransport(opts: { detectAck?: boolean; failConnect?: boolean 
     isOpen: () => openSocket,
     pushFrame: (obj: object) => reply(lastConnId, obj),
     dropSocket: () => emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: lastConnId }),
+    goSilent: () => {
+      silent = true
+    },
+    revive: () => {
+      silent = false
+    },
   }
 }
 
@@ -209,6 +221,64 @@ describe('ExtensionControllerProvider', () => {
       flushTimers() // fire the scheduled reconnect
       await new Promise((r) => setTimeout(r, 0))
       expect(p.getStatus().kind).toBe('connected')
+    })
+
+    it('keeps reconnecting indefinitely by default while the Controller is gone', async () => {
+      const d = makeDeviceTransport()
+      const p = new ExtensionControllerProvider({
+        transport: d.transport,
+        reconnectDelayMs: 5,
+        setTimeout: ((fn: () => void) => {
+          timers.push(fn)
+          return 0
+        }) as unknown as typeof setTimeout,
+      })
+      await p.connect(TARGET)
+      d.goSilent() // device is now unreachable; reconnect opens will fail
+      d.dropSocket()
+      await new Promise((r) => queueMicrotask(() => r(null)))
+
+      // Several failed reconnect cycles must not give up — status stays connecting.
+      for (let i = 0; i < 5; i++) {
+        flushTimers()
+        await new Promise((r) => setTimeout(r, 0)) // drain the open→fail→reschedule chain
+        expect(p.getStatus().kind).toBe('connecting')
+      }
+
+      // When the Controller returns, the next cycle reconnects.
+      d.revive()
+      flushTimers()
+      await new Promise((r) => setTimeout(r, 0))
+      expect(p.getStatus().kind).toBe('connected')
+    })
+
+    it('reconnects after the watchdog flags a silent (no-close) connection', async () => {
+      vi.useFakeTimers()
+      try {
+        const d = makeDeviceTransport()
+        const p = new ExtensionControllerProvider({
+          transport: d.transport,
+          pingIntervalMs: 1000,
+          livenessTimeoutMs: 2500,
+          reconnectDelayMs: 5,
+        })
+        const connectP = p.connect(TARGET)
+        await vi.advanceTimersByTimeAsync(0) // flush detect-ack + open microtasks
+        await connectP
+        expect(p.getStatus().kind).toBe('connected')
+
+        // Power-off: device stops answering pings and never sends a close frame.
+        d.goSilent()
+        await vi.advanceTimersByTimeAsync(4000) // crosses the 2.5s watchdog window
+        expect(p.getStatus().kind).toBe('connecting')
+
+        // Power back on: the scheduled reconnect reopens and returns to connected.
+        d.revive()
+        await vi.advanceTimersByTimeAsync(10)
+        expect(p.getStatus().kind).toBe('connected')
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('goes to error after exhausting reconnect attempts', async () => {
