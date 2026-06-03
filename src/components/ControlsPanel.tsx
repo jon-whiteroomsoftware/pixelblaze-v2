@@ -1,6 +1,7 @@
 import { useEditorStore } from '@/store/editorStore'
 import { useControlStore, type ControlValue } from '@/store/controlStore'
 import { DeckSlider } from '@/components/DeckSlider'
+import { HelpHint } from '@/components/HelpHint'
 
 function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   const i = Math.floor(h * 6)
@@ -61,6 +62,11 @@ export function ControlsPanel() {
   const pickers = controls.filter((c) => c.kind === 'hsvPicker' || c.kind === 'rgbPicker')
   if (sliders.length + toggles.length + pickers.length === 0) return null
 
+  // Only offer the help affordance when there's something to explain — demo
+  // controls carry curated descriptions; user/imported patterns don't, so the
+  // "?" simply doesn't appear for them.
+  const hasDescriptions = controls.some((c) => c.description)
+
   const renderSlider = (c: (typeof controls)[number]) => {
     const raw = controlValues[c.exportName]
     const value = typeof raw === 'number' ? raw : 0.5
@@ -116,8 +122,22 @@ export function ControlsPanel() {
 
   return (
     <div className="font-mono text-xs mt-1 pt-1.5 pb-3 pr-3">
-      <h4 className="text-[11px] font-semibold text-structural uppercase tracking-wider mb-2">
+      <h4 className="flex items-center gap-1.5 text-[11px] font-semibold text-structural uppercase tracking-wider mb-2">
         Pattern controls
+        {hasDescriptions && (
+          <HelpHint label="About these controls" width={300}>
+            <div className="flex flex-col gap-1.5 normal-case tracking-normal">
+              {controls.map((c) => (
+                <div key={c.exportName} className="leading-snug">
+                  <span className="text-zinc-200">{c.label}</span>
+                  {c.description && (
+                    <span className="text-zinc-400"> — {c.description}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </HelpHint>
+        )}
       </h4>
       <div className="flex flex-col gap-2">
         {sliders.length > 0 && (
