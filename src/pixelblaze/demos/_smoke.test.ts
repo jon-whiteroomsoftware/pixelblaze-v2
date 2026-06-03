@@ -100,6 +100,48 @@ describe('demo smoke tests', () => {
     })
   }
 
+  // "Living 1D" demos: 1D render()-only patterns (rhythm / emergence).
+  // Run on a 1D strip through the render() dispatch path, exercising controls and
+  // several frames of beforeRender so the stateful ones (firefly arrays) actually
+  // advance. Each must light pixels and expose its sliders.
+  for (const file of ['PulseLoom.js', 'FireflyChoir.js']) {
+    it(`${file} bundles, runs render(), lights pixels, and exposes sliders`, () => {
+      const N = 120
+      const src = readFileSync(join(here, file), 'utf8')
+      const { code, metadata } = bundle(src, LIBRARIES)
+      expect(metadata.renderFns.hasRender).toBe(true)
+      expect(metadata.controls.length).toBeGreaterThanOrEqual(3)
+
+      let vt = 0
+      const mapPoints = Array.from({ length: N }, (_, i) => {
+        const x = i / (N - 1)
+        return { sample: [x] as [number], pos: [x, 0] as [number, number] }
+      })
+      const shim = createShim({ mapPoints, pixelCount: N, dimensions: 1, getVirtualTime: () => vt })
+      const handle = loadPattern(code, metadata, shim.builtins)
+      const enc = shim.encodeScalar
+
+      // Drive every control to a mid value so stateful sliders take effect.
+      for (const c of metadata.controls) {
+        const fn = handle.controls[c.exportName]
+        if (c.kind === 'rgbPicker' || c.kind === 'hsvPicker') fn?.(enc(0.5), enc(0.5), enc(0.5))
+        else fn?.(enc(0.5))
+      }
+
+      let anyLit = false
+      for (let frame = 0; frame < 8; frame++) {
+        vt += 33 * 65.536
+        handle.beforeRender(enc(33))
+        for (let i = 0; i < N; i++) {
+          handle.render(enc(i))
+          const [r, g, b] = shim.capturedPixel()
+          if (r + g + b > 0.01) anyLit = true
+        }
+      }
+      expect(anyLit).toBe(true)
+    })
+  }
+
   // AuroraSphere is a self-calibrating 3D pattern: it scans the map via
   // mapPixels to learn center + radius, then paints over render3D. Run it on a
   // synthetic Fibonacci-ish sphere so calibration has real geometry to read.
