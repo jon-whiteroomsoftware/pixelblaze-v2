@@ -73,7 +73,7 @@ export function LayoutSelector() {
         <DeckSelect
           ariaLabel="Map"
           value={mapValue ?? maps[0].id}
-          options={maps.map((o) => ({ value: o.id, label: o.name, badge: `${o.displayDim}D` }))}
+          options={maps.map((o) => ({ value: o.id, label: o.name }))}
           onChange={(id) => route(id, maps)}
           menuWidthClass="w-44"
         />
@@ -85,7 +85,6 @@ export function LayoutSelector() {
           options={embeddings.map((o) => ({
             value: o.id,
             label: o.name,
-            badge: `${o.displayDim}D`,
           }))}
           onChange={(id) => route(id, embeddings)}
           menuWidthClass="w-28"
