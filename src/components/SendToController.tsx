@@ -24,9 +24,16 @@ export function SendToController() {
     () => provider.getStatus(),
   )
   const patternDim = useEditorStore((s) => s.nativeDim)
-  const mapDim = useControllerStore((s) => s.mapDim)
+  // Target the active Controller (#210): the gate + label key off its entry.
+  const activeIp = useControllerStore((s) => s.activeIp)
+  const active = useControllerStore((s) => (s.activeIp ? s.controllers[s.activeIp] : undefined))
+  const mapDim = active?.mapDim ?? null
 
   const { enabled, reason } = describeSendToController({ status, patternDim, mapDim })
+  // Name the action after the active Controller ("Send to <nickname>"), falling
+  // back to its IP, then a generic label when nothing is active.
+  const target = active ? active.nickname || activeIp : null
+  const label = target ? `Send to ${target}` : 'Send to Controller'
 
   return (
     <Button
@@ -41,7 +48,7 @@ export function SendToController() {
       }}
       data-testid="send-to-controller"
     >
-      Send to Controller
+      {label}
     </Button>
   )
 }

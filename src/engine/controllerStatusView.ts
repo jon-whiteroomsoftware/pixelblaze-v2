@@ -21,9 +21,9 @@ export interface ControllerStatusView {
  *  triggers connect/detect; H4 is display-only (the dropdown arrives in H5). */
 export function describeControllerStatus(status: ControllerStatus): ControllerStatusView {
   switch (status.kind) {
-    case 'no-helper':
+    case 'no-extension':
       return { kind: status.kind, tone: 'absent', label: 'No Controller helper installed' }
-    case 'helper-present':
+    case 'extension-present':
       return { kind: status.kind, tone: 'idle', label: 'No Controller connected' }
     case 'connecting':
       return { kind: status.kind, tone: 'pending', label: `Connecting to ${status.target.address}…` }

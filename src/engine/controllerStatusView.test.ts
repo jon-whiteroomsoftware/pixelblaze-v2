@@ -3,14 +3,14 @@ import type { ControllerStatus } from './ControllerProvider'
 
 describe('describeControllerStatus', () => {
   it('marks no-helper as absent', () => {
-    const v = describeControllerStatus({ kind: 'no-helper' })
-    expect(v.kind).toBe('no-helper')
+    const v = describeControllerStatus({ kind: 'no-extension' })
+    expect(v.kind).toBe('no-extension')
     expect(v.tone).toBe('absent')
     expect(v.label).toMatch(/helper/i)
   })
 
   it('marks helper-present as idle (no Controller)', () => {
-    const v = describeControllerStatus({ kind: 'helper-present' })
+    const v = describeControllerStatus({ kind: 'extension-present' })
     expect(v.tone).toBe('idle')
     expect(v.label).toMatch(/no controller/i)
   })

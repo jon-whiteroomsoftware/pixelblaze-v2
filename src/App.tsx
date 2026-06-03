@@ -5,8 +5,7 @@ import { CompileStatusBadge } from '@/components/CompileStatusBadge'
 import { PatternList } from '@/components/PatternList'
 import { Preview } from '@/components/Preview'
 import { PaneHeader } from '@/components/PaneHeader'
-import { ConnectionStatus } from '@/components/ConnectionStatus'
-import { ControllerConnect } from '@/components/ControllerConnect'
+import { ControllerBar } from '@/components/ControllerBar'
 import { SendToController } from '@/components/SendToController'
 import { ControllerPanel } from '@/components/ControllerPanel'
 import { useControllerStore } from '@/store/controllerStore'
@@ -67,12 +66,15 @@ export default function App() {
   const setPreviewSource = useEditorStore((s) => s.setPreviewSource)
   const setPreviewPatternName = useEditorStore((s) => s.setPreviewPatternName)
 
-  // On startup, if a Controller IP was remembered from a previous session, try to
-  // reconnect. Silent on failure (#197): a missing Controller just stays disconnected.
+  // On startup, probe extension presence (global) and, if a Controller IP was
+  // remembered from a previous session, reconnect only that one (#210). Silent on
+  // failure: a missing extension or unreachable Controller just stays disconnected.
   const autoConnectController = useControllerStore((s) => s.autoConnect)
+  const detectExtension = useControllerStore((s) => s.detectExtension)
   useEffect(() => {
+    void detectExtension()
     void autoConnectController()
-  }, [autoConnectController])
+  }, [autoConnectController, detectExtension])
 
   // If source becomes empty while a pattern is active (e.g. after a store hot-reload),
   // restore it from the pattern record so the editor doesn't go blank.
@@ -162,8 +164,7 @@ export default function App() {
           </span>
         </span>
         <span className="ml-auto flex items-center gap-2.5">
-          <ControllerConnect />
-          <ConnectionStatus />
+          <ControllerBar />
         </span>
       </header>
       <div className="flex flex-1 min-h-0">

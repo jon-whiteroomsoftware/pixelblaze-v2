@@ -25,7 +25,7 @@ describe('mapDimension', () => {
 describe('describeSendToController', () => {
   it('disables when no Controller is connected, explaining why', () => {
     const gate = describeSendToController({
-      status: { kind: 'no-helper' },
+      status: { kind: 'no-extension' },
       patternDim: 2,
       mapDim: 2,
     })

@@ -358,6 +358,20 @@ describe('PixelblazeConnection', () => {
         brightness: 0.4,
         activeProgramId: 'pat1',
         activeControls: { sliderA: 0.7 },
+        name: 'pb',
+      })
+    })
+
+    it('getConfig leaves name undefined when the settings packet carries none', async () => {
+      const { conn, socket } = await connected()
+      const promise = conn.getConfig()
+      socket.simulateMessage({ brightness: 0.5 })
+      socket.simulateMessage({ activeProgram: { activeProgramId: 'pat1' } })
+      await expect(promise).resolves.toEqual({
+        brightness: 0.5,
+        activeProgramId: 'pat1',
+        activeControls: undefined,
+        name: undefined,
       })
     })
 
@@ -370,6 +384,7 @@ describe('PixelblazeConnection', () => {
         brightness: 0.9,
         activeProgramId: 'pat2',
         activeControls: undefined,
+        name: undefined,
       })
     })
 

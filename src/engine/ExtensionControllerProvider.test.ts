@@ -77,14 +77,14 @@ const TARGET = { address: '192.168.8.224' }
 describe('ExtensionControllerProvider', () => {
   it('starts in no-helper', () => {
     const p = new ExtensionControllerProvider({ transport: makeDeviceTransport().transport })
-    expect(p.getStatus()).toEqual({ kind: 'no-helper' })
+    expect(p.getStatus()).toEqual({ kind: 'no-extension' })
     expect(p.capabilities).toEqual({ push: false, compile: false })
   })
 
   it('detectHelper resolves true and moves to helper-present when the relay acks', async () => {
     const p = new ExtensionControllerProvider({ transport: makeDeviceTransport().transport })
     await expect(p.detectHelper()).resolves.toBe(true)
-    expect(p.getStatus()).toEqual({ kind: 'helper-present' })
+    expect(p.getStatus()).toEqual({ kind: 'extension-present' })
   })
 
   it('detectHelper resolves false and stays no-helper when there is no ack', async () => {
@@ -93,7 +93,7 @@ describe('ExtensionControllerProvider', () => {
       detectTimeoutMs: 10,
     })
     await expect(p.detectHelper()).resolves.toBe(false)
-    expect(p.getStatus()).toEqual({ kind: 'no-helper' })
+    expect(p.getStatus()).toEqual({ kind: 'no-extension' })
   })
 
   it('connects through the relay and reports connected', async () => {
@@ -169,7 +169,7 @@ describe('ExtensionControllerProvider', () => {
     const p = new ExtensionControllerProvider({ transport: d.transport })
     await p.connect(TARGET)
     await p.disconnect()
-    expect(p.getStatus()).toEqual({ kind: 'helper-present' })
+    expect(p.getStatus()).toEqual({ kind: 'extension-present' })
     expect(d.isOpen()).toBe(false)
   })
 

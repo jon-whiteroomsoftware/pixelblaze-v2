@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
+import { useControllerStore } from '@/store/controllerStore'
 import { useControllerPanelStore } from '@/store/controllerPanelStore'
 import {
   describeControllerPanel,
@@ -48,6 +49,9 @@ const VARS_HINT = (
 )
 
 export function ControllerPanel() {
+  // Re-render (and so re-subscribe to the active provider below) when the active
+  // Controller changes — the panel is bound to the active Controller (#210).
+  const activeIp = useControllerStore((s) => s.activeIp)
   const provider = getControllerProvider()
   const status = useSyncExternalStore(
     (onChange) => provider.subscribe(onChange),
@@ -57,12 +61,14 @@ export function ControllerPanel() {
 
   const start = useControllerPanelStore((s) => s.start)
   const stop = useControllerPanelStore((s) => s.stop)
-  // Poll only while connected; tear the polling down on disconnect/unmount.
+  // Poll only while connected; tear the polling down on disconnect/unmount. Keyed
+  // on the active Controller so switching pills restarts polling against the new
+  // device (a fresh seed of brightness/controls) rather than fighting stale state.
   useEffect(() => {
     if (!connected) return
     start()
     return () => stop()
-  }, [connected, start, stop])
+  }, [connected, activeIp, start, stop])
 
   const brightness = useControllerPanelStore((s) => s.brightness)
   const activeProgramId = useControllerPanelStore((s) => s.activeProgramId)

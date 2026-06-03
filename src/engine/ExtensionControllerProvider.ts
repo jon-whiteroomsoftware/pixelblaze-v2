@@ -7,7 +7,7 @@
 // extension packaging (manifest, service worker, content script) lives entirely
 // on the far side of the RelayTransport seam and is never imported here.
 //
-// What this module adds over the raw connection: the helper-present handshake,
+// What this module adds over the raw connection: the extension-present handshake,
 // the ControllerStatus state machine the nav/panel subscribe to, and a bounded
 // reconnect when the socket drops unexpectedly (MV3 can evict the service worker).
 //
@@ -49,7 +49,7 @@ export interface ExtensionControllerProviderOptions {
 export class ExtensionControllerProvider implements ControllerProvider {
   readonly capabilities: ControllerCapabilities = NO_CAPABILITIES
 
-  private status: ControllerStatus = { kind: 'no-helper' }
+  private status: ControllerStatus = { kind: 'no-extension' }
   private readonly listeners = new Set<(status: ControllerStatus) => void>()
   private conn: PixelblazeConnection | null = null
   private target: ControllerTarget | null = null
@@ -82,7 +82,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
   // ── helper handshake ──────────────────────────────────────────────────────
 
   /** Ask the relay "are you installed?" and resolve on its ack (or timeout).
-   *  Updates no-helper ↔ helper-present when not actively connected. */
+   *  Updates no-extension ↔ extension-present when not actively connected. */
   detectHelper(): Promise<boolean> {
     return new Promise((resolve) => {
       let settled = false
@@ -91,8 +91,8 @@ export class ExtensionControllerProvider implements ControllerProvider {
         settled = true
         unsubscribe()
         this._clearTimeout(timer)
-        if (this.status.kind === 'no-helper' || this.status.kind === 'helper-present') {
-          this.setStatus({ kind: present ? 'helper-present' : 'no-helper' })
+        if (this.status.kind === 'no-extension' || this.status.kind === 'extension-present') {
+          this.setStatus({ kind: present ? 'extension-present' : 'no-extension' })
         }
         resolve(present)
       }
@@ -188,8 +188,8 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this.target = null
     this.conn?.close()
     this.conn = null
-    // We had a helper to connect through, so fall back to helper-present.
-    this.setStatus({ kind: 'helper-present' })
+    // We had a helper to connect through, so fall back to extension-present.
+    this.setStatus({ kind: 'extension-present' })
     return Promise.resolve()
   }
 

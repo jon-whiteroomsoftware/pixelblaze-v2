@@ -31,7 +31,7 @@ describe('NullControllerProvider', () => {
 
   it('reports the no-helper status', () => {
     const status: ControllerStatus = new NullControllerProvider().getStatus()
-    expect(status).toEqual({ kind: 'no-helper' })
+    expect(status).toEqual({ kind: 'no-extension' })
   })
 
   it('supports subscribe/unsubscribe without leaking', () => {

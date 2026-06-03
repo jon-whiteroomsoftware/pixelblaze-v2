@@ -1,111 +1,184 @@
-import { useControllerStore, controllerInitialState } from './controllerStore'
-import { setControllerProvider, resetControllerProvider } from '@/engine/controllerProviderRegistry'
-import { NullControllerProvider, type ControllerTarget } from '@/engine/ControllerProvider'
+import {
+  useControllerStore,
+  controllerInitialState,
+  __resetControllerProviders,
+} from './controllerStore'
+import {
+  setControllerProviderFactory,
+  resetControllerProvider,
+  getControllerProvider,
+} from '@/engine/controllerProviderRegistry'
+import {
+  NullControllerProvider,
+  type ControllerStatus,
+  type ControllerTarget,
+  type ControllerConfig,
+} from '@/engine/ControllerProvider'
 
-// A provider that records connect/disconnect calls and can be made to fail, so we
-// can assert the store's orchestration without a real backend.
-class RecordingProvider extends NullControllerProvider {
-  connects: ControllerTarget[] = []
-  disconnects = 0
+// A fake per-Controller provider with a real (if minimal) status machine, so we
+// can assert the keyed store's orchestration end-to-end. detectHelper acks true
+// so the global extension probe reports present.
+class FakeProvider extends NullControllerProvider {
+  status: ControllerStatus = { kind: 'extension-present' }
+  subs = new Set<(s: ControllerStatus) => void>()
   shouldFailConnect = false
+  name: string | undefined = 'pixel-1'
   pixelMap: number[][] | null = [
     [0, 0],
     [1, 1],
   ]
+  connects: ControllerTarget[] = []
+  disconnects = 0
+
+  detectHelper(): Promise<boolean> {
+    return Promise.resolve(true)
+  }
+  getStatus(): ControllerStatus {
+    return this.status
+  }
+  subscribe(listener: (s: ControllerStatus) => void): () => void {
+    this.subs.add(listener)
+    return () => this.subs.delete(listener)
+  }
+  private emit(status: ControllerStatus) {
+    this.status = status
+    this.subs.forEach((l) => l(status))
+  }
   connect(target: ControllerTarget): Promise<void> {
     this.connects.push(target)
-    return this.shouldFailConnect
-      ? Promise.reject(new Error('unreachable'))
-      : Promise.resolve()
+    this.emit({ kind: 'connecting', target })
+    if (this.shouldFailConnect) {
+      this.emit({ kind: 'error', message: 'unreachable' })
+      return Promise.reject(new Error('unreachable'))
+    }
+    this.emit({ kind: 'connected', controller: { id: target.address, address: target.address, name: this.name } })
+    return Promise.resolve()
   }
   disconnect(): Promise<void> {
     this.disconnects++
+    this.emit({ kind: 'extension-present' })
     return Promise.resolve()
+  }
+  getConfig(): Promise<ControllerConfig> {
+    return Promise.resolve({ name: this.name })
   }
   getPixelMap(): Promise<number[][] | null> {
     return Promise.resolve(this.pixelMap)
   }
 }
 
-let provider: RecordingProvider
+const created = new Map<string, FakeProvider>()
 
 beforeEach(() => {
   localStorage.clear()
+  __resetControllerProviders()
   useControllerStore.setState(controllerInitialState)
-  provider = new RecordingProvider()
-  setControllerProvider(provider)
+  created.clear()
+  setControllerProviderFactory((ip) => {
+    const p = new FakeProvider()
+    created.set(ip, p)
+    return p
+  })
 })
 
-afterEach(() => resetControllerProvider())
+afterEach(() => {
+  __resetControllerProviders()
+  resetControllerProvider()
+})
 
-describe('controllerStore', () => {
-  it('connect passes the address to the provider and persists it', async () => {
-    await useControllerStore.getState().connect('10.0.0.5')
-    expect(provider.connects).toEqual([{ address: '10.0.0.5' }])
-    expect(useControllerStore.getState().ip).toBe('10.0.0.5')
+const store = () => useControllerStore.getState()
+
+describe('controllerStore (keyed)', () => {
+  it('detectExtension records global extension presence', async () => {
+    await store().detectExtension()
+    expect(store().extensionPresent).toBe(true)
   })
 
-  it('connect falls back to the stored ip and trims it', async () => {
-    useControllerStore.getState().setIp('  10.0.0.9  ')
-    await useControllerStore.getState().connect()
-    expect(provider.connects).toEqual([{ address: '10.0.0.9' }])
+  it('addController connects, becomes the active live pill, reads nickname + mapDim', async () => {
+    await store().addController('10.0.0.5')
+    const entry = store().controllers['10.0.0.5']
+    expect(entry.phase).toBe('live')
+    expect(entry.nickname).toBe('pixel-1')
+    expect(entry.mapDim).toBe(2)
+    expect(store().activeIp).toBe('10.0.0.5')
+    expect(created.get('10.0.0.5')!.connects).toEqual([{ address: '10.0.0.5' }])
   })
 
-  it('connect is a no-op with no address', async () => {
-    await useControllerStore.getState().connect()
-    expect(provider.connects).toHaveLength(0)
+  it('a nameless device leaves the nickname unset (pill falls back to IP)', async () => {
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.name = undefined
+      created.set(ip, p)
+      return p
+    })
+    await store().addController('10.0.0.7')
+    expect(store().controllers['10.0.0.7'].nickname).toBeUndefined()
   })
 
-  it('connect rejection propagates (manual attempt surfaces the error)', async () => {
-    provider.shouldFailConnect = true
-    await expect(useControllerStore.getState().connect('10.0.0.5')).rejects.toThrow('unreachable')
+  it('points the registry active provider at the connected Controller', async () => {
+    await store().addController('10.0.0.5')
+    expect(getControllerProvider()).toBe(created.get('10.0.0.5'))
   })
 
-  it('autoConnect tries the remembered ip', async () => {
-    useControllerStore.setState({ ip: '10.0.0.5' })
-    await useControllerStore.getState().autoConnect()
-    expect(provider.connects).toEqual([{ address: '10.0.0.5' }])
+  it('a failed connect leaves the pill in error and does not persist it', async () => {
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.shouldFailConnect = true
+      created.set(ip, p)
+      return p
+    })
+    await store().addController('10.0.0.9')
+    expect(store().controllers['10.0.0.9'].phase).toBe('error')
+    expect(store().lastConnectedIp).toBeNull()
   })
 
-  it('autoConnect with no remembered ip does nothing', async () => {
-    await useControllerStore.getState().autoConnect()
-    expect(provider.connects).toHaveLength(0)
-  })
-
-  it('autoConnect swallows failure and leaves it disconnected', async () => {
-    provider.shouldFailConnect = true
-    useControllerStore.setState({ ip: '10.0.0.5' })
-    await expect(useControllerStore.getState().autoConnect()).resolves.toBeUndefined()
-    expect(provider.disconnects).toBe(1)
-    // ip is retained for a later retry
-    expect(useControllerStore.getState().ip).toBe('10.0.0.5')
-  })
-
-  it('reads the installed map dimensionality on connect', async () => {
-    await useControllerStore.getState().connect('10.0.0.5')
-    expect(useControllerStore.getState().mapDim).toBe(2)
-  })
-
-  it('leaves mapDim null when the map cannot be read', async () => {
-    provider.getPixelMap = () => Promise.reject(new Error('no read-back'))
-    await useControllerStore.getState().connect('10.0.0.5')
-    expect(useControllerStore.getState().mapDim).toBeNull()
-  })
-
-  it('clears mapDim on disconnect', async () => {
-    await useControllerStore.getState().connect('10.0.0.5')
-    await useControllerStore.getState().disconnect()
-    expect(useControllerStore.getState().mapDim).toBeNull()
-  })
-
-  it('reads the map on a successful autoConnect', async () => {
-    useControllerStore.setState({ ip: '10.0.0.5' })
-    await useControllerStore.getState().autoConnect()
-    expect(useControllerStore.getState().mapDim).toBe(2)
-  })
-
-  it('persists the ip to localStorage', async () => {
-    await useControllerStore.getState().connect('10.0.0.5')
+  it('persists only the last-connected IP', async () => {
+    await store().addController('10.0.0.5')
+    expect(store().lastConnectedIp).toBe('10.0.0.5')
     expect(localStorage.getItem('pixelblaze-controller')).toContain('10.0.0.5')
+  })
+
+  it('supports a second Controller: it becomes active, the first stays connected', async () => {
+    await store().addController('10.0.0.5')
+    await store().addController('10.0.0.6')
+    expect(Object.keys(store().controllers)).toEqual(['10.0.0.5', '10.0.0.6'])
+    expect(store().activeIp).toBe('10.0.0.6')
+    expect(store().controllers['10.0.0.5'].phase).toBe('live')
+  })
+
+  it('setActive re-points the registry provider', async () => {
+    await store().addController('10.0.0.5')
+    await store().addController('10.0.0.6')
+    store().setActive('10.0.0.5')
+    expect(store().activeIp).toBe('10.0.0.5')
+    expect(getControllerProvider()).toBe(created.get('10.0.0.5'))
+  })
+
+  it('removeController drops the entry, disconnects, and re-points active', async () => {
+    await store().addController('10.0.0.5')
+    await store().addController('10.0.0.6')
+    await store().removeController('10.0.0.6')
+    expect(store().controllers['10.0.0.6']).toBeUndefined()
+    expect(store().activeIp).toBe('10.0.0.5')
+    expect(getControllerProvider()).toBe(created.get('10.0.0.5'))
+  })
+
+  it('removing the last-connected Controller clears the remembered IP', async () => {
+    await store().addController('10.0.0.5')
+    await store().removeController('10.0.0.5')
+    expect(store().activeIp).toBeNull()
+    expect(store().lastConnectedIp).toBeNull()
+  })
+
+  it('autoConnect reconnects only the remembered Controller', async () => {
+    useControllerStore.setState({ lastConnectedIp: '10.0.0.5' })
+    await store().autoConnect()
+    expect(store().controllers['10.0.0.5'].phase).toBe('live')
+    expect(store().activeIp).toBe('10.0.0.5')
+  })
+
+  it('autoConnect with nothing remembered does nothing', async () => {
+    await store().autoConnect()
+    expect(Object.keys(store().controllers)).toHaveLength(0)
   })
 })

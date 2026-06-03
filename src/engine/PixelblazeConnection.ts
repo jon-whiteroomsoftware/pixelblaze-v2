@@ -202,6 +202,11 @@ export class PixelblazeConnection {
   // until the device has reported one.
   private _lastFps: number | null = null
 
+  // The device's configured name, captured passively from the top-level `name`
+  // field of the settings packet (the same packet getConfig's brightness rides
+  // in). Null until a settings frame reports one. Drives the Controller nickname.
+  private _deviceName: string | null = null
+
   /** True once the socket handshake is open and frames can flow. */
   get isConnected(): boolean {
     return this.ws != null && this.ws.readyState === OPEN
@@ -210,6 +215,11 @@ export class PixelblazeConnection {
   /** The most recently reported frame rate, or null if none seen yet. */
   get fps(): number | null {
     return this._lastFps
+  }
+
+  /** The device's configured name, or null if it hasn't reported one. */
+  get deviceName(): string | null {
+    return this._deviceName
   }
 
   /** Subscribe to lifecycle events. Returns an unsubscribe function. */
@@ -293,6 +303,7 @@ export class PixelblazeConnection {
     brightness?: number
     activeProgramId?: string
     activeControls?: Record<string, number>
+    name?: string
   }> {
     if (!this.isConnected) {
       return Promise.reject(new Error('Cannot send: Pixelblaze connection is not open'))
@@ -309,6 +320,7 @@ export class PixelblazeConnection {
         brightness: typeof b === 'number' ? b : undefined,
         activeProgramId: active.activeProgramId,
         activeControls: active.controls,
+        name: this._deviceName ?? undefined,
       }
     })
   }
@@ -431,6 +443,9 @@ export class PixelblazeConnection {
     }
     // Passively capture the reported frame rate from any status frame.
     if ('fps' in msg && typeof msg.fps === 'number') this._lastFps = msg.fps
+    // Passively capture the device name from the settings packet's top-level
+    // `name` (distinct from the sequencer packet's nested activeProgram.name).
+    if ('name' in msg && typeof msg.name === 'string') this._deviceName = msg.name
     // Resolve the first matching pending request by response field.
     if ('vars' in msg) this.fulfil('vars', msg.vars)
     if ('ack' in msg) this.fulfil('ack', msg.ack)

@@ -39,14 +39,14 @@ export interface ConnectedController {
  *  indicator (H4) and the Controller panel (H5+). Deliberately mirrors H4's four
  *  states plus an explicit error.
  *
- *  - `no-helper`        — no relay helper installed/reachable at all.
- *  - `helper-present`   — helper is there, but no Controller is connected.
+ *  - `no-extension`     — no relay extension installed/reachable at all.
+ *  - `extension-present`— extension is there, but no Controller is connected.
  *  - `connecting`       — a connect() is in flight.
  *  - `connected`        — a Controller is live.
  *  - `error`            — last connect/operation failed; carries a message. */
 export type ControllerStatus =
-  | { kind: 'no-helper' }
-  | { kind: 'helper-present' }
+  | { kind: 'no-extension' }
+  | { kind: 'extension-present' }
   | { kind: 'connecting'; target: ControllerTarget }
   | { kind: 'connected'; controller: ConnectedController }
   | { kind: 'error'; message: string }
@@ -69,6 +69,8 @@ export interface ControllerConfig {
   brightness?: number
   activeProgramId?: string
   activeControls?: Record<string, number>
+  /** The device's configured name, when it reports one — the Controller nickname. */
+  name?: string
 }
 
 /** Live runtime metrics the device reports while running — distinct from stored
@@ -89,7 +91,7 @@ export interface ControllerProvider {
   /** Static description of what this backend supports. */
   readonly capabilities: ControllerCapabilities
 
-  /** Is the relay helper installed/reachable? Drives no-helper vs helper-present.
+  /** Is the relay helper installed/reachable? Drives no-extension vs extension-present.
    *  Cheap and side-effect-free; safe to poll. */
   detectHelper(): Promise<boolean>
 
@@ -103,8 +105,8 @@ export interface ControllerProvider {
    *  (or `error`). Rejects if no helper is present. */
   connect(target: ControllerTarget): Promise<void>
 
-  /** Disconnect the current Controller. Returns to `helper-present` (or
-   *  `no-helper`). Safe to call when already disconnected. */
+  /** Disconnect the current Controller. Returns to `extension-present` (or
+   *  `no-extension`). Safe to call when already disconnected. */
   disconnect(): Promise<void>
 
   // ── read / control surface (documented JSON API, backend-forwarded) ──────────
@@ -144,7 +146,7 @@ export interface ControllerProvider {
 export const NO_CAPABILITIES: ControllerCapabilities = { push: false, compile: false }
 
 /**
- * The default provider before any helper exists: permanently `no-helper`, no
+ * The default provider before any helper exists: permanently `no-extension`, no
  * capabilities, every operation rejects. Lets the app (nav indicator, panel)
  * render and be wired against the seam from day one, and gives tests a trivial
  * stand-in. A real backend (H3 extension) replaces it once installed.
@@ -152,7 +154,7 @@ export const NO_CAPABILITIES: ControllerCapabilities = { push: false, compile: f
 export class NullControllerProvider implements ControllerProvider {
   readonly capabilities = NO_CAPABILITIES
   private readonly listeners = new Set<(status: ControllerStatus) => void>()
-  private static readonly STATUS: ControllerStatus = { kind: 'no-helper' }
+  private static readonly STATUS: ControllerStatus = { kind: 'no-extension' }
 
   detectHelper(): Promise<boolean> {
     return Promise.resolve(false)

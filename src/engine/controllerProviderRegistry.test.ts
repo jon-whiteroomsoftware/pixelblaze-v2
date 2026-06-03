@@ -11,7 +11,7 @@ describe('controllerProviderRegistry', () => {
   it('defaults to a no-helper NullControllerProvider', () => {
     const p = getControllerProvider()
     expect(p).toBeInstanceOf(NullControllerProvider)
-    expect(p.getStatus()).toEqual({ kind: 'no-helper' })
+    expect(p.getStatus()).toEqual({ kind: 'no-extension' })
   })
 
   it('swaps in a provided backend', () => {
