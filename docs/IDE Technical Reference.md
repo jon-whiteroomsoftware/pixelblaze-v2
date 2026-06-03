@@ -297,9 +297,10 @@ runs — single source of truth, no parallel TS generator to drift. Stock maps
 The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (label "Square"), `wide`
 ("Wide 2:1"), `seed-ring-2d` ("Ring") — 2D; and the 3D set, named by the **shell /
 volume** scheme (ADR-0012): `cube` ("Cube (volume)"), `cube-shell` ("Cube (shell)"),
-`star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere (shell)"), and
-`sphere-volume`. Shell entries carry a `normals` recipe
-(`'face' | 'star' | 'centroid'`), whose presence is the solid-eligibility gate
+`star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere (shell)"),
+`sphere-volume`, and `tetra-shell`/`tetra-volume` (a four-sided die / d4). Shell
+entries carry a `normals` recipe
+(`'face' | 'star' | 'tetra' | 'centroid'`), whose presence is the solid-eligibility gate
 (§9). A lattice entry carries a `grid` recipe (`'square' | 'wide' | 'cube'`),
 which `createSourceMap` maps to the live count→dims derivation backing
 `PixelMap.gridDims` — `plane`/`wide` to their plane dims, `cube` to its side³
@@ -412,13 +413,13 @@ bit-identical).
 
 Eligibility is **the presence of a per-point normal**, and is **provenance-gated, not
 geometry-inferred**: the IDE supplies a normal only because it owns the generator —
-analytic embeddings (Cylinder) emit it from their formula, faceted shells (Cube/Star
-shell) emit per-face normals, a convex shell (Sphere) re-derives
+analytic embeddings (Cylinder) emit it from their formula, faceted shells
+(Cube/Star/Tetra shell) emit per-face normals, a convex shell (Sphere) re-derives
 `normalize(pos − centroid)` *because the catalogue entry tags it with a `normals`
-recipe* (`'face' | 'star' | 'centroid'`); the resolver maps that tag to the
+recipe* (`'face' | 'star' | 'tetra' | 'centroid'`); the resolver maps that tag to the
 derivation (`NORMAL_FNS` in `layout.ts`), so no map-id strings leak into it.
 A hand-imported sphere-shaped cloud carries no recipe and is never solid-able. Normals
-(`centroidNormals.ts`, `starGeometry.ts`) are preview-only — **never** stored in a map
+(`centroidNormals.ts`, `starGeometry.ts`, `tetraGeometry.ts`) are preview-only — **never** stored in a map
 or sent to a controller (a Pixelblaze map is positions only). Solidity persists on
 `PatternRecord.solidity` (default `1.0`) and `editorStore.solidEligible` gates whether
 the deck shows the slider.
