@@ -76,6 +76,7 @@ export function ControllerPanel() {
   const programs = useControllerPanelStore((s) => s.programs)
   const fps = useControllerPanelStore((s) => s.fps)
   const pixelCount = useControllerPanelStore((s) => s.pixelCount)
+  const mapPointCount = useControllerPanelStore((s) => s.mapPointCount)
   const activeControls = useControllerPanelStore((s) => s.activeControls)
   const vars = useControllerPanelStore((s) => s.vars)
   const setBrightness = useControllerPanelStore((s) => s.setBrightness)
@@ -83,12 +84,14 @@ export function ControllerPanel() {
 
   if (!connected) return null
 
-  const { patternName, fpsLabel, pixelsLabel } = describeControllerPanel({
-    activeProgramId,
-    programs,
-    fps,
-    pixelCount,
-  })
+  const { patternName, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch } =
+    describeControllerPanel({
+      activeProgramId,
+      programs,
+      fps,
+      pixelCount,
+      mapPointCount,
+    })
   const controls = shapeControllerControls(activeControls)
   const watchedVars = describeControllerVars(vars)
   // The section header carries the Controller's identity (device name, else its address).
@@ -101,6 +104,19 @@ export function ControllerPanel() {
           <DeckTelemetry label="pattern" value={patternName} />
           <DeckTelemetry label="fps" value={fpsLabel} />
           <DeckTelemetry label="pixels" value={pixelsLabel} />
+          <DeckCell label="map points">
+            <span
+              className={`tabular-nums truncate ${mapCountMismatch ? 'text-amber-400' : 'text-live'}`}
+              title={
+                mapCountMismatch
+                  ? `Map has ${mapPointsLabel} points but the Controller has ${pixelsLabel} pixels — the firmware silently drops a mismatched map (#204).`
+                  : undefined
+              }
+              data-testid="controller-map-points"
+            >
+              {mapPointsLabel}
+            </span>
+          </DeckCell>
         </DeckGrid>
         <DeckGrid>
           <DeckSlider

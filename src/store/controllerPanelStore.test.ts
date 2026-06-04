@@ -74,6 +74,25 @@ describe('controllerPanelStore', () => {
     expect(s.programs).toHaveLength(2)
   })
 
+  it('reads the installed map point count once on start (#205)', async () => {
+    provider.getPixelMap = () =>
+      Promise.resolve([
+        [0, 0],
+        [1, 1],
+        [0.5, 0.5],
+      ])
+    useControllerPanelStore.getState().start()
+    await flush()
+    expect(useControllerPanelStore.getState().mapPointCount).toBe(3)
+  })
+
+  it('leaves the map point count null when the device has no map', async () => {
+    provider.getPixelMap = () => Promise.resolve(null)
+    useControllerPanelStore.getState().start()
+    await flush()
+    expect(useControllerPanelStore.getState().mapPointCount).toBeNull()
+  })
+
   it('keeps polling on the interval', async () => {
     useControllerPanelStore.getState().start()
     await flush()

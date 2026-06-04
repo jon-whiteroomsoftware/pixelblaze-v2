@@ -41,6 +41,8 @@ protocol code drives it unchanged. Binary frames cross the seam as base64
 - [ ] Connect to a real Pixelblaze by IP → status **connected**; panel shows live
       active pattern / brightness / fps.
 - [ ] Live controls + brightness writes visibly affect the LEDs.
+- [ ] Panel **map points** row shows the installed map's coordinate count (read back
+      from `/pixelmap.dat`, #205); turns amber when it disagrees with **pixels**.
 - [ ] Pull the device off the network → status drops, then **reconnects** when it
       returns (bounded retries).
 - [ ] No **Local Network Access** prompt blocks it on current Chrome (re-verify;
@@ -51,8 +53,6 @@ protocol code drives it unchanged. Binary frames cross the seam as base64
 
 ## Known gaps (by design, gated downstream)
 
-- **No push / compile.** `getPixelMap` resolves null and capabilities report
-  `{push:false, compile:false}` until H8 (compiler-in-extension) and H10 land.
 - **No discovery.** Manual IP only (H14 adds discovery).
 - **Persistent socket vs MV3 eviction.** A pinged socket keeps the worker awake on
   current Chrome; if evicted, the page sees a close and the provider reconnects.

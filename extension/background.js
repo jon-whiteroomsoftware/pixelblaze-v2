@@ -69,6 +69,36 @@ chrome.runtime.onConnect.addListener((port) => {
       return
     }
 
+    // Map read-back request (#205): like compile, correlated by reqId and independent
+    // of any socket. The device's installed pixel map is a plain HTTP GET of
+    // /pixelmap.dat (there is no "get map" WS message) — the same HTTP capability the
+    // compiler fetch already uses. The blob crosses back as base64; a device with no
+    // map (404 or empty body) comes back ok with mapData absent, NOT an error.
+    if (msg.type === 'get-map') {
+      handleGetMap(msg).then(
+        (mapBytes) =>
+          send({
+            source: RELAY_SOURCE,
+            dir: 'from-helper',
+            type: 'map-data',
+            reqId: msg.reqId,
+            ok: true,
+            // Absent mapData ⇒ no installed map; present ⇒ the /pixelmap.dat blob.
+            ...(mapBytes ? { mapData: bytesToBase64(mapBytes.buffer) } : {}),
+          }),
+        (e) =>
+          send({
+            source: RELAY_SOURCE,
+            dir: 'from-helper',
+            type: 'map-data',
+            reqId: msg.reqId,
+            ok: false,
+            error: e && e.message ? e.message : String(e),
+          }),
+      )
+      return
+    }
+
     if (msg.type === 'connect') {
       let ws
       try {
@@ -149,6 +179,23 @@ async function handleCompile(msg) {
   const result = await compileInSandbox(compilerEnv, msg.patternSrc)
   if (!result.ok) throw new Error(result.error || 'compile failed')
   return new Uint8Array(result.bytecode)
+}
+
+// ── map read-back (#205) ─────────────────────────────────────────────────────
+//
+// GET the device's installed pixel map blob (/pixelmap.dat) over HTTP, the same
+// transport the compiler fetch uses. Mirrors getMapData -> getFile('/pixelmap.dat')
+// in the reference client (zranger1/pixelblaze-client, pixelblaze.py ~L1675).
+// Returns a Uint8Array of the raw blob, or null when the device has no map (the
+// firmware answers 404, or 200 with an empty body). The page decodes the blob; a
+// real network/HTTP failure rejects so the page can tell "no map" from "unread".
+async function handleGetMap(msg) {
+  const resp = await fetch(`http://${msg.address}/pixelmap.dat`)
+  if (resp.status === 404) return null
+  if (!resp.ok) throw new Error(`GET /pixelmap.dat -> ${resp.status}`)
+  const buf = await resp.arrayBuffer()
+  if (buf.byteLength === 0) return null
+  return new Uint8Array(buf)
 }
 
 // Fetch + gunzip + decode the device web UI (utf-8-sig: strip BOM).

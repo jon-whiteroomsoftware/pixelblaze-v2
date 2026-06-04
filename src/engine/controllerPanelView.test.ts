@@ -41,6 +41,39 @@ describe('describeControllerPanel', () => {
   it('shows an em-dash placeholder when pixel count has not been read', () => {
     expect(describeControllerPanel({ programs, fps: null }).pixelsLabel).toBe('—')
   })
+
+  it('renders the installed-map point count as an integer string', () => {
+    expect(
+      describeControllerPanel({ programs, fps: null, mapPointCount: 16 }).mapPointsLabel,
+    ).toBe('16')
+  })
+
+  it('shows an em-dash placeholder when the map point count has not been read', () => {
+    expect(describeControllerPanel({ programs, fps: null }).mapPointsLabel).toBe('—')
+  })
+
+  it('flags a mismatch when map points and pixel count are both known and disagree', () => {
+    expect(
+      describeControllerPanel({ programs, fps: null, pixelCount: 256, mapPointCount: 16 })
+        .mapCountMismatch,
+    ).toBe(true)
+  })
+
+  it('does not flag a mismatch when the counts match', () => {
+    expect(
+      describeControllerPanel({ programs, fps: null, pixelCount: 16, mapPointCount: 16 })
+        .mapCountMismatch,
+    ).toBe(false)
+  })
+
+  it('does not flag a mismatch when either count is unknown', () => {
+    expect(
+      describeControllerPanel({ programs, fps: null, pixelCount: 256 }).mapCountMismatch,
+    ).toBe(false)
+    expect(
+      describeControllerPanel({ programs, fps: null, mapPointCount: 16 }).mapCountMismatch,
+    ).toBe(false)
+  })
 })
 
 describe('shapeControllerControls', () => {

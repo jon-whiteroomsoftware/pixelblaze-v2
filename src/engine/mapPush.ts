@@ -109,3 +109,65 @@ export function encodeMapData(
 
   return out
 }
+
+// ── read-back (H13, issue #205) ─────────────────────────────────────────────
+//
+// The inverse of encodeMapData: the device's installed map is read back as the
+// same binary blob via a plain HTTP GET of `/pixelmap.dat` (NOT a WebSocket
+// call — there is no "get map" message). This mirrors `getMapData` /
+// `getMapCoordinates` in the reference client zranger1/pixelblaze-client
+// (pixelblaze/pixelblaze.py, commit 9be8470):
+//   https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L1675
+// We parse the 12-byte header for arity + formatVersion (firmware major - 1; do
+// NOT assume 2 — read it), then divide each formatVersion-byte LE unsigned int
+// by maxInt to un-normalize back to [0,1].
+
+/** Parse just the map blob's 12-byte header into its point count, without
+ *  decoding the body — cheap enough for the panel readout. `numPixels =
+ *  bodyBytes / numDimensions / formatVersion`. Returns null for a buffer too
+ *  short to hold a header, or a header whose fields don't form a whole count. */
+export function mapPointCount(bytes: Uint8Array): number | null {
+  if (bytes.length < 12) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const formatVersion = view.getUint32(0, true)
+  const numDimensions = view.getUint32(4, true)
+  const bodyBytes = view.getUint32(8, true)
+  if (formatVersion < 1 || numDimensions < 1 || numDimensions > 3) return null
+  const per = numDimensions * formatVersion
+  if (per === 0 || bodyBytes % per !== 0) return null
+  return bodyBytes / per
+}
+
+/** Decode the firmware's binary mapData blob back into a baked coordinate array,
+ *  un-normalized to [0,1] per axis. The inverse of encodeMapData. Returns null
+ *  for an empty/absent/short buffer or a malformed header — a device with no map
+ *  reads back as null, never `[]` and never a throw. */
+export function decodeMapData(bytes: Uint8Array | null | undefined): MapCoord[] | null {
+  if (!bytes || bytes.length < 12) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const formatVersion = view.getUint32(0, true)
+  const numDimensions = view.getUint32(4, true)
+  const bodyBytes = view.getUint32(8, true)
+  if (formatVersion < 1 || numDimensions < 1 || numDimensions > 3) return null
+  const per = numDimensions * formatVersion
+  if (per === 0 || bodyBytes % per !== 0) return null
+  if (12 + bodyBytes > bytes.length) return null
+  const numPixels = bodyBytes / per
+  if (numPixels === 0) return null
+
+  const maxInt = 2 ** (8 * formatVersion) - 1
+  const points: MapCoord[] = []
+  let off = 12
+  for (let i = 0; i < numPixels; i++) {
+    const coord: number[] = []
+    for (let d = 0; d < numDimensions; d++) {
+      let v = 0
+      for (let b = 0; b < formatVersion; b++) {
+        v += bytes[off++] * 2 ** (8 * b)
+      }
+      coord.push(v / maxInt)
+    }
+    points.push(coord)
+  }
+  return points
+}

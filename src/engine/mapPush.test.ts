@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeMapData, resolveMapPushPoints } from './mapPush'
+import { encodeMapData, decodeMapData, mapPointCount, resolveMapPushPoints } from './mapPush'
 
 // The reference format (pixelblaze-client createMapData) for v3 firmware:
 //   formatVersion = 2 → maxInt = 65535, 2 bytes per coordinate (uint16 LE).
@@ -86,6 +86,82 @@ describe('encodeMapData', () => {
     expect(data.length).toBe(HEADER_BYTES + 2 * 1)
     expect(data[HEADER_BYTES + 0]).toBe(0)
     expect(data[HEADER_BYTES + 1]).toBe(255)
+  })
+})
+
+describe('decodeMapData', () => {
+  function expectClose(a: number[][], b: number[][], tol = 1 / 65535) {
+    expect(a.length).toBe(b.length)
+    for (let i = 0; i < a.length; i++) {
+      expect(a[i].length).toBe(b[i].length)
+      for (let d = 0; d < a[i].length; d++) {
+        expect(Math.abs(a[i][d] - b[i][d])).toBeLessThanOrEqual(tol)
+      }
+    }
+  }
+
+  it('round-trips a 2D map through encode → decode within rounding', () => {
+    const points = [
+      [0, 0],
+      [1, 1],
+      [0.5, 0.25],
+      [0.123, 0.987],
+    ]
+    expectClose(decodeMapData(encodeMapData(points))!, points)
+  })
+
+  it('round-trips a 3D map', () => {
+    const points = [
+      [0, 0.5, 1],
+      [0.25, 0.75, 0.1],
+    ]
+    expectClose(decodeMapData(encodeMapData(points))!, points)
+  })
+
+  it('round-trips a 1D map', () => {
+    const points = Array.from({ length: 16 }, (_, i) => [i / 15])
+    expectClose(decodeMapData(encodeMapData(points))!, points)
+  })
+
+  it('reads formatVersion from the header (v2 firmware: 1 byte/coord)', () => {
+    const points = [[0, 1]]
+    const data = encodeMapData(points, { formatVersion: 1 })
+    expectClose(decodeMapData(data)!, points, 1 / 255)
+  })
+
+  it('returns null for an empty or too-short buffer', () => {
+    expect(decodeMapData(null)).toBeNull()
+    expect(decodeMapData(undefined)).toBeNull()
+    expect(decodeMapData(new Uint8Array(0))).toBeNull()
+    expect(decodeMapData(new Uint8Array(8))).toBeNull()
+  })
+
+  it('returns null for a header-only blob (no coords)', () => {
+    const data = new Uint8Array(12)
+    new DataView(data.buffer).setUint32(0, 2, true) // formatVersion
+    new DataView(data.buffer).setUint32(4, 2, true) // numDimensions
+    // bodyBytes = 0
+    expect(decodeMapData(data)).toBeNull()
+  })
+
+  it('returns null for a malformed header (body byte count not whole)', () => {
+    const data = new Uint8Array(12)
+    const view = new DataView(data.buffer)
+    view.setUint32(0, 2, true)
+    view.setUint32(4, 2, true)
+    view.setUint32(8, 3, true) // 3 not divisible by 2*2
+    expect(decodeMapData(data)).toBeNull()
+  })
+})
+
+describe('mapPointCount', () => {
+  it('reads the point count from the header without decoding the body', () => {
+    const data = encodeMapData(Array.from({ length: 16 }, (_, i) => [i / 15, 0]))
+    expect(mapPointCount(data)).toBe(16)
+  })
+
+  it('returns null for a too-short buffer', () => {
+    expect(mapPointCount(new Uint8Array(8))).toBeNull()
   })
 })
 

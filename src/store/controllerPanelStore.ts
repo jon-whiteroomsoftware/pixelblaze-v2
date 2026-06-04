@@ -29,6 +29,11 @@ interface ControllerPanelState {
   fps: number | null
   /** The device's configured pixel count, read-only; null until read. */
   pixelCount: number | null
+  /** Number of coordinates in the device's installed pixel map, read back once on
+   *  start (H13, #205); null until read or when the device has no map. Surfaced
+   *  next to pixelCount so a count mismatch — silently dropped by firmware (#204) —
+   *  is visible. */
+  mapPointCount: number | null
   /** The running pattern's live controls (name → value). Seeded from the device,
    *  then slider-owned until the active pattern changes (so a scrub never fights
    *  the poll); reseeded when `activeProgramId` changes. */
@@ -55,6 +60,7 @@ export const controllerPanelInitialState = {
   programs: [] as ProgramListEntry[],
   fps: null,
   pixelCount: null,
+  mapPointCount: null,
   activeControls: {} as Record<string, number>,
   vars: {} as Record<string, number>,
 }
@@ -78,6 +84,12 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
     getControllerProvider()
       .listPrograms()
       .then((programs) => set({ programs }))
+      .catch(() => {})
+    // The installed map rarely changes and read-back is a one-off HTTP fetch, so
+    // read it once on start (not every poll) to surface its point count (#205).
+    getControllerProvider()
+      .getPixelMap()
+      .then((map) => set({ mapPointCount: map ? map.length : null }))
       .catch(() => {})
     void get().poll()
     pollTimer = setInterval(() => void get().poll(), CONTROLLER_POLL_INTERVAL_MS)

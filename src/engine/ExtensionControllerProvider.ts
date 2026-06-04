@@ -24,7 +24,7 @@ import {
   type ProgramListEntry,
 } from './ControllerProvider'
 import { PixelblazeConnection } from './PixelblazeConnection'
-import { encodeMapData } from './mapPush'
+import { encodeMapData, decodeMapData } from './mapPush'
 import {
   RelayWebSocket,
   RELAY_SOURCE,
@@ -61,6 +61,10 @@ export interface ExtensionControllerProviderOptions {
    *  The helper fetches + gunzips the ~1.2MB device web UI and evals the ~170k-char
    *  compiler, so this is generous. Default 20000ms. */
   compileTimeoutMs?: number
+  /** How long a map read-back round-trip waits for the helper's reply before
+   *  resolving null. A plain HTTP GET of `/pixelmap.dat`, so much cheaper than
+   *  compile. Default 5000ms. */
+  getMapTimeoutMs?: number
   /** Injectable timers (tests). Default to globals. */
   setTimeout?: (fn: () => void, ms: number) => unknown
   clearTimeout?: (handle: unknown) => void
@@ -88,7 +92,9 @@ export class ExtensionControllerProvider implements ControllerProvider {
   private readonly maxReconnectAttempts: number
   private readonly reconnectDelayMs: number
   private readonly compileTimeoutMs: number
+  private readonly getMapTimeoutMs: number
   private compileSeq = 0
+  private mapSeq = 0
   private readonly _setTimeout: (fn: () => void, ms: number) => unknown
   private readonly _clearTimeout: (h: unknown) => void
 
@@ -101,6 +107,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this.maxReconnectAttempts = options.maxReconnectAttempts ?? Infinity
     this.reconnectDelayMs = options.reconnectDelayMs ?? 1000
     this.compileTimeoutMs = options.compileTimeoutMs ?? 20000
+    this.getMapTimeoutMs = options.getMapTimeoutMs ?? 5000
     this._setTimeout = options.setTimeout ?? ((fn, ms) => setTimeout(fn, ms))
     this._clearTimeout =
       options.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>))
@@ -252,11 +259,50 @@ export class ExtensionControllerProvider implements ControllerProvider {
     return this.withConn((conn) => conn.getVars() as Promise<Record<string, number>>)
   }
 
-  /** Map read-back is the unconfirmed H13 capability; the extension relay cannot
-   *  read it yet, so it resolves null. The Send gate degrades to connected-only
-   *  rather than blocking on an unknowable dimensionality. */
+  /** Read the device's installed pixel map (H13, issue #205). The current map is a
+   *  plain HTTP GET of `/pixelmap.dat`, which only the helper can do (mixed-content
+   *  / CORS) — so, like compile, it's a one-off reqId-keyed relay round-trip, not a
+   *  ws call. The helper returns the raw blob as base64; we decode it to the baked
+   *  [0,1] coordinate array. A device with no map, a read failure, or a timeout all
+   *  resolve null (never throw) — the connect path stays fast and failure-tolerant,
+   *  and the Send gate degrades to connected-only rather than blocking. */
   getPixelMap(): Promise<number[][] | null> {
-    return Promise.resolve(null)
+    const target = this.target
+    if (!target) return Promise.resolve(null)
+    const reqId = `get-map-${this.mapSeq++}`
+    return new Promise<number[][] | null>((resolve) => {
+      let settled = false
+      const finish = (value: number[][] | null) => {
+        if (settled) return
+        settled = true
+        unsubscribe()
+        this._clearTimeout(timer)
+        resolve(value)
+      }
+      const unsubscribe = this.transport.subscribe((msg) => {
+        if (
+          msg.source === RELAY_SOURCE &&
+          msg.dir === 'from-helper' &&
+          msg.type === 'map-data' &&
+          msg.reqId === reqId
+        ) {
+          if (msg.ok && msg.mapData != null) {
+            finish(decodeMapData(base64ToBytes(msg.mapData)))
+          } else {
+            // No map on the device, or a read failure — both are "no usable map".
+            finish(null)
+          }
+        }
+      })
+      const timer = this._setTimeout(() => finish(null), this.getMapTimeoutMs)
+      this.transport.post({
+        source: RELAY_SOURCE,
+        dir: 'to-helper',
+        type: 'get-map',
+        reqId,
+        address: target.address,
+      })
+    })
   }
 
   setControls(controls: Record<string, number>, save = false): Promise<void> {

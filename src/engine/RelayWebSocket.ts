@@ -31,6 +31,19 @@ export type RelayMessage =
       payload: RelayPayload
     }
   | { source: typeof RELAY_SOURCE; dir: 'to-helper'; type: 'close'; connId: string }
+  // Map read-back (H13, issue #205): the device's installed pixel map is read as a
+  // plain HTTP GET of `/pixelmap.dat`, NOT over the ws socket — there is no "get map"
+  // WS message. So, like `compile`, this is a one-off request/response correlated by
+  // `reqId` and independent of any connection. `address` is the device IP the helper
+  // fetches from. Mirrors getMapData -> getFile('/pixelmap.dat') in the reference
+  // client (pixelblaze-client/pixelblaze.py ~L1675).
+  | {
+      source: typeof RELAY_SOURCE
+      dir: 'to-helper'
+      type: 'get-map'
+      reqId: string
+      address: string
+    }
   // Compile request (H10, issue #202): the device's own compiler runs inside the
   // helper (an offscreen-hosted sandboxed iframe, the only MV3-legal place to eval
   // remote code), not over a ws socket — so this is a one-off request/response
@@ -54,6 +67,20 @@ export type RelayMessage =
       ok: boolean
       /** Compiled bytecode as base64 (binary can't cross chrome messaging raw). */
       bytecode?: string
+      /** Failure reason when `ok` is false. */
+      error?: string
+    }
+  // Reply to `get-map`. `ok` true with `mapData` base64 carries the device's blob;
+  // `ok` true with `mapData` absent means the device has no installed map (a clean
+  // null, not an error — e.g. an empty body or a 404). `ok` false carries `error`.
+  | {
+      source: typeof RELAY_SOURCE
+      dir: 'from-helper'
+      type: 'map-data'
+      reqId: string
+      ok: boolean
+      /** The `/pixelmap.dat` blob as base64; absent when the device has no map. */
+      mapData?: string
       /** Failure reason when `ok` is false. */
       error?: string
     }

@@ -14,6 +14,11 @@ export interface ControllerPanelTelemetry {
   fps: number | null
   /** The device's configured pixel count; `null`/absent until read. Read-only. */
   pixelCount?: number | null
+  /** Number of coordinates in the device's installed pixel map, read back over the
+   *  provider seam (H13, #205); `null`/absent until read, or when the device has no
+   *  map. Surfacing it next to `pixelCount` makes the #204-class mismatch (a map
+   *  whose count != pixelCount is silently dropped) visible at a glance. */
+  mapPointCount?: number | null
 }
 
 export interface ControllerPanelView {
@@ -23,6 +28,12 @@ export interface ControllerPanelView {
   fpsLabel: string
   /** Pixel count as an integer string, or '—' when not yet read. */
   pixelsLabel: string
+  /** Installed-map point count as an integer string, or '—' when not yet read /
+   *  the device has no map. */
+  mapPointsLabel: string
+  /** True when both counts are known and disagree — the silent-drop footgun (#204).
+   *  The panel can flag this so a stale/mismatched map is visible, not invisible. */
+  mapCountMismatch: boolean
 }
 
 const PLACEHOLDER = '—'
@@ -33,6 +44,7 @@ export function describeControllerPanel({
   programs,
   fps,
   pixelCount,
+  mapPointCount,
 }: ControllerPanelTelemetry): ControllerPanelView {
   const match = activeProgramId
     ? programs.find((p) => p.id === activeProgramId)
@@ -40,7 +52,10 @@ export function describeControllerPanel({
   const patternName = match?.name ?? activeProgramId ?? PLACEHOLDER
   const fpsLabel = fps === null ? PLACEHOLDER : fps.toFixed(1)
   const pixelsLabel = pixelCount == null ? PLACEHOLDER : String(pixelCount)
-  return { patternName, fpsLabel, pixelsLabel }
+  const mapPointsLabel = mapPointCount == null ? PLACEHOLDER : String(mapPointCount)
+  const mapCountMismatch =
+    pixelCount != null && mapPointCount != null && pixelCount !== mapPointCount
+  return { patternName, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch }
 }
 
 // ── live controls + watched vars (H7, issue #199) ────────────────────────────

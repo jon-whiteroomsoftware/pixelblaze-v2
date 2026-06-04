@@ -14,6 +14,7 @@ import {
   type RelayTransport,
 } from './RelayWebSocket'
 import { encodeBinaryFrames, MessageType } from './PixelblazeConnection'
+import { encodeMapData } from './mapPush'
 import type { ControllerStatus } from './ControllerProvider'
 
 /** A fake relay that plays both the extension and a Pixelblaze device. Replies
@@ -27,6 +28,11 @@ function makeDeviceTransport(
     compileBytecode?: Uint8Array
     /** When set, the fake helper fails compile with this error. */
     compileError?: string
+    /** Map blob the fake helper returns from a `get-map` request (base64-encoded
+     *  internally). Absent → the helper replies ok with no map (device has none). */
+    mapData?: Uint8Array
+    /** When set, the fake helper fails get-map with this error. */
+    mapError?: string
     /** Program ids the fake device reports from listPrograms. */
     programIds?: string[]
   } = {},
@@ -73,6 +79,15 @@ function makeDeviceTransport(
           } else {
             const blob = opts.compileBytecode ?? new Uint8Array(8) // header reconciles (0+0+8)
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'compile-result', reqId: msg.reqId, ok: true, bytecode: bytesToBase64(blob) })
+          }
+          return
+        case 'get-map':
+          if (opts.mapError) {
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'map-data', reqId: msg.reqId, ok: false, error: opts.mapError })
+          } else if (opts.mapData) {
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'map-data', reqId: msg.reqId, ok: true, mapData: bytesToBase64(opts.mapData) })
+          } else {
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'map-data', reqId: msg.reqId, ok: true })
           }
           return
         case 'send': {
@@ -242,6 +257,55 @@ describe('ExtensionControllerProvider', () => {
     it('setPixelMap rejects when not connected', async () => {
       const p = new ExtensionControllerProvider({ transport: makeDeviceTransport().transport })
       await expect(p.setPixelMap([[0, 0]])).rejects.toThrow(/Not connected/)
+    })
+  })
+
+  describe('map read-back (H13)', () => {
+    it('round-trips a reqId-keyed get-map and decodes the helper blob to coords', async () => {
+      const map = encodeMapData([
+        [0, 0],
+        [1, 1],
+        [0.5, 0.25],
+      ])
+      const d = makeDeviceTransport({ mapData: map })
+      const p = new ExtensionControllerProvider({ transport: d.transport })
+      await p.connect(TARGET)
+      const read = await p.getPixelMap()
+      expect(read).not.toBeNull()
+      expect(read!).toHaveLength(3)
+      expect(read![0][0]).toBeCloseTo(0, 4)
+      expect(read![1][1]).toBeCloseTo(1, 4)
+      expect(read![2][0]).toBeCloseTo(0.5, 3)
+    })
+
+    it('resolves null when the device has no installed map', async () => {
+      const d = makeDeviceTransport() // no mapData
+      const p = new ExtensionControllerProvider({ transport: d.transport })
+      await p.connect(TARGET)
+      await expect(p.getPixelMap()).resolves.toBeNull()
+    })
+
+    it('resolves null (never throws) on a helper read error', async () => {
+      const d = makeDeviceTransport({ mapError: '404 not found' })
+      const p = new ExtensionControllerProvider({ transport: d.transport })
+      await p.connect(TARGET)
+      await expect(p.getPixelMap()).resolves.toBeNull()
+    })
+
+    it('resolves null when not connected (no target)', async () => {
+      const p = new ExtensionControllerProvider({ transport: makeDeviceTransport().transport })
+      await expect(p.getPixelMap()).resolves.toBeNull()
+    })
+
+    it('resolves null on timeout when the helper never answers', async () => {
+      const d = makeDeviceTransport()
+      const orig = d.transport.post
+      d.transport.post = (m) => {
+        if (m.type !== 'get-map') orig(m)
+      }
+      const p = new ExtensionControllerProvider({ transport: d.transport, getMapTimeoutMs: 10 })
+      await p.connect(TARGET)
+      await expect(p.getPixelMap()).resolves.toBeNull()
     })
   })
 
