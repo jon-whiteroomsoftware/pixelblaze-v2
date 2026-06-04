@@ -21,6 +21,7 @@ class FakeProvider extends NullControllerProvider {
   ]
   vars: Record<string, number> = { phase: 0.5 }
   brightnessWrites: Array<{ value: number; save: boolean }> = []
+  pixelCountWrites: Array<{ value: number; save: boolean }> = []
   controlWrites: Array<{ controls: Record<string, number>; save: boolean }> = []
 
   getConfig(): Promise<ControllerConfig> {
@@ -37,6 +38,10 @@ class FakeProvider extends NullControllerProvider {
   }
   setBrightness(value: number, save = false): Promise<void> {
     this.brightnessWrites.push({ value, save })
+    return Promise.resolve()
+  }
+  setPixelCount(value: number, save = true): Promise<void> {
+    this.pixelCountWrites.push({ value, save })
     return Promise.resolve()
   }
   setControls(controls: Record<string, number>, save = false): Promise<void> {
@@ -161,6 +166,12 @@ describe('controllerPanelStore', () => {
     useControllerPanelStore.getState().setBrightness(0.25)
     expect(useControllerPanelStore.getState().brightness).toBe(0.25)
     expect(provider.brightnessWrites).toEqual([{ value: 0.25, save: false }])
+  })
+
+  it('setPixelCount writes through saved (save:true) and updates locally', () => {
+    useControllerPanelStore.getState().setPixelCount(16)
+    expect(useControllerPanelStore.getState().pixelCount).toBe(16)
+    expect(provider.pixelCountWrites).toEqual([{ value: 16, save: true }])
   })
 
   it('stop() halts polling and resets state', async () => {

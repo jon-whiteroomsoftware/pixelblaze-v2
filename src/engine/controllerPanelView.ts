@@ -12,7 +12,8 @@ export interface ControllerPanelTelemetry {
   programs: ProgramListEntry[]
   /** Device-reported frame rate; `null` until a frame rate has been reported. */
   fps: number | null
-  /** The device's configured pixel count; `null`/absent until read. Read-only. */
+  /** The device's configured pixel count; `null`/absent until read. Editable from
+   *  the panel via `setPixelCount` (#213). */
   pixelCount?: number | null
   /** Number of coordinates in the device's installed pixel map, read back over the
    *  provider seam (H13, #205); `null`/absent until read, or when the device has no

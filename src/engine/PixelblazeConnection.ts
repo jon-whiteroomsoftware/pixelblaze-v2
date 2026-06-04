@@ -385,6 +385,15 @@ export class PixelblazeConnection {
     this.sendJson({ brightness: value, save })
   }
 
+  /** Set the device's configured pixel count. Fire-and-forget; sends
+   *  `{pixelCount, save}` — `save:true` persists to flash so it survives a reboot
+   *  (the reference client's `setPixelCount(n, save=True)`,
+   *  https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L2083).
+   *  This is real wiring config, not a volatile control, so it defaults to save. */
+  setPixelCount(value: number, save = true): void {
+    this.sendJson({ pixelCount: value, save })
+  }
+
   /** UNDOCUMENTED, EXPERIMENTAL — the headline unknown for #108. Attempts to
    *  push pattern *source* via the chunked binary protocol: LZString-compress
    *  the source to a Uint8Array, then send it as type-1 (putSourceCode) frames.

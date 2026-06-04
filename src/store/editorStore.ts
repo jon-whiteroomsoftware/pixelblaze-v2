@@ -39,7 +39,7 @@ interface EditorState {
   solidEligible: boolean
   // The realized pixel count of the active layout (its modeled "map points"),
   // published by Preview from the resolved layout. Drives the Send-to-Controller
-  // preflight (#203), which reconciles it against the Controller's fixed pixel count.
+  // preflight (#203), which reconciles it against the Controller's configured pixel count.
   previewPixelCount: number
   setCompileStatus: (status: CompileStatus) => void
   setEditorFlavor: (flavor: EditorFlavor) => void

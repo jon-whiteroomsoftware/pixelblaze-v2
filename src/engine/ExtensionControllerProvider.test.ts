@@ -108,6 +108,7 @@ function makeDeviceTransport(
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'message', connId: msg.connId, payload: { binary: bytesToBase64(frame) } })
           }
           if ('brightness' in cmd) writes.push(cmd)
+          if ('pixelCount' in cmd) writes.push(cmd)
           if ('setControls' in cmd) writes.push(cmd)
           if ('setCode' in cmd) writes.push(cmd)
           if ('savePixelMap' in cmd) writes.push(cmd)
@@ -340,6 +341,14 @@ describe('ExtensionControllerProvider', () => {
       { brightness: 0.25, save: false },
       { setControls: { sliderX: 0.9 }, save: true },
     ])
+  })
+
+  it('sends a saved pixelCount write to the device', async () => {
+    const d = makeDeviceTransport()
+    const p = new ExtensionControllerProvider({ transport: d.transport })
+    await p.connect(TARGET)
+    await p.setPixelCount(16)
+    expect(d.writes).toEqual([{ pixelCount: 16, save: true }])
   })
 
   it('resolves getPixelMap as null (H13 unconfirmed)', async () => {

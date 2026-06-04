@@ -458,6 +458,14 @@ describe('PixelblazeConnection', () => {
       conn.setBrightness(0.3)
       expect(socket.lastFrame()).toEqual({ brightness: 0.3, save: false })
     })
+
+    it('setPixelCount sends {pixelCount, save} and defaults to save:true', async () => {
+      const { conn, socket } = await connected()
+      conn.setPixelCount(16)
+      expect(socket.lastFrame()).toEqual({ pixelCount: 16, save: true })
+      conn.setPixelCount(64, false)
+      expect(socket.lastFrame()).toEqual({ pixelCount: 64, save: false })
+    })
   })
 
   describe('putSourceCode (experimental push)', () => {

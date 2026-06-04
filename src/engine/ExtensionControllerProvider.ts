@@ -313,6 +313,10 @@ export class ExtensionControllerProvider implements ControllerProvider {
     return this.fireAndForget((conn) => conn.setBrightness(value, save))
   }
 
+  setPixelCount(value: number, save = true): Promise<void> {
+    return this.fireAndForget((conn) => conn.setPixelCount(value, save))
+  }
+
   // ── push surface (H10, issue #202) ──────────────────────────────────────────
 
   /** Compile pattern source to bytecode helper-side. The device's own compiler can

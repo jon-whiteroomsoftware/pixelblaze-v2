@@ -96,7 +96,7 @@ interface ControllerConnectionState {
    *  nothing is active. Sets `pushing`/`pushResult` for the button to reflect. */
   pushActivePattern: () => Promise<void>
   /** Run the Send-to-Controller preflight (#203): reconcile the open pattern's
-   *  modeled pixel count against the Controller's fixed count. A clean preflight
+   *  modeled pixel count against the Controller's configured count. A clean preflight
    *  pushes straight through (preserving the one-click path); any warning opens the
    *  reconciliation dialog (`preflight`) instead, deferring the push to confirmPush. */
   requestPush: () => Promise<void>
@@ -105,7 +105,7 @@ interface ControllerConnectionState {
   /** Dismiss the preflight dialog without pushing. */
   cancelPush: () => void
   /** Run the map-send preflight (#204): reconcile the open map's baked point count
-   *  against the Controller's fixed pixel count and always surface the map-overwrite
+   *  against the Controller's configured pixel count and always surface the map-overwrite
    *  warning (writing the shared map is a deliberate act). Opens the reconciliation
    *  dialog (`preflight`), deferring the write to confirmMapPush. A no-op when no map
    *  is open or no Controller is active. */
@@ -296,7 +296,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
           // Mirror pushActivePattern's no-op guard: nothing active → nothing to do.
           if (!controllerId || !patternId || !previewSource) return
 
-          // The Controller's fixed pixel count is read fresh (best-effort) so the
+          // The Controller's configured pixel count is read fresh (best-effort) so the
           // reconciliation reflects the device as wired now; a read failure leaves it
           // unknown and the fit warnings are simply suppressed (engine handles null).
           const config = await getControllerProvider().getConfig().catch(() => null)

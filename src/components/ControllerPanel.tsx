@@ -1,4 +1,5 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { clampPixelCount } from '@/engine/camera'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { useControllerStore } from '@/store/controllerStore'
 import { useControllerPanelStore } from '@/store/controllerPanelStore'
@@ -26,7 +27,7 @@ const PANEL_HINT = (
     items={[
       ['pattern', 'the pattern the Controller is currently running'],
       ['fps', 'frame rate the device reports'],
-      ['pixels', 'pixel count configured on the device — fixed to its wiring'],
+      ['pixels', 'pixel count configured on the device — editable; saved to the device so it survives a reboot'],
       ['brightness', 'master output level on the device — applied live'],
     ]}
   />
@@ -48,6 +49,52 @@ const VARS_HINT = (
     items={[['value', 'the variable’s current value on the device']]}
   />
 )
+
+// Editable pixel-count control (#213). Mirrors the preview deck's PixelCountInput —
+// same draft/commit-on-Enter-or-blur logic and styling — but reads/writes the live
+// Controller's pixel count. Unlike the preview's preview-only count this is real
+// device config: committing it sends a saved `setPixelCount` to the device. Setting
+// the count is also the remedy for an unconformable map push (a map only applies
+// when its point count exactly matches the device's pixel count).
+function ControllerPixelCountInput() {
+  const pixelCount = useControllerPanelStore((s) => s.pixelCount)
+  const setPixelCount = useControllerPanelStore((s) => s.setPixelCount)
+
+  const [draft, setDraft] = useState(pixelCount == null ? '' : String(pixelCount))
+
+  // Reflect external count changes (the device's reported value, polled) into the
+  // draft by adjusting state during render — React's recommended pattern over an effect.
+  const [lastCount, setLastCount] = useState(pixelCount)
+  if (pixelCount !== lastCount) {
+    setLastCount(pixelCount)
+    setDraft(pixelCount == null ? '' : String(pixelCount))
+  }
+
+  function commit() {
+    const parsed = parseInt(draft, 10)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      // Reject empty/garbage: snap back to the last known device count.
+      setDraft(pixelCount == null ? '' : String(pixelCount))
+      return
+    }
+    const n = clampPixelCount(parsed)
+    setDraft(String(n))
+    if (n !== pixelCount) setPixelCount(n)
+  }
+
+  return (
+    <input
+      aria-label="Controller pixel count"
+      type="text"
+      inputMode="numeric"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value.replace(/\D/g, ''))}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      onBlur={commit}
+      className="w-[42px] h-5 px-0.5 rounded border border-zinc-500 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-400 focus:outline-none focus:border-live"
+    />
+  )
+}
 
 export function ControllerPanel() {
   // Re-render (and so re-subscribe to the active provider below) when the active
@@ -103,7 +150,9 @@ export function ControllerPanel() {
         <DeckGrid gapY="gap-y-1" className="mb-2">
           <DeckTelemetry label="pattern" value={patternName} />
           <DeckTelemetry label="fps" value={fpsLabel} />
-          <DeckTelemetry label="pixels" value={pixelsLabel} />
+          <DeckCell label="pixels">
+            <ControllerPixelCountInput />
+          </DeckCell>
           <DeckCell label="map points">
             <span
               className={`tabular-nums truncate ${mapCountMismatch ? 'text-amber-400' : 'text-live'}`}

@@ -577,8 +577,12 @@ tooling:
 Two read-back facts that shape what the live **Controller panel** can mirror:
 
 - **`pixelCount` rides in the `getConfig` settings packet** (top-level, alongside
-  `brightness`/`name`), so it is cheap read-only telemetry — surfaced as the panel's
-  `pixels` row. It is fixed to the device's wiring; the panel never offers to edit it.
+  `brightness`/`name`), so it is cheap to read — surfaced as the panel's `pixels` row.
+  The row is **editable**: committing a value sends `setPixelCount(n, save:true)` to the
+  device (saved so it survives a reboot). Bench setups re-wire and re-map constantly, and
+  setting the count is also the only way to make a hard-coded-count map apply (#213), so
+  the panel treats it as live device config, not read-only telemetry. (Earlier the count
+  was deliberately read-only on the Controller; that decision was reversed.)
 - **The Fill/Contain fit mode is *map-bound*, not a standalone settings field.** It is
   chosen in the Mapper and saved *with the map*, so reading it back requires **map
   read-back** — the unconfirmed capability the H13 spike (#205) gates and the H11

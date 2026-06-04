@@ -19,11 +19,13 @@ class ConnectedProvider extends NullControllerProvider {
     brightness: 0.4,
     activeProgramId: 'def',
     activeControls: { sliderSpeed: 0.3, toggleMirror: 1 },
+    pixelCount: 256,
   }
   telemetry: ControllerTelemetry = { fps: 30 }
   programs: ProgramListEntry[] = [{ id: 'def', name: 'Nebula' }]
   vars: Record<string, number> = { phase: 0.5 }
   brightnessWrites: Array<{ value: number; save: boolean }> = []
+  pixelCountWrites: Array<{ value: number; save: boolean }> = []
   controlWrites: Array<{ controls: Record<string, number>; save: boolean }> = []
   private status: ControllerStatus = {
     kind: 'connected',
@@ -46,6 +48,10 @@ class ConnectedProvider extends NullControllerProvider {
   }
   setBrightness(value: number, save = false): Promise<void> {
     this.brightnessWrites.push({ value, save })
+    return Promise.resolve()
+  }
+  setPixelCount(value: number, save = true): Promise<void> {
+    this.pixelCountWrites.push({ value, save })
     return Promise.resolve()
   }
   setControls(controls: Record<string, number>, save = false): Promise<void> {
@@ -100,6 +106,22 @@ describe('ControllerPanel', () => {
       expect(provider.controlWrites[provider.controlWrites.length - 1]).toEqual({
         controls: { sliderSpeed: 0.8 },
         save: false,
+      }),
+    )
+  })
+
+  it('shows the device pixel count in an editable field and writes it back (saved) on commit', async () => {
+    const provider = new ConnectedProvider()
+    setControllerProvider(provider)
+    render(<ControllerPanel />)
+    const input = (await screen.findByLabelText('Controller pixel count')) as HTMLInputElement
+    await waitFor(() => expect(input.value).toBe('256'))
+    fireEvent.change(input, { target: { value: '16' } })
+    fireEvent.blur(input)
+    await waitFor(() =>
+      expect(provider.pixelCountWrites[provider.pixelCountWrites.length - 1]).toEqual({
+        value: 16,
+        save: true,
       }),
     )
   })

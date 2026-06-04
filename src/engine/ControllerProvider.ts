@@ -71,7 +71,8 @@ export interface ControllerConfig {
   activeControls?: Record<string, number>
   /** The device's configured name, when it reports one — the Controller nickname. */
   name?: string
-  /** The device's configured pixel count — fixed to its wiring; shown read-only. */
+  /** The device's configured pixel count. Editable from the panel via
+   *  `setPixelCount` (#213); read here for display and preflight reconciliation. */
   pixelCount?: number
 }
 
@@ -142,6 +143,13 @@ export interface ControllerProvider {
   /** Set global brightness (0..1). `save` persists to flash — default false.
    *  Resolves once the command is sent. */
   setBrightness(value: number, save?: boolean): Promise<void>
+
+  /** Set the device's configured pixel count. `save` persists to flash — default
+   *  true (this is wiring config, not a volatile control, so it should survive a
+   *  reboot). Resolves once the command is sent. Also the remedy for an
+   *  unconformable map push: a map only applies when its point count exactly
+   *  matches `pixelCount` (#213). */
+  setPixelCount(value: number, save?: boolean): Promise<void>
 
   // ── push surface (H10, issue #202; gated by `capabilities`) ─────────────────
 
@@ -225,6 +233,10 @@ export class NullControllerProvider implements ControllerProvider {
   }
 
   setBrightness(_value: number, _save = false): Promise<void> {
+    return Promise.reject(new Error('Not connected to a Controller'))
+  }
+
+  setPixelCount(_value: number, _save = true): Promise<void> {
     return Promise.reject(new Error('Not connected to a Controller'))
   }
 

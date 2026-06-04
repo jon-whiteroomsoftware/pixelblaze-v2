@@ -1,6 +1,6 @@
 // Pure preflight reconciliation for Send-to-Controller (H11, issue #203). Before a
 // push the IDE compares the open pattern's modeled pixel count (its "map points")
-// against the Controller's fixed, wired-in pixel count and surfaces any mismatch as
+// against the Controller's configured pixel count and surfaces any mismatch as
 // an acknowledgeable warning — never a hard block. The push pipeline (H10) sends
 // only pattern bytecode and keeps whatever map the device already has, so a
 // count mismatch is a "this won't look right" heads-up, not an error.
@@ -24,7 +24,7 @@ export interface PreflightWarning {
 export interface PreflightInput {
   /** The open pattern's modeled pixel count — how many points its map produces. */
   localPixelCount: number
-  /** The Controller's fixed pixel count (from getConfig), or null when it can't be
+  /** The Controller's configured pixel count (from getConfig), or null when it can't be
    *  read — in which case the pixel-fit warnings are suppressed (nothing to compare). */
   devicePixelCount: number | null
   /** True when this Send also uploads the IDE's map, overwriting the device's single

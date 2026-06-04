@@ -27,7 +27,8 @@ interface ControllerPanelState {
   programs: ProgramListEntry[]
   /** Device-reported frame rate; null until reported. */
   fps: number | null
-  /** The device's configured pixel count, read-only; null until read. */
+  /** The device's configured pixel count; null until read. Editable via
+   *  `setPixelCount` (#213) and refreshed from the device each poll. */
   pixelCount: number | null
   /** Number of coordinates in the device's installed pixel map, read back once on
    *  start (H13, #205); null until read or when the device has no map. Surfaced
@@ -50,6 +51,10 @@ interface ControllerPanelState {
   poll: () => Promise<void>
   /** Set brightness on the device — volatile, never `save:true`. Optimistic local. */
   setBrightness: (value: number) => void
+  /** Set the device's pixel count — persisted (`save:true`), since it is wiring
+   *  config that must survive a reboot. Optimistic local; the next poll reconciles
+   *  with whatever the device reports. (#213) */
+  setPixelCount: (value: number) => void
   /** Set one control value on the device — volatile, never `save:true`. Optimistic. */
   setControl: (name: string, value: number) => void
 }
@@ -121,8 +126,9 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
           activeProgramId: config.activeProgramId,
           // Seed brightness once (?? on the existing value), then slider-owned.
           brightness: s.brightness ?? config.brightness ?? null,
-          // Pixel count is fixed to the device's wiring; refresh it whenever
-          // reported, falling back to the last known value.
+          // Pixel count is device config (editable via setPixelCount, #213);
+          // refresh it from each poll, falling back to the last known value. An
+          // optimistic local edit is reconciled here once the device reports back.
           pixelCount: config.pixelCount ?? s.pixelCount,
           activeControls: reseed ? config.activeControls ?? {} : s.activeControls,
         }
@@ -136,6 +142,13 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
     set({ brightness: value })
     void getControllerProvider()
       .setBrightness(value, false)
+      .catch(() => {})
+  },
+
+  setPixelCount: (value) => {
+    set({ pixelCount: value })
+    void getControllerProvider()
+      .setPixelCount(value)
       .catch(() => {})
   },
 
