@@ -322,6 +322,15 @@ guidance: *"if you rely on pixelCount and change the number of pixels, visit the
 mapper page and save it to re-generate the pixel map."* This is by-design behaviour,
 not a bug, and any faithful tool must reproduce it rather than paper over it.
 
+There is a sharper, *push-time* sibling to this footgun: **a map written to a device
+must contain exactly `pixelCount` coordinates, or the device will not apply it.**
+Saving a count-mismatched map (e.g. a 16-point map onto a device set to 256 pixels)
+appears to succeed but produces no visible change — the map is dropped, not partially
+applied — and the reference client refuses to even parse such a map on read-back
+(`numElements != pixelCount` raises `ValueError`). So a tool that pushes maps must
+either generate exactly `pixelCount` points or set the device's pixel count to match
+the map; the two are inseparable.
+
 ### Map dimensionality
 
 A map is 1D, 2D, or 3D. `pixelMapDimensions()` reports it (0 = no map). With no map

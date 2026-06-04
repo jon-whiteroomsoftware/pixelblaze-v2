@@ -561,6 +561,18 @@ tooling:
   plus device map push/pull, captured as direction only (`Feature - Hardware
   Connectivity.md`). On hardware a Pixelblaze stores one shared map per device, so a
   map push is a guarded device-configuration action, never part of routine deploy.
+  **A pushed map must contain exactly `pixelCount` coordinates or the device will not
+  apply it.** A freshly pushed count-mismatched map produced *no* visible change on
+  hardware in testing (#204) — the `putPixelMap`/`savePixelMap` frames are accepted and
+  report success, but the map is dropped — and the reference client enforces the same
+  rule on read-back (`numElements != pixelCount → ValueError`, pixelblaze-client
+  `pixelblaze.py` ~L1723). `resolveMapPushPoints` (`mapPush.ts`) re-bakes the map source
+  to the device `pixelCount` before encoding (mirroring the reference `setMapFunction`,
+  which calls the map function with `getPixelCount()`), which conforms any map whose
+  `function(pixelCount)` honours its argument. A map with a hard-coded point count
+  cannot conform; the planned remedy couples the push with `setPixelCount` (#213). This
+  is a *push-time* constraint, distinct from the post-hoc stale-map drift of ADR-0004
+  (changing `pixelCount` after a valid save).
 
 Two read-back facts that shape what the live **Controller panel** can mirror:
 
@@ -573,6 +585,14 @@ Two read-back facts that shape what the live **Controller panel** can mirror:
   preflight (#203) defers its map-mismatch warning behind. A `fit` panel row therefore
   cannot be shown faithfully until map read-back is proven; it is not free telemetry
   the way `pixelCount` is.
+- **Map read-back is an HTTP GET of `/pixelmap.dat`, not a WebSocket call.** There is no
+  WS "get map" message (`putPixelMap` type 8 is send-only) and the `getConfig` packet
+  carries no map data, so the H13 read-back (#205) needs the extension helper to fetch
+  the file over HTTP (the same helper already fetches the device compiler for H8). The
+  blob's 12-byte header is three LE uint32 `[formatVersion, numDimensions, bodyBytes]`,
+  and `numPixels = bodyBytes / numDimensions / formatVersion` — so even a map's point
+  count is a cheap header parse. Surfacing that point count beside the panel's `pixels`
+  row is a follow-on of #205.
 
 ---
 
