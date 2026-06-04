@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeMapData } from './mapPush'
+import { encodeMapData, resolveMapPushPoints } from './mapPush'
 
 // The reference format (pixelblaze-client createMapData) for v3 firmware:
 //   formatVersion = 2 → maxInt = 65535, 2 bytes per coordinate (uint16 LE).
@@ -86,5 +86,44 @@ describe('encodeMapData', () => {
     expect(data.length).toBe(HEADER_BYTES + 2 * 1)
     expect(data[HEADER_BYTES + 0]).toBe(0)
     expect(data[HEADER_BYTES + 1]).toBe(255)
+  })
+})
+
+describe('resolveMapPushPoints', () => {
+  // A 1D map source that returns exactly `pixelCount` evenly-spaced coords — the
+  // count is honoured, so re-baking yields a different-sized array per device.
+  const source = `function (pixelCount) {
+    var p = []
+    for (var i = 0; i < pixelCount; i++) p.push([i, 0])
+    return p
+  }`
+  // Stand-in for the preview-baked array (baked at the preview count, e.g. 4096).
+  const previewBaked = Array.from({ length: 4096 }, (_, i) => [i / 4095, 0])
+
+  it('re-bakes the map source to the device pixel count (the #204 fix)', () => {
+    const points = resolveMapPushPoints(source, previewBaked, 256)
+    // The firmware needs exactly pixelCount entries; a 4096-point blob to a
+    // 256-pixel device is dropped wholesale. Re-baking pins the count to 256.
+    expect(points.length).toBe(256)
+  })
+
+  it('falls back to the preview-baked points when the device count is unknown', () => {
+    const points = resolveMapPushPoints(source, previewBaked, null)
+    expect(points).toBe(previewBaked)
+  })
+
+  it('falls back when there is no source to re-bake', () => {
+    const points = resolveMapPushPoints(undefined, previewBaked, 256)
+    expect(points).toBe(previewBaked)
+  })
+
+  it('falls back when the source fails to evaluate', () => {
+    const points = resolveMapPushPoints('function (n) { throw new Error("boom") }', previewBaked, 256)
+    expect(points).toBe(previewBaked)
+  })
+
+  it('falls back when re-baking yields no points', () => {
+    const points = resolveMapPushPoints('function (n) { return [] }', previewBaked, 256)
+    expect(points).toBe(previewBaked)
   })
 })

@@ -20,9 +20,40 @@
 // and break aspect, so we scale [0,1] straight through and only clamp. What the
 // preview shows is exactly what the device receives.
 
+import { bakeMapSource } from './maps'
+
 /** A baked coordinate per pixel: `[x,y]` (2D), `[x,y,z]` (3D), or `[x]` (1D). Values
  *  are expected pre-normalized to [0,1] per axis; out-of-range values are clamped. */
 export type MapCoord = number[]
+
+/** Resolve the coordinate array to actually push to a Controller (#204 hardware fix).
+ *
+ *  The firmware stores exactly `pixelCount` map entries — a blob of any other size is
+ *  dropped wholesale, so the map silently never takes effect. Our preview-baked points
+ *  are baked at the *preview* pixel count (`activePixelCount`, default 4096), which has
+ *  no relation to the device's wired pixel count, so they routinely mismatch.
+ *
+ *  When we know the device count and have the map's source, re-evaluate the map at that
+ *  count — mirroring the reference client's `setMapFunction`, which calls the map
+ *  function with `getPixelCount()` before encoding:
+ *    https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L1635
+ *  Fall back to the preview-baked points when the source or device count is missing, the
+ *  re-bake throws, or it yields nothing — a same-size mismatch is still better than none. */
+export function resolveMapPushPoints(
+  source: string | undefined,
+  fallbackPoints: MapCoord[],
+  devicePixelCount: number | null,
+): MapCoord[] {
+  if (source && devicePixelCount != null && devicePixelCount > 0) {
+    try {
+      const baked = bakeMapSource(source, devicePixelCount)
+      if (baked.points.length > 0) return baked.points
+    } catch {
+      // Source no longer evaluates — fall through to the last good baked points.
+    }
+  }
+  return fallbackPoints
+}
 
 export interface EncodeMapDataOptions {
   /** Bytes per coordinate AND the version tag, per the reference: firmware major - 1.

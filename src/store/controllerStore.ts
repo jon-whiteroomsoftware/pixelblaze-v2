@@ -9,6 +9,7 @@ import {
 import { NullControllerProvider, type ControllerProvider, type ControllerStatus } from '@/engine/ControllerProvider'
 import { mapDimension, type MapDimension } from '@/engine/sendToController'
 import { describePreflight, type PreflightWarning } from '@/engine/preflight'
+import { resolveMapPushPoints } from '@/engine/mapPush'
 import type { ControllerPhase } from '@/engine/controllerPillView'
 import { pushPattern } from '@/engine/pushPattern'
 import { getControllerBindings, setControllerBindings } from '@/engine/storage'
@@ -170,12 +171,22 @@ export const useControllerStore = create<ControllerConnectionState>()(
       // needs: its stable id, baked coordinate array, and a change signature (its
       // source) for the dirty gate. Returns null unless a custom map is open AND has
       // baked points — a stock map (no source) or an unbaked map can't be pushed.
-      const openMapForPush = (): { id: string; points: number[][]; signature: string } | null => {
+      const openMapForPush = ():
+        | { id: string; points: number[][]; source: string | undefined; signature: string }
+        | null => {
         const { editingMap, userMaps } = useMapStore.getState()
         if (editingMap?.kind !== 'existing') return null
         const record = userMaps.find((m) => m.id === editingMap.id)
         if (!record || !record.points || record.points.length === 0) return null
-        return { id: record.id, points: record.points, signature: record.source ?? '' }
+        // `points` are baked at the *preview* count; the push re-bakes `source` to the
+        // device's pixel count (resolveMapPushPoints, #204). `signature` is the source
+        // text used by the dirty gate.
+        return {
+          id: record.id,
+          points: record.points,
+          source: record.source ?? undefined,
+          signature: record.source ?? '',
+        }
       }
 
       // Fold a per-Controller patch into the keyed map without dropping siblings.
@@ -319,9 +330,14 @@ export const useControllerStore = create<ControllerConnectionState>()(
           // Fresh device count (best-effort) for the count-fit reconciliation; a read
           // failure leaves it unknown and only the overwrite warning shows.
           const config = await getControllerProvider().getConfig().catch(() => null)
+          const devicePixelCount = config?.pixelCount ?? null
+          // Reconcile against what we will *actually* send: the map re-baked to the
+          // device count (#204), not the preview-baked array. After the re-bake the
+          // counts normally match, so the only warning left is the overwrite guard.
+          const points = resolveMapPushPoints(map.source, map.points, devicePixelCount)
           const { warnings } = describePreflight({
-            localPixelCount: map.points.length,
-            devicePixelCount: config?.pixelCount ?? null,
+            localPixelCount: points.length,
+            devicePixelCount,
             // A map send always overwrites the device's single shared map, so the
             // overwrite warning always fires — the dialog always opens (a deliberate
             // act, never a silent one-click like a clean pattern push).
@@ -342,7 +358,12 @@ export const useControllerStore = create<ControllerConnectionState>()(
 
           set({ pushing: true, pushResult: null })
           try {
-            await getControllerProvider().setPixelMap(map.points)
+            // Re-bake to the device's pixel count before sending (#204): the firmware
+            // ignores a map whose entry count differs from its wired pixelCount, and the
+            // baked `points` are sized to the preview, not the device.
+            const config = await getControllerProvider().getConfig().catch(() => null)
+            const points = resolveMapPushPoints(map.source, map.points, config?.pixelCount ?? null)
+            await getControllerProvider().setPixelMap(points)
             set((s) => ({
               pushing: false,
               // A Controller has one map slot — a push always overwrites it in place,
