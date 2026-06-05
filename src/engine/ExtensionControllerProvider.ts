@@ -46,6 +46,12 @@ export interface ExtensionControllerProviderOptions {
   pingIntervalMs?: number
   /** Per-request reply timeout passed to the connection. Default 5000ms. */
   requestTimeoutMs?: number
+  /** How long a (re)connect waits for the socket to open before failing the
+   *  attempt and tearing down the half-open socket. Default 3000ms. Bounds the
+   *  reconnect loop so it can't stall forever on one hung attempt (an unreachable
+   *  host's socket can hang indefinitely). Generous enough to absorb the relay seam
+   *  + per-IP permission gate (#229) so a real open isn't aborted prematurely. */
+  connectTimeoutMs?: number
   /** Liveness watchdog window passed to the connection: declare the Controller
    *  gone after this much inbound silence (no reply/ack/fps), even with no socket
    *  close. Default 4000ms — the device streams fps several times a second, so a
@@ -57,7 +63,9 @@ export interface ExtensionControllerProviderOptions {
    *  probing (status stays `connecting`) until it does or the user disconnects.
    *  Set a finite value to cap it. */
   maxReconnectAttempts?: number
-  /** Delay between reconnect attempts. Default 1000ms. */
+  /** Delay between reconnect attempts. Default 1000ms. Kept modest so we don't
+   *  hammer a rebooting Controller; recovery still feels prompt because the device
+   *  answers a probe soon after it is back. */
   reconnectDelayMs?: number
   /** How long a compile round-trip waits for the helper's result before failing.
    *  The helper fetches + gunzips the ~1.2MB device web UI and evals the ~170k-char
@@ -100,6 +108,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
   private readonly detectTimeoutMs: number
   private readonly pingIntervalMs: number
   private readonly requestTimeoutMs: number
+  private readonly connectTimeoutMs: number
   private readonly livenessTimeoutMs: number
   private readonly maxReconnectAttempts: number
   private readonly reconnectDelayMs: number
@@ -117,6 +126,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this.detectTimeoutMs = options.detectTimeoutMs ?? 500
     this.pingIntervalMs = options.pingIntervalMs ?? 1000
     this.requestTimeoutMs = options.requestTimeoutMs ?? 5000
+    this.connectTimeoutMs = options.connectTimeoutMs ?? 3000
     this.livenessTimeoutMs = options.livenessTimeoutMs ?? 4000
     this.maxReconnectAttempts = options.maxReconnectAttempts ?? Infinity
     this.reconnectDelayMs = options.reconnectDelayMs ?? 1000
@@ -250,12 +260,23 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this.target = target
     this.intentionalClose = false
     this.permissionBlocked = false
-    await this.openConnection(target)
+    try {
+      await this.openConnection(target)
+    } catch (e) {
+      // The initial connect is fatal: surface it as an error pill. (A reconnect
+      // attempt's failure, by contrast, stays `connecting` — the loop owns that
+      // status and only goes `error` when it exhausts its attempts.)
+      if (e instanceof ControllerPermissionDeniedError) throw e
+      const message = e instanceof Error ? e.message : 'Connection failed'
+      this.setStatus({ kind: 'error', message })
+      throw e
+    }
   }
 
-  /** Open (or reopen) the socket. On success arms reconnect; on failure leaves
-   *  the provider in `error` and rethrows. The caller decides whether a failure
-   *  is fatal (initial connect) or feeds the retry loop (reconnect). */
+  /** Open (or reopen) the socket. On success arms reconnect; on failure clears the
+   *  connection and rethrows, leaving the status untouched. The caller decides what
+   *  a failure means: the initial connect renders it as an error pill, the reconnect
+   *  loop keeps `connecting` and reschedules. */
   private async openConnection(target: ControllerTarget): Promise<void> {
     this.setStatus({ kind: 'connecting', target })
     const conn = new PixelblazeConnection({
@@ -263,24 +284,33 @@ export class ExtensionControllerProvider implements ControllerProvider {
       webSocketFactory: (url) => new RelayWebSocket(url, this.transport),
       pingIntervalMs: this.pingIntervalMs,
       requestTimeoutMs: this.requestTimeoutMs,
+      connectTimeoutMs: this.connectTimeoutMs,
       livenessTimeoutMs: this.livenessTimeoutMs,
     })
     conn.on('close', () => this.onSocketClosed())
     conn.on('stale', () => this.onSocketStale())
     this.conn = conn
+    // TEMP DEBUG (#230): trace each (re)connect attempt and its outcome.
+    const t0 = Date.now()
+    console.log(`[pblz-reconnect] attempt → ${target.address}`)
     try {
       await conn.connect()
     } catch (e) {
       this.conn = null
       this.expectConnected = false
+      console.log(
+        `[pblz-reconnect] attempt FAILED after ${Date.now() - t0}ms:`,
+        e instanceof Error ? e.message : e,
+      )
       // A permission decline already reset us to idle (extension-present); surface
       // it as the typed error the store resets on, not the generic socket failure
       // the rejection carries, and leave the idle status in place.
       if (this.permissionBlocked) throw new ControllerPermissionDeniedError(target.address)
-      const message = e instanceof Error ? e.message : 'Connection failed'
-      this.setStatus({ kind: 'error', message })
+      // Leave the status as-is and rethrow — the caller decides whether this is a
+      // fatal initial connect (error pill) or a reconnect attempt (stay connecting).
       throw e
     }
+    console.log(`[pblz-reconnect] attempt OPENED after ${Date.now() - t0}ms → connected`)
     this.expectConnected = true
     this.setStatus({
       kind: 'connected',

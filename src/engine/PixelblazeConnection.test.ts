@@ -106,6 +106,66 @@ describe('PixelblazeConnection', () => {
     await expect(promise).rejects.toThrow(/before open/)
   })
 
+  describe('connect timeout', () => {
+    it('rejects and closes the socket when open never arrives within connectTimeoutMs', async () => {
+      vi.useFakeTimers()
+      try {
+        const { conn, getSocket } = makeConnection({ connectTimeoutMs: 3000 })
+        const promise = conn.connect()
+        // Surface the rejection so it isn't an unhandled promise when it settles.
+        const settled = promise.then(
+          () => 'resolved',
+          (e: Error) => e.message,
+        )
+        const socket = getSocket()
+        expect(socket.readyState).toBe(0) // still CONNECTING
+        await vi.advanceTimersByTimeAsync(3000)
+        expect(await settled).toMatch(/timed out/)
+        expect(socket.readyState).toBe(FakeWebSocket.CLOSED)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('a late open after the timeout does not resolve or start pinging', async () => {
+      vi.useFakeTimers()
+      try {
+        const { conn, getSocket } = makeConnection({
+          connectTimeoutMs: 3000,
+          pingIntervalMs: 1000,
+        })
+        const promise = conn.connect()
+        const settled = promise.then(
+          () => 'resolved',
+          (e: Error) => e.message,
+        )
+        await vi.advanceTimersByTimeAsync(3000)
+        const socket = getSocket()
+        const sentBefore = socket.sent.length
+        socket.simulateOpen() // device shows up too late
+        vi.advanceTimersByTime(5000)
+        expect(await settled).toMatch(/timed out/)
+        expect(socket.sent.length).toBe(sentBefore) // no keepalive started
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not time out a connection that opens in time', async () => {
+      vi.useFakeTimers()
+      try {
+        const { conn, getSocket } = makeConnection({ connectTimeoutMs: 3000 })
+        const promise = conn.connect()
+        getSocket().simulateOpen()
+        await promise
+        vi.advanceTimersByTime(10000)
+        expect(conn.isConnected).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   describe('getVars', () => {
     it('round-trips: sends {getVars:true} and resolves with the reply vars', async () => {
       const { conn, socket } = await connected()

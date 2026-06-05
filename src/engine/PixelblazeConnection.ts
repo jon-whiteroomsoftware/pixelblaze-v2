@@ -154,6 +154,14 @@ export interface PixelblazeConnectionOptions {
   now?: () => number
   /** How long a correlated request waits for its reply before rejecting. */
   requestTimeoutMs?: number
+  /** How long `connect()` waits for the socket `open` event before rejecting and
+   *  closing the half-open socket. 0 (or undefined) disables the timeout — open
+   *  is then awaited indefinitely. A browser/relay socket pointed at an
+   *  unreachable host can hang at the TCP layer for tens of seconds before it
+   *  errors; a bounded timeout lets a reconnect loop poll at a steady cadence
+   *  instead of stalling on one hung attempt, and tears down the dead socket so
+   *  it does not leak into the device's small WS pool. */
+  connectTimeoutMs?: number
   /** Injectable timers so tests need no fake clock; default to globals. */
   setInterval?: (fn: () => void, ms: number) => unknown
   clearInterval?: (handle: unknown) => void
@@ -177,7 +185,7 @@ export class PixelblazeConnection {
   private readonly opts: Required<
     Pick<
       PixelblazeConnectionOptions,
-      'pingIntervalMs' | 'requestTimeoutMs' | 'livenessTimeoutMs'
+      'pingIntervalMs' | 'requestTimeoutMs' | 'livenessTimeoutMs' | 'connectTimeoutMs'
     >
   > &
     PixelblazeConnectionOptions
@@ -206,6 +214,7 @@ export class PixelblazeConnection {
       pingIntervalMs: 0,
       requestTimeoutMs: 5000,
       livenessTimeoutMs: 0,
+      connectTimeoutMs: 0,
       ...options,
     }
     this._now = options.now ?? (() => Date.now())
@@ -273,10 +282,29 @@ export class PixelblazeConnection {
     return new Promise((resolve, reject) => {
       const ws = this.opts.webSocketFactory(this.url)
       this.ws = ws
-      let opened = false
+      // Latches once the open race is decided (open, pre-open error, or timeout),
+      // so a later event can't double-settle the promise or start a keepalive on a
+      // socket we've already abandoned.
+      let settled = false
+
+      // Bound the wait for `open`: a socket pointed at an unreachable host can hang
+      // at the TCP layer for tens of seconds, which would stall a reconnect loop
+      // that only advances when each attempt settles. On timeout, reject and close
+      // the dead socket so the relay tears down its real socket.
+      const timer =
+        this.opts.connectTimeoutMs > 0
+          ? this._setTimeout(() => {
+              if (settled) return
+              settled = true
+              ws.close()
+              reject(new Error('WebSocket open timed out'))
+            }, this.opts.connectTimeoutMs)
+          : null
 
       ws.onopen = () => {
-        opened = true
+        if (settled) return
+        settled = true
+        if (timer != null) this._clearTimeout(timer)
         this.lastInboundAt = this._now()
         this.staleEmitted = false
         this.startPing()
@@ -285,8 +313,17 @@ export class PixelblazeConnection {
       }
       ws.onmessage = (ev) => this.handleMessage(ev.data)
       ws.onerror = (ev) => {
+        // Emit to subscribers UNCONDITIONALLY — deliberately outside the `settled`
+        // latch. The latch guards only the one-shot connect() promise (resolve/
+        // reject exactly once); the `error` event is a separate, repeatable signal
+        // that must fire for errors during a live connection too, after open has
+        // already settled the promise. (See lifecycle test: open → error → close.)
         this.emit('error', ev)
-        if (!opened) reject(new Error('WebSocket error before open'))
+        // Past this point we only touch the promise, so a settled connection stops.
+        if (settled) return
+        settled = true
+        if (timer != null) this._clearTimeout(timer)
+        reject(new Error('WebSocket error before open'))
       }
       ws.onclose = (ev) => this.handleClose(ev)
     })

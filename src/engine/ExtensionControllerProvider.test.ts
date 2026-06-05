@@ -56,6 +56,10 @@ function makeDeviceTransport(
   // close — modelling an abrupt power-off (no FIN/RST). Only the liveness
   // watchdog can detect this.
   let silent = false
+  // When hanging, a `connect` produces neither open nor error — modelling a TCP
+  // connect to an unreachable host that stalls for a long time. Only the connect
+  // timeout can move past it.
+  let hangConnect = false
 
   const emit = (m: RelayMessage) => queueMicrotask(() => listeners.forEach((l) => l(m)))
   const reply = (connId: string, obj: object) => {
@@ -71,6 +75,7 @@ function makeDeviceTransport(
           return
         case 'connect':
           lastConnId = msg.connId
+          if (hangConnect) return // no open, no error — the socket just stalls
           if (opts.denyPermission) {
             const address = new URL(msg.url).hostname
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-needed', address })
@@ -158,6 +163,12 @@ function makeDeviceTransport(
     },
     revive: () => {
       silent = false
+    },
+    hang: () => {
+      hangConnect = true
+    },
+    unhang: () => {
+      hangConnect = false
     },
   }
 }
@@ -535,6 +546,51 @@ describe('ExtensionControllerProvider', () => {
         // Power back on: the scheduled reconnect reopens and returns to connected.
         d.revive()
         await vi.advanceTimersByTimeAsync(10)
+        expect(p.getStatus().kind).toBe('connected')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('times out a stalled reconnect attempt and keeps polling until the Controller returns', async () => {
+      vi.useFakeTimers()
+      try {
+        const d = makeDeviceTransport()
+        const p = new ExtensionControllerProvider({
+          transport: d.transport,
+          pingIntervalMs: 1000,
+          livenessTimeoutMs: 2500,
+          connectTimeoutMs: 3000,
+          reconnectDelayMs: 5,
+        })
+        const connectP = p.connect(TARGET)
+        await vi.advanceTimersByTimeAsync(0)
+        await connectP
+        expect(p.getStatus().kind).toBe('connected')
+
+        // Track every status the reconnect loop emits: a failed *attempt* must not
+        // flash the error pill — the loop stays connecting until it gives up.
+        const kinds: string[] = []
+        p.subscribe((s) => kinds.push(s.kind))
+
+        // Power-off where the socket neither closes nor refuses — reopen attempts
+        // stall instead of failing fast. Without a connect timeout the loop would
+        // hang on the first attempt forever.
+        d.goSilent()
+        d.hang()
+        await vi.advanceTimersByTimeAsync(4000) // watchdog flags it → first reconnect
+        expect(p.getStatus().kind).toBe('connecting')
+
+        // Each stalled attempt is abandoned after connectTimeoutMs and a fresh one
+        // scheduled; status holds at connecting across several cycles, never error.
+        await vi.advanceTimersByTimeAsync(10000)
+        expect(p.getStatus().kind).toBe('connecting')
+        expect(kinds).not.toContain('error')
+
+        // Power back on: the next attempt opens within the timeout window.
+        d.revive()
+        d.unhang()
+        await vi.advanceTimersByTimeAsync(3010)
         expect(p.getStatus().kind).toBe('connected')
       } finally {
         vi.useRealTimers()
