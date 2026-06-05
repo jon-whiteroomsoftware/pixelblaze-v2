@@ -75,6 +75,51 @@ export function describeSendToController({
   return { enabled: true }
 }
 
+// ── run-vs-save mode (H?, issue #238) ─────────────────────────────────────────
+//
+// Send-to-Controller carries one armed *mode*: run-only (play on the device, the
+// default) or save (persist to the device's Saved Patterns, #236). The mode is a
+// sticky toggle beside the button. Two pure helpers below keep the mode-derived
+// logic out of the component: the dirty gate splits by mode (run and save are
+// distinct acts — a clean run does not satisfy a pending save), and the action
+// label flips its glyph + tooltip with the mode.
+
+/** The armed Send mode: `run` plays the pattern on the device under a throwaway id;
+ *  `save` persists it to Saved Patterns (#236). */
+export type SendMode = 'run' | 'save'
+
+export interface DirtyGateInput {
+  /** The armed mode — selects which last-pushed record to compare against. */
+  mode: SendMode
+  /** The open pattern's current clean source. Empty → never "already pushed". */
+  source: string
+  /** Source last *run* to this Controller for this pattern (run-mode record). */
+  lastRunSource?: string
+  /** Source last *saved* to this Controller for this pattern (save-mode record). */
+  lastSavedSource?: string
+}
+
+/** Decide whether the current source already matches what was last pushed *in the
+ *  armed mode* — the mode-split dirty gate (#238). Run and save are tracked
+ *  separately, so arming the other mode after a clean push re-enables Send. */
+export function isAlreadyPushed({
+  mode,
+  source,
+  lastRunSource,
+  lastSavedSource,
+}: DirtyGateInput): boolean {
+  if (source.length === 0) return false
+  const last = mode === 'save' ? lastSavedSource : lastRunSource
+  return last === source
+}
+
+/** The verb the Send button surfaces for the armed mode, used for its tooltip when
+ *  the action is enabled: "Play on <name>" (run) / "Save to <name>" (save). The
+ *  glyph choice mirrors this (Play vs Save), decided in the component. */
+export function describeSendAction(mode: SendMode, name: string): { tooltip: string } {
+  return { tooltip: mode === 'save' ? `Save to ${name}` : `Play on ${name}` }
+}
+
 // ── map send (H12, issue #204) ────────────────────────────────────────────────
 //
 // The map editor's own Send-to-Controller action, the map analogue of the pattern

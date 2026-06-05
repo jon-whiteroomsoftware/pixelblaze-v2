@@ -106,6 +106,11 @@ class FakeProvider extends NullControllerProvider {
     this.pushed.push({ bytecode, opts })
     return Promise.resolve()
   }
+  saved: { blob: Uint8Array; opts: { id: string } }[] = []
+  saveProgram(blob: Uint8Array, opts: { id: string }): Promise<void> {
+    this.saved.push({ blob, opts })
+    return Promise.resolve()
+  }
 
   // ── map push surface (#204) ─────────────────────────────────────────────────
   pushedMaps: { points: number[][]; opts?: { save?: boolean } }[] = []
@@ -408,6 +413,28 @@ describe('controllerStore (keyed)', () => {
       expect(useControllerPanelStore.getState().programLabels[pushedId]).toBe('Twinkle')
     })
 
+    it('save-armed: writes a persisted PBP record and records the save dirty-gate (#238)', async () => {
+      await store().addController('10.0.0.5')
+      usePatternStore.setState({ activePatternId: 'pat-1' })
+      useEditorStore.setState({ previewSource: PATTERN_SRC, previewPatternName: 'Twinkle' })
+      store().setSaveArmed(true)
+
+      await store().pushActivePattern()
+
+      const provider = created.get('10.0.0.5')!
+      // Save mode persists via saveProgram, not a run-only pushBytecode.
+      expect(provider.saved).toHaveLength(1)
+      expect(provider.pushed).toHaveLength(0)
+      expect(store().pushResult).toEqual({ ok: true, created: true })
+      // The dirty gate is recorded in the SAVE map, not the run map — so flipping the
+      // toggle back to run leaves run-mode Send enabled.
+      expect(store().lastSavedSource['10.0.0.5']['pat-1']).toBe(PATTERN_SRC)
+      expect(store().lastPushedSource['10.0.0.5']).toBeUndefined()
+      // Save mode records the overwrite binding (#236).
+      const bindings = await getControllerBindings()
+      expect(bindings['10.0.0.5']['pat-1']).toBe(provider.saved[0].opts.id)
+    })
+
     it('is a no-op when no pattern is active', async () => {
       await store().addController('10.0.0.5')
       useEditorStore.setState({ previewSource: PATTERN_SRC })
@@ -434,56 +461,28 @@ describe('controllerStore (keyed)', () => {
     })
   })
 
-  describe('requestPush preflight (#203)', () => {
+  describe('requestPush (#239 — pattern push has no preflight)', () => {
     const PATTERN_SRC = 'export function render(index) {\n  hsv(index, 1, 1)\n}\n'
 
-    async function arm(devicePixelCount: number | undefined, localPixelCount: number) {
+    async function arm(devicePixelCount: number | undefined) {
       await store().addController('10.0.0.5')
       created.get('10.0.0.5')!.pixelCount = devicePixelCount
       usePatternStore.setState({ activePatternId: 'pat-1' })
-      useEditorStore.setState({
-        previewSource: PATTERN_SRC,
-        previewPatternName: 'Twinkle',
-        previewPixelCount: localPixelCount,
-      })
+      useEditorStore.setState({ previewSource: PATTERN_SRC, previewPatternName: 'Twinkle' })
     }
 
-    it('pushes straight through when the counts match (no dialog)', async () => {
-      await arm(256, 256)
+    it('pushes straight through, opening no dialog, whatever the device count', async () => {
+      // The preview resolution no longer factors in — a pattern runs on the device's
+      // own pixels, so there is nothing to reconcile and the push is always one-click.
+      await arm(256)
       await store().requestPush()
-      expect(store().preflight).toBeNull()
-      expect(created.get('10.0.0.5')!.pushed).toHaveLength(1)
-    })
-
-    it('opens the dialog and defers the push on a count mismatch', async () => {
-      await arm(256, 100)
-      await store().requestPush()
-      expect(store().preflight?.map((w) => w.kind)).toEqual(['fewer-than-device'])
-      // The push has NOT happened yet — it waits on confirmPush.
-      expect(created.get('10.0.0.5')!.pushed).toHaveLength(0)
-    })
-
-    it('confirmPush clears the dialog and completes the push', async () => {
-      await arm(256, 400)
-      await store().requestPush()
-      expect(store().preflight).not.toBeNull()
-
-      await store().confirmPush()
       expect(store().preflight).toBeNull()
       expect(created.get('10.0.0.5')!.pushed).toHaveLength(1)
       expect(store().pushResult).toEqual({ ok: true, created: true })
     })
 
-    it('cancelPush dismisses the dialog without pushing', async () => {
-      await arm(256, 100)
-      await store().requestPush()
-      store().cancelPush()
-      expect(store().preflight).toBeNull()
-      expect(created.get('10.0.0.5')!.pushed).toHaveLength(0)
-    })
-
     it('pushes through when the device count is unknown', async () => {
-      await arm(undefined, 100)
+      await arm(undefined)
       await store().requestPush()
       expect(store().preflight).toBeNull()
       expect(created.get('10.0.0.5')!.pushed).toHaveLength(1)

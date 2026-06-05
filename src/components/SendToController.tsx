@@ -1,23 +1,22 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { RotateCw, Check, ArrowRight } from 'lucide-react'
+import { RotateCw, Check, Play, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { useControllerStore } from '@/store/controllerStore'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore } from '@/store/patternStore'
-import { describeSendToController } from '@/engine/sendToController'
-import { PushConfirmPopover, pushPopoverButton } from '@/components/PushConfirmPopover'
+import { describeSendToController, isAlreadyPushed, describeSendAction } from '@/engine/sendToController'
 
-// The editor-header "Send to Controller" action (H9 #201 → H10 #202 → H11 #203). One
-// verb that runs *and* stores the open pattern on the connected Controller,
-// overwrite-in-place: the extension compiles the bundled artifact to bytecode, the
-// page frames it and pushes it over the existing socket (save + run), and the
-// per-Controller binding is remembered so the next push overwrites the same program.
+// The editor-header "Send to Controller" action (H9 #201 → H10 #202; save mode #236,
+// run-vs-save toggle #238). One verb that plays *or* saves the open pattern on the
+// connected Controller: the extension compiles the bundled artifact to bytecode and the
+// page frames it over the existing socket. A sticky Save toggle (#238) picks run-only
+// (play) vs persisted (save) mode; the button glyph/tooltip reflect it.
 //
-// A thin shell over the pure gates: `describeSendToController` decides enablement;
-// `requestPush` runs the #203 preflight (pixel-count reconciliation) and either
-// pushes straight through (clean) or opens the reconciliation popover (any warning),
-// deferring the push to `confirmPush`. The store's `preflight` slice drives the popover.
+// A thin shell over the pure gates: `describeSendToController` decides enablement and
+// `isAlreadyPushed` the mode-split dirty gate; `requestPush` pushes straight through (a
+// pattern push has no preflight — #239 removed the misleading preview-vs-device count
+// warning; the device runs the pattern on its own pixels + map).
 
 export function SendToController() {
   const provider = getControllerProvider()
@@ -36,10 +35,10 @@ export function SendToController() {
   const pushing = useControllerStore((s) => s.pushing)
   const pushResult = useControllerStore((s) => s.pushResult)
   const lastPushedSource = useControllerStore((s) => s.lastPushedSource)
+  const lastSavedSource = useControllerStore((s) => s.lastSavedSource)
+  const saveArmed = useControllerStore((s) => s.saveArmed)
+  const setSaveArmed = useControllerStore((s) => s.setSaveArmed)
   const requestPush = useControllerStore((s) => s.requestPush)
-  const confirmPush = useControllerStore((s) => s.confirmPush)
-  const cancelPush = useControllerStore((s) => s.cancelPush)
-  const preflight = useControllerStore((s) => s.preflight)
   const clearPushResult = useControllerStore((s) => s.clearPushResult)
 
   // Hold the just-pushed check on screen (button inert) for a few seconds, then let
@@ -51,13 +50,20 @@ export function SendToController() {
     return () => clearTimeout(t)
   }, [pushResult, clearPushResult])
 
-  // The dirty gate: a push is redundant when the open pattern's current clean source
-  // already matches what was last pushed to this Controller for this pattern.
+  // The dirty gate, split by armed mode (#238): a push is redundant when the open
+  // pattern's current clean source already matches what was last pushed to this
+  // Controller *in this mode*. Run and save are distinct acts, so arming the other
+  // mode after a clean push re-enables Send.
+  const mode = saveArmed ? 'save' : 'run'
   const alreadyPushed =
     !!activeIp &&
     !!patternId &&
-    previewSource.length > 0 &&
-    lastPushedSource[activeIp]?.[patternId] === previewSource
+    isAlreadyPushed({
+      mode,
+      source: previewSource,
+      lastRunSource: lastPushedSource[activeIp]?.[patternId],
+      lastSavedSource: lastSavedSource[activeIp]?.[patternId],
+    })
 
   const { enabled, reason } = describeSendToController({
     status,
@@ -66,17 +72,23 @@ export function SendToController() {
     compileStatus,
     alreadyPushed,
   })
-  // The button reads as a motion *toward* the active Controller: a leading glyph +
-  // the Controller's name (nickname, else IP, else a generic word). Only the glyph
-  // morphs — arrow (idle) → spinner (pushing) → check (done) — so the name holds its
-  // place and the button keeps its width.
+  // The button names the active Controller: a leading glyph + the Controller's name
+  // (nickname, else IP, else a generic word). Only the glyph morphs — Play/Save (idle,
+  // per the armed mode #238) → spinner (pushing) → check (done) — so the name holds
+  // its place and the button keeps its width.
   const target = active ? active.nickname || activeIp : null
   const name = target ?? 'Controller'
 
-  // arrow → "going toward"; amber spinner → working; check → landed. The error case
-  // is the only one that swaps the text, transiently.
-  let title = reason
-  let glyph = <ArrowRight size={14} strokeWidth={2.75} aria-hidden />
+  // Idle glyph reflects the armed mode (#238): Play (run on device) / Save (persist).
+  // Amber spinner → working; check → landed. The error case is the only one that swaps
+  // the text, transiently. When enabled and idle, the tooltip names the mode action
+  // ("Play on <name>" / "Save to <name>"); the gate's reason wins when disabled.
+  let title = enabled ? describeSendAction(mode, name).tooltip : reason
+  let glyph = saveArmed ? (
+    <Save size={14} strokeWidth={2.75} aria-hidden />
+  ) : (
+    <Play size={14} strokeWidth={2.75} aria-hidden />
+  )
   if (pushing) {
     glyph = (
       <RotateCw size={14} strokeWidth={2.75} className="animate-spin text-amber-400" aria-hidden />
@@ -103,44 +115,43 @@ export function SendToController() {
   const working = pushing || !!pushResult?.ok
   const dimClass = working ? 'opacity-95' : 'disabled:opacity-30'
 
-  // Preflight reconciliation (#203): the popover only opens when the push surfaced a
-  // warning. Closing it any way (Cancel, Escape, click-away) cancels the push; only
-  // the explicit action proceeds.
-  return (
-    <PushConfirmPopover
-      open={preflight !== null}
-      onCancel={cancelPush}
-      title={`Send to ${name}?`}
-      testId="preflight-dialog"
-      anchor={
-        <Button
-          size="sm"
-          variant="ghost"
-          className={`text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300 ${dimClass}`}
-          disabled={!enabled || working}
-          title={title}
-          onClick={() => void requestPush()}
-          data-testid="send-to-controller"
-        >
-          {content}
-        </Button>
-      }
+  // The sticky Save toggle (#238): always visible (never a hidden mode), immediately
+  // left of the Send button. Armed → Send persists to Saved Patterns; off → run-only.
+  const saveToggle = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={saveArmed}
+      aria-label="Save to Controller"
+      title={saveArmed ? 'Saving: Send persists to the Controller' : 'Arm to save the pattern on the Controller'}
+      onClick={() => setSaveArmed(!saveArmed)}
+      data-testid="save-toggle"
+      className={`flex items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors ${
+        saveArmed
+          ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+          : 'text-zinc-500 hover:bg-zinc-800/70 hover:text-zinc-300'
+      }`}
     >
-      <ul className="mt-2 space-y-1.5">
-        {(preflight ?? []).map((w) => (
-          <li key={w.kind} className="text-zinc-400">
-            {w.message}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex justify-end gap-2">
-        <button type="button" className={pushPopoverButton.cancel} onClick={() => cancelPush()}>
-          Cancel
-        </button>
-        <button type="button" className={pushPopoverButton.action} onClick={() => void confirmPush()}>
-          Send anyway
-        </button>
-      </div>
-    </PushConfirmPopover>
+      <Save size={13} strokeWidth={2.5} aria-hidden />
+    </button>
+  )
+
+  // A pattern push goes straight through (no preflight, #239), so the button is a plain
+  // action — the click pushes immediately.
+  return (
+    <span className="flex items-center gap-1">
+      {saveToggle}
+      <Button
+        size="sm"
+        variant="ghost"
+        className={`text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300 ${dimClass}`}
+        disabled={!enabled || working}
+        title={title}
+        onClick={() => void requestPush()}
+        data-testid="send-to-controller"
+      >
+        {content}
+      </Button>
+    </span>
   )
 }

@@ -86,6 +86,15 @@ interface ControllerConnectionState {
    *  Drives the dirty gate: Send is inert until the source differs from this. Not
    *  persisted — a fresh session re-enables a push (the device may have changed). */
   lastPushedSource: Record<string, Record<string, string>>
+  /** The pattern source last successfully *saved* (persist mode, #238), keyed
+   *  controllerId → patternId. The save-mode analogue of `lastPushedSource`: run and
+   *  save are distinct acts, so the dirty gate compares against this when Save is
+   *  armed. Not persisted, same as the run record. */
+  lastSavedSource: Record<string, Record<string, string>>
+  /** Whether the Send button's Save toggle is armed (#238). When on, Send persists the
+   *  pattern to the device's Saved Patterns (#236) instead of a run-only push. Sticky:
+   *  persisted across sessions (it's a deliberate, remembered intent). */
+  saveArmed: boolean
   /** The map source last successfully pushed, keyed controllerId → mapId (#204). The
    *  map analogue of `lastPushedSource`: drives the map editor's dirty gate so its Send
    *  is inert until the open map's bake changes. Not persisted (a fresh session re-enables
@@ -130,14 +139,11 @@ interface ControllerConnectionState {
    *  (#202). Reads the last-clean preview source and active pattern id; a no-op when
    *  nothing is active. Sets `pushing`/`pushResult` for the button to reflect. */
   pushActivePattern: () => Promise<void>
-  /** Run the Send-to-Controller preflight (#203): reconcile the open pattern's
-   *  modeled pixel count against the Controller's configured count. A clean preflight
-   *  pushes straight through (preserving the one-click path); any warning opens the
-   *  reconciliation dialog (`preflight`) instead, deferring the push to confirmPush. */
+  /** Push the active pattern to the active Controller. A pattern push has no preflight
+   *  (#239) — it sends bytecode only and the device runs it on its own pixels + map —
+   *  so this pushes straight through (the one-click path). */
   requestPush: () => Promise<void>
-  /** Acknowledge the preflight dialog and proceed with the push. */
-  confirmPush: () => Promise<void>
-  /** Dismiss the preflight dialog without pushing. */
+  /** Dismiss the (map-push) preflight dialog without pushing. */
   cancelPush: () => void
   /** Run the map-send preflight (#204): reconcile the open map's baked point count
    *  against the Controller's configured pixel count and always surface the map-overwrite
@@ -164,6 +170,8 @@ interface ControllerConnectionState {
    *  map slot (#204). Reuses `pushing`/`pushResult` for the button animation; a no-op
    *  when nothing is open/active. */
   pushActiveMap: () => Promise<void>
+  /** Arm/disarm the Save toggle (#238). Sticky across sessions. */
+  setSaveArmed: (armed: boolean) => void
   /** Clear the transient push result (e.g. after the toast/badge times out). */
   clearPushResult: () => void
 }
@@ -182,6 +190,8 @@ export const controllerInitialState = {
   pushing: false,
   pushResult: null as PushResult | null,
   lastPushedSource: {} as Record<string, Record<string, string>>,
+  lastSavedSource: {} as Record<string, Record<string, string>>,
+  saveArmed: false,
   lastPushedMap: {} as Record<string, Record<string, string>>,
   preflight: null as PreflightWarning[] | null,
   mapPushRemedyCount: null as number | null,
@@ -388,36 +398,15 @@ export const useControllerStore = create<ControllerConnectionState>()(
           await get().addController(remembered, get().lastConnectedNickname ?? undefined)
         },
 
+        setSaveArmed: (armed) => set({ saveArmed: armed }),
+
         clearPushResult: () => set({ pushResult: null }),
 
         requestPush: async () => {
-          const controllerId = get().activeIp
-          const patternId = usePatternStore.getState().activePatternId
-          const { previewSource, previewPixelCount } = useEditorStore.getState()
-          // Mirror pushActivePattern's no-op guard: nothing active → nothing to do.
-          if (!controllerId || !patternId || !previewSource) return
-
-          // The Controller's configured pixel count is read fresh (best-effort) so the
-          // reconciliation reflects the device as wired now; a read failure leaves it
-          // unknown and the fit warnings are simply suppressed (engine handles null).
-          const config = await getControllerProvider().getConfig().catch(() => null)
-          const { warnings } = describePreflight({
-            localPixelCount: previewPixelCount,
-            devicePixelCount: config?.pixelCount ?? null,
-            // Map upload isn't wired yet (H10/H11 push pattern bytecode only); the
-            // device keeps its own map, so there's nothing to overwrite.
-            pushingMap: false,
-          })
-          // Clean preflight → keep the one-click path. Any warning → open the dialog.
-          if (warnings.length === 0) {
-            await get().pushActivePattern()
-            return
-          }
-          set({ preflight: warnings })
-        },
-
-        confirmPush: async () => {
-          set({ preflight: null })
+          // A pattern push has no preflight (#239): it sends bytecode only and the
+          // device runs it on its own pixels + map, so there is nothing preview-side to
+          // reconcile. Push straight through (the guard inside pushActivePattern makes a
+          // stray call an inert no-op).
           await get().pushActivePattern()
         },
 
@@ -532,6 +521,11 @@ export const useControllerStore = create<ControllerConnectionState>()(
           // active pattern, but guard anyway so a stray call is an inert no-op.
           if (!controllerId || !patternId || !previewSource) return
 
+          // The armed mode (#238): Save on persists a PBP record (#236); off is a
+          // run-only push. Captured up front so the post-push dirty-gate record lands
+          // in the matching map (run vs save are tracked separately).
+          const persist = get().saveArmed
+
           set({ pushing: true, pushResult: null })
           try {
             // Push the bundled artifact (library-inlined) — the same code Copy/Download
@@ -544,6 +538,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
               patternId,
               source: code,
               name: previewPatternName,
+              persist,
               loadBindings: getControllerBindings,
               saveBindings: setControllerBindings,
             })
@@ -562,13 +557,15 @@ export const useControllerStore = create<ControllerConnectionState>()(
               useControllerPanelStore.getState().noteProgramLabel(programId, previewPatternName)
             }
             // Remember the clean source we just pushed so the dirty gate disables a
-            // redundant re-push until the pattern is edited again.
+            // redundant re-push until the pattern is edited again — into the run or save
+            // record per the armed mode (#238), so flipping the toggle re-enables Send.
+            const recordKey = persist ? 'lastSavedSource' : 'lastPushedSource'
             set((s) => ({
               pushing: false,
               pushResult: { ok: true, created },
-              lastPushedSource: {
-                ...s.lastPushedSource,
-                [controllerId]: { ...s.lastPushedSource[controllerId], [patternId]: previewSource },
+              [recordKey]: {
+                ...s[recordKey],
+                [controllerId]: { ...s[recordKey][controllerId], [patternId]: previewSource },
               },
             }))
           } catch (err) {
@@ -583,6 +580,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
       partialize: (s) => ({
         lastConnectedIp: s.lastConnectedIp,
         lastConnectedNickname: s.lastConnectedNickname,
+        saveArmed: s.saveArmed,
       }),
     },
   ),

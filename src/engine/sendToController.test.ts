@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { mapDimension, describeSendToController, describeSendMap } from './sendToController'
+import {
+  mapDimension,
+  describeSendToController,
+  describeSendMap,
+  isAlreadyPushed,
+  describeSendAction,
+} from './sendToController'
 import type { ControllerStatus } from './ControllerProvider'
 
 const connected: ControllerStatus = {
@@ -72,6 +78,36 @@ describe('describeSendToController', () => {
     })
     expect(gate.enabled).toBe(false)
     expect(gate.reason).toMatch(/no changes/i)
+  })
+})
+
+describe('isAlreadyPushed (mode-split dirty gate)', () => {
+  it('never matches an empty source', () => {
+    expect(isAlreadyPushed({ mode: 'run', source: '', lastRunSource: '' })).toBe(false)
+  })
+
+  it('matches the run record only in run mode', () => {
+    const args = { source: 'abc', lastRunSource: 'abc', lastSavedSource: undefined }
+    expect(isAlreadyPushed({ ...args, mode: 'run' })).toBe(true)
+    // A clean run does not satisfy a pending save — arming save re-enables Send.
+    expect(isAlreadyPushed({ ...args, mode: 'save' })).toBe(false)
+  })
+
+  it('matches the save record only in save mode', () => {
+    const args = { source: 'abc', lastRunSource: undefined, lastSavedSource: 'abc' }
+    expect(isAlreadyPushed({ ...args, mode: 'save' })).toBe(true)
+    expect(isAlreadyPushed({ ...args, mode: 'run' })).toBe(false)
+  })
+
+  it('does not match when the source has changed since the push', () => {
+    expect(isAlreadyPushed({ mode: 'run', source: 'xyz', lastRunSource: 'abc' })).toBe(false)
+  })
+})
+
+describe('describeSendAction', () => {
+  it('plays in run mode and saves in save mode', () => {
+    expect(describeSendAction('run', 'Desk').tooltip).toBe('Play on Desk')
+    expect(describeSendAction('save', 'Desk').tooltip).toBe('Save to Desk')
   })
 })
 

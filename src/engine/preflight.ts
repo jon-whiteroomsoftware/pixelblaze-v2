@@ -1,12 +1,12 @@
-// Pure preflight reconciliation for Send-to-Controller (issue #203, #213). Before a
-// push the IDE compares the modeled pixel count (its "map points") against the
-// Controller's configured pixel count and surfaces any mismatch — but a *pattern*
-// push and a *map* push handle a mismatch in opposite ways, because the firmware
-// treats them differently:
+// Pure preflight reconciliation for Send-to-Controller (issue #203, #213, #239). Only
+// a *map* push reconciles a count here — a *pattern* push does not:
 //
-//   - **Pattern push** keeps the non-blocking heads-up. A pattern runs on whatever
-//     pixels exist, so a count mismatch is "this won't look right", not an error. The
-//     push pipeline sends bytecode only and keeps the device's own map.
+//   - **Pattern push** has NO count preflight (#239). It sends bytecode only; the
+//     device runs it on its own pixels and its own map, so the device's pixel count is
+//     the only count that matters. The IDE's *preview* resolution (a rendering choice —
+//     e.g. a 64x64 preview grid) is unrelated to what the hardware drives, so comparing
+//     it to the device count produced a misleading "maps 4096 pixels, extra ignored"
+//     warning on essentially every push. Removed: a pattern push goes straight through.
 //   - **Map push** is a *hard* failure on a count mismatch. The firmware silently
 //     **drops** a map whose point count != pixelCount (confirmed against the device
 //     and by the reference client, which refuses to even parse such a map on
@@ -16,18 +16,14 @@
 //     fixed-count map apply. The caller offers that as one explicit action.
 //
 // Transport-agnostic and React-free: the caller supplies the two counts (device count
-// read via getConfig; local count from the resolved preview layout / re-baked map) and
-// whether a map upload is opted into. A map *dimensionality* mismatch needs map
-// read-back (#205) and is out of scope here — see issue #203.
+// read via getConfig; local count from the re-baked map) and whether a map upload is
+// opted into. A map *dimensionality* mismatch needs map read-back (#205) and is out of
+// scope here — see issue #203.
 
-/** Each distinct preflight concern. `*-device` kinds are non-blocking pattern-fit
- *  heads-ups; `map-overwrite` is the shared-map guard; `map-count-mismatch` is the
- *  blocking map-push failure (firmware would silently drop the map). */
-export type PreflightWarningKind =
-  | 'fewer-than-device'
-  | 'more-than-device'
-  | 'map-overwrite'
-  | 'map-count-mismatch'
+/** Each distinct preflight concern. `map-overwrite` is the shared-map guard;
+ *  `map-count-mismatch` is the blocking map-push failure (firmware would silently drop
+ *  the map). Both are map-push only — a pattern push has no preflight (#239). */
+export type PreflightWarningKind = 'map-overwrite' | 'map-count-mismatch'
 
 export interface PreflightWarning {
   kind: PreflightWarningKind
@@ -39,16 +35,15 @@ export interface PreflightWarning {
 }
 
 export interface PreflightInput {
-  /** The modeled pixel count — for a pattern, how many points its map produces; for a
-   *  map push, the re-baked map's point count (what will actually be sent). */
+  /** The re-baked map's point count — what will actually be sent. Map push only. */
   localPixelCount: number
   /** The Controller's configured pixel count (from getConfig), or null when it can't be
-   *  read — in which case the pixel-fit / mismatch checks are suppressed (nothing to
-   *  compare, and we can't safely block). */
+   *  read — in which case the mismatch check is suppressed (nothing to compare, and we
+   *  can't safely block). */
   devicePixelCount: number | null
   /** True when this Send uploads the IDE's map (overwriting the device's single shared
-   *  map). Switches the mismatch handling from non-blocking pattern-fit to a blocking
-   *  map-count failure. Defaults false (push pattern bytecode only). */
+   *  map) — the only mode this function reconciles. When false/omitted the result is
+   *  always an empty, non-blocking preflight (a pattern push has no preflight, #239). */
   pushingMap?: boolean
 }
 
@@ -97,21 +92,7 @@ export function describePreflight({
     return { warnings, blocking, remedyPixelCount }
   }
 
-  // Pattern push: non-blocking fit heads-up — a pattern runs on whatever pixels exist.
-  if (devicePixelCount !== null) {
-    if (localPixelCount < devicePixelCount) {
-      warnings.push({
-        kind: 'fewer-than-device',
-        message: `Only ${localPixelCount} of the Controller’s ${devicePixelCount} pixels will light up.`,
-      })
-    } else if (localPixelCount > devicePixelCount) {
-      const extra = localPixelCount - devicePixelCount
-      warnings.push({
-        kind: 'more-than-device',
-        message: `This pattern maps ${localPixelCount} pixels but the Controller has ${devicePixelCount}; the extra ${extra} are ignored.`,
-      })
-    }
-  }
-
+  // Pattern push: no preflight (#239). A pattern runs on the device's own pixels and
+  // map; the IDE's preview resolution is unrelated, so there is nothing to reconcile.
   return { warnings, blocking: false, remedyPixelCount: null }
 }
