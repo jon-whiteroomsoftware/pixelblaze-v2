@@ -581,6 +581,25 @@ describe('PixelblazeConnection', () => {
     })
   })
 
+  describe('saveProgram', () => {
+    it('frames a putSourceCode payload of id bytes followed by the PBP blob', async () => {
+      const { conn, socket } = await connected()
+      const id = 'PROG00000000000AB' // 17 chars
+      const blob = new Uint8Array([10, 20, 30])
+      conn.saveProgram(id, blob)
+
+      // One type-1 (putSourceCode) frame, first|last for this small payload.
+      expect(socket.sentBinary).toHaveLength(1)
+      expect(socket.sentBinary[0][0]).toBe(MessageType.putSourceCode)
+      expect(socket.sentBinary[0][1]).toBe(FrameFlag.first | FrameFlag.last)
+
+      // Body: 17 id bytes (UTF-8) then the blob.
+      const body = socket.sentBinary[0].subarray(2)
+      expect([...body.subarray(0, 17)]).toEqual([...new TextEncoder().encode(id)])
+      expect([...body.subarray(17)]).toEqual([10, 20, 30])
+    })
+  })
+
   describe('putPixelMap', () => {
     it('sends the mapData as type-8 binary frames then {savePixelMap:true}', async () => {
       const { conn, socket } = await connected()

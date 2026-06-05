@@ -389,9 +389,10 @@ describe('controllerStore (keyed)', () => {
       expect(store().pushResult).toEqual({ ok: true, created: true })
       // The pushed source is remembered (dirty gate) so a re-push is a no-op.
       expect(store().lastPushedSource['10.0.0.5']['pat-1']).toBe(PATTERN_SRC)
-      // The freshly-minted binding is persisted for overwrite-in-place next time.
+      // Run-only push mints a throwaway id and records NO binding (the #236 reframe —
+      // overwrite-in-place applies only to saved patterns, not run-only pushes).
       const bindings = await getControllerBindings()
-      expect(bindings['10.0.0.5']['pat-1']).toBe(provider.pushed[0].opts.id)
+      expect(bindings['10.0.0.5']).toBeUndefined()
     })
 
     it('is a no-op when no pattern is active', async () => {

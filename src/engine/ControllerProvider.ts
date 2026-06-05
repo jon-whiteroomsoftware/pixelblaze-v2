@@ -198,6 +198,15 @@ export interface ControllerProvider {
    *  to overwrite, mint one to create). Resolves once the frames are sent. */
   pushBytecode(bytecode: Uint8Array, opts: { id: string; name?: string }): Promise<void>
 
+  /** Save a pattern to the Controller as a persisted record (#236) so it appears in
+   *  the device's Saved Patterns list — distinct from `pushBytecode`, which loads +
+   *  runs a pattern but persists nothing. `pbpBlob` is the encoded Pixelblaze Binary
+   *  Pattern (header + name/jpeg/bytecode/source sections, see `encodePbp`); the
+   *  backend frames it over `putSourceCode` (type 1) with the program `id`. Reuse the
+   *  bound id to overwrite a saved pattern in place, mint one to create. Resolves once
+   *  the frames are sent. */
+  saveProgram(pbpBlob: Uint8Array, opts: { id: string }): Promise<void>
+
   /** Write a baked coordinate array to the Controller's single shared pixel map
    *  (H12, issue #204) — the map every pattern on the device reads. `points` are
    *  firmware-normalized `[x,y(,z)]` tuples (the preview's resolved map points); the
@@ -283,6 +292,10 @@ export class NullControllerProvider implements ControllerProvider {
   }
 
   pushBytecode(_bytecode: Uint8Array, _opts: { id: string; name?: string }): Promise<void> {
+    return Promise.reject(new Error('Not connected to a Controller'))
+  }
+
+  saveProgram(_pbpBlob: Uint8Array, _opts: { id: string }): Promise<void> {
     return Promise.reject(new Error('Not connected to a Controller'))
   }
 

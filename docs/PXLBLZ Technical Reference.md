@@ -697,11 +697,30 @@ multi-Controller list/select model is deferred.
 `compile`/`pushBytecode` are capability-gated (the H8 in-extension compiler spike,
 #200, returned GO): the device's own compiler runs inside the helper's offscreen
 sandbox (the only MV3-legal place to eval the remote compiler), turning source into
-bytecode; `pushBytecode` sends it over the socket. `pushPattern` owns the *policy* —
-**overwrite-in-place** (`controllerBinding`): each `(Controller, IDE pattern)` pair
-remembers the device program id it last pushed to and reuses it; a remembered id the
-user deleted on the device is silently re-minted. Control values are never in the push;
-the binding is identity only, persisted in IndexedDB. `sendToController` is the pure
+bytecode; `pushBytecode` sends it over the socket. `pushPattern` owns the *policy*, and
+runs in one of **two modes** (#236):
+
+- **Run-only** (today's default): compile, mint a *throwaway* program id, and load +
+  run via `pushBytecode` — the firmware's `setCode`/`putByteCode`/`pause:false`
+  sequence (the reference client's `sendPatternToRenderer`). The pattern runs but is
+  **not persisted**: it never enters the device's Saved Patterns list and its id
+  resolves to no name. Run-only deliberately does **not** consult or write the binding.
+- **Save** (`persist: true`): compile, encode a **PBP blob** (`encodePbp`, `pbpEncode.ts`)
+  — a 17-char id plus a 36-byte header of nine LE uint32s (version, then offset/length
+  pairs for name/jpeg/bytecode/source) followed by the concatenated sections; the source
+  rides as the firmware-required `{"main":<source>}` JSON container, LZString-compressed,
+  and the preview JPEG is an empty section — and write it via `saveProgram`
+  (`putSourceCode`, binary type 1, payload = id bytes + blob). This creates the `/p/{id}`
+  record that shows in Saved Patterns with its name. Mirrors `PBP.fromComponents` /
+  `PBP.toPixelblaze` in [pixelblaze-client](https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L2992).
+
+**Overwrite-in-place** (`controllerBinding`) applies to **save mode only**, because only
+a saved pattern enters the program list: each `(Controller, IDE pattern)` pair remembers
+the device program id it last saved to and reuses it (a remembered id the user deleted on
+the device is silently re-minted, detected against the live `listPrograms`). Run-only's
+id never lists, so binding it would always miss and churn a fresh id every push — hence
+the reframe. Control values are never in either push; the binding is identity only,
+persisted in IndexedDB. `sendToController` is the pure
 gate for the editor-header button: enabled only when a Controller is connected, the
 pattern compiles, and — *when known* — its dimensionality matches the installed map
 (an unknown map dim never blocks; a permanently-disabled Send would be worse). Before a

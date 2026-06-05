@@ -493,6 +493,13 @@ export class ExtensionControllerProvider implements ControllerProvider {
     return this.fireAndForget((conn) => conn.pushByteCode(bytecode, opts))
   }
 
+  /** Save a pattern as a persisted PBP record over the live connection (#236) — it
+   *  appears in the device's Saved Patterns list, unlike a run-only bytecode push.
+   *  Fire-and-forget at the protocol level. */
+  saveProgram(pbpBlob: Uint8Array, opts: { id: string }): Promise<void> {
+    return this.fireAndForget((conn) => conn.saveProgram(opts.id, pbpBlob))
+  }
+
   /** Encode the baked coordinate array to the firmware mapData blob and write it to
    *  the device's single shared map slot over the live connection (H12, #204).
    *  Fire-and-forget at the protocol level. */

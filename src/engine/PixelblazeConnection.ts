@@ -448,6 +448,25 @@ export class PixelblazeConnection {
     }
   }
 
+  /** Save a pattern to flash as a persisted record (#236), so it appears in the
+   *  ElectroMage Saved Patterns list and its id resolves to a name — distinct from
+   *  `pushByteCode`, which loads + runs a pattern but persists nothing. The blob is
+   *  the encoded PBP (see `encodePbp` in pbpEncode.ts); the firmware's `putSourceCode`
+   *  (type 1) payload is the 17-char program id (UTF-8) followed by the blob, mirroring
+   *  the reference client's `PBP.toPixelblaze`:
+   *  https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L3126
+   *
+   *  Fire-and-forget at the protocol level: resolves once every frame is sent. */
+  saveProgram(id: string, pbpBlob: Uint8Array): void {
+    const idBytes = new TextEncoder().encode(id)
+    const payload = new Uint8Array(idBytes.length + pbpBlob.length)
+    payload.set(idBytes, 0)
+    payload.set(pbpBlob, idBytes.length)
+    for (const frame of encodeBinaryFrames(MessageType.putSourceCode, payload)) {
+      this.sendBinary(frame)
+    }
+  }
+
   /** Push compiled bytecode to the device as the save-and-run sequence (H10,
    *  issue #202): `{pause:true, setCode:{size,crc,name,id}}`, then the bytecode as
    *  chunked `putByteCode` binary frames, then `{setControls:{}}` and
