@@ -15,7 +15,7 @@ A browser-based pattern editor for Pixelblaze that lets you **write, preview, an
 tune patterns entirely offline** — no controller, no network, no install — and then
 paste or download the result straight onto your device.
 
-**[Open PXLBLZ →](https://jon-whiteroomsoftware.github.io/pixelblaze-v2/)**
+**[Open PXLBLZ →](https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/)**
 
 ---
 

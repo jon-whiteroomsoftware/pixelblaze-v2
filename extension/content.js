@@ -1,4 +1,4 @@
-// Content script for the Pixelblaze IDE Controller Bridge (H3, issue #195).
+// Content script for the PXLBLZ-IDE Controller Helper (H3, issue #195).
 //
 // It is the page-side end of the relay seam. The app (RelayWebSocket via
 // windowRelayTransport) talks to it with window.postMessage; it forwards the
@@ -30,7 +30,10 @@ function getPort() {
 }
 
 window.addEventListener('message', (event) => {
-  if (event.source !== window) return
+  // Only trust messages this same document posted to itself. The content-script
+  // `matches` already scopes injection to our own origins; checking origin too is
+  // cheap defense-in-depth against a same-origin frame spoofing relay traffic.
+  if (event.source !== window || event.origin !== window.location.origin) return
   const msg = event.data
   if (!msg || msg.source !== RELAY_SOURCE || msg.dir !== 'to-helper') return
 

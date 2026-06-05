@@ -1,4 +1,4 @@
-# Pixelblaze IDE Controller Bridge (Chrome extension)
+# PXLBLZ-IDE Controller Helper (Chrome extension)
 
 The v1 transport helper for the Hardware Connectivity arc (H3, issue #195). It is
 the productionized H1 spike (`test/h1-extension-spike/`, GO verdict).

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Pixelblaze IDE Controller Bridge",
-  "version": "0.2.0",
-  "description": "Relays ws://LAN Pixelblaze traffic to the Pixelblaze IDE web app, which is served over https and cannot open a LAN websocket directly (mixed content).",
+  "name": "PXLBLZ-IDE Controller Helper",
+  "version": "0.3.0",
+  "description": "Connects the PXLBLZ-IDE web app to Pixelblaze controllers on your local network. It relays the controller's WebSocket traffic.",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -12,9 +12,9 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.github.io/*",
-        "http://localhost/*",
-        "http://127.0.0.1/*"
+        "https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/*",
+        "http://localhost:5174/*",
+        "http://127.0.0.1:5174/*"
       ],
       "js": ["content.js"],
       "run_at": "document_start"
@@ -27,8 +27,5 @@
   },
   "content_security_policy": {
     "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none';"
-  },
-  "web_accessible_resources": [
-    { "resources": ["sandbox.html"], "matches": ["<all_urls>"] }
-  ]
+  }
 }

@@ -1,4 +1,4 @@
-// Service worker for the Pixelblaze IDE Controller Bridge (H3, issue #195).
+// Service worker for the PXLBLZ-IDE Controller Helper (H3, issue #195).
 //
 // Owns the real ws://<LAN-IP>:81 sockets — the one thing the https page cannot
 // open itself. One long-lived Port per page; sockets are keyed by the connId the

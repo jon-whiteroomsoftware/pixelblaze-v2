@@ -1,5 +1,5 @@
 {
-  "name": "pixelblaze-v2",
+  "name": "pxlblz-ide",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -20,16 +20,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jon-whiteroomsoftware/pixelblaze-v2.git"
+    "url": "git+https://github.com/jon-whiteroomsoftware/PXLBLZ-IDE.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "bugs": {
-    "url": "https://github.com/jon-whiteroomsoftware/pixelblaze-v2/issues"
+    "url": "https://github.com/jon-whiteroomsoftware/PXLBLZ-IDE/issues"
   },
-  "homepage": "https://github.com/jon-whiteroomsoftware/pixelblaze-v2#readme",
+  "homepage": "https://github.com/jon-whiteroomsoftware/PXLBLZ-IDE#readme",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
