@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
+import { applyControllerPixelCount } from '@/engine/applyControllerPixelCount'
 import type { ProgramListEntry } from '@/engine/PixelblazeConnection'
 
 // Polling orchestration for the live Controller panel (H6, issue #198).
@@ -146,9 +147,17 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
   },
 
   setPixelCount: (value) => {
+    // Capture the live device count before the optimistic local set so the helper
+    // can tell a reduction (which must truncate the device map, #222) from a raise.
+    const prev = get().pixelCount
     set({ pixelCount: value })
-    void getControllerProvider()
-      .setPixelCount(value)
+    void applyControllerPixelCount(getControllerProvider(), value, prev)
+      .then((newMapCount) => {
+        // The map was truncated to match the smaller count — reflect its new point
+        // count so the panel's points/pixels readout stays truthful (mapPointCount
+        // is otherwise only read once on start).
+        if (newMapCount != null) set({ mapPointCount: newMapCount })
+      })
       .catch(() => {})
   },
 

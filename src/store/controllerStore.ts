@@ -10,6 +10,7 @@ import { NullControllerProvider, type ControllerProvider, type ControllerStatus 
 import { mapDimension, type MapDimension } from '@/engine/sendToController'
 import { describePreflight, type PreflightWarning } from '@/engine/preflight'
 import { resolveMapPushPoints } from '@/engine/mapPush'
+import { applyControllerPixelCount } from '@/engine/applyControllerPixelCount'
 import type { ControllerPhase } from '@/engine/controllerPillView'
 import { pushPattern } from '@/engine/pushPattern'
 import { getControllerBindings, setControllerBindings } from '@/engine/storage'
@@ -18,6 +19,7 @@ import { LIBRARIES } from '@/pixelblaze/libs'
 import { usePatternStore } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useMapStore } from '@/store/mapStore'
+import { useControllerPanelStore } from '@/store/controllerPanelStore'
 
 // Keyed connection orchestration for the live Controller surface (#210).
 //
@@ -401,7 +403,12 @@ export const useControllerStore = create<ControllerConnectionState>()(
           // pushResult slice the button reads, so the check/Send-failed states still apply.
           set({ pushing: true, pushResult: null })
           try {
-            await getControllerProvider().setPixelCount(remedy)
+            // Couple the count write with a device-map truncation when this lowers the
+            // count (#222), so pixels beyond the new limit go dark — exactly as a panel
+            // edit does. A reduction is judged against the live device count.
+            const prev = useControllerPanelStore.getState().pixelCount
+            const newMapCount = await applyControllerPixelCount(getControllerProvider(), remedy, prev)
+            if (newMapCount != null) useControllerPanelStore.setState({ mapPointCount: newMapCount })
             set({ pushing: false, pushResult: { ok: true, created: false } })
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err)

@@ -23,6 +23,8 @@ class FakeProvider extends NullControllerProvider {
   brightnessWrites: Array<{ value: number; save: boolean }> = []
   pixelCountWrites: Array<{ value: number; save: boolean }> = []
   controlWrites: Array<{ controls: Record<string, number>; save: boolean }> = []
+  installedMap: number[][] | null = null
+  mapWrites: number[][][] = []
 
   getConfig(): Promise<ControllerConfig> {
     return Promise.resolve(this.config)
@@ -46,6 +48,14 @@ class FakeProvider extends NullControllerProvider {
   }
   setControls(controls: Record<string, number>, save = false): Promise<void> {
     this.controlWrites.push({ controls, save })
+    return Promise.resolve()
+  }
+  getPixelMap(): Promise<number[][] | null> {
+    return Promise.resolve(this.installedMap)
+  }
+  setPixelMap(points: number[][]): Promise<void> {
+    this.mapWrites.push(points)
+    this.installedMap = points
     return Promise.resolve()
   }
 }
@@ -168,10 +178,49 @@ describe('controllerPanelStore', () => {
     expect(provider.brightnessWrites).toEqual([{ value: 0.25, save: false }])
   })
 
-  it('setPixelCount writes through saved (save:true) and updates locally', () => {
+  it('setPixelCount applies live (save:false) then persists (save:true), and updates locally', async () => {
     useControllerPanelStore.getState().setPixelCount(16)
     expect(useControllerPanelStore.getState().pixelCount).toBe(16)
-    expect(provider.pixelCountWrites).toEqual([{ value: 16, save: true }])
+    await flush()
+    // Live apply first (clears any tail pixels), then a persisted write (#222).
+    expect(provider.pixelCountWrites).toEqual([
+      { value: 16, save: false },
+      { value: 16, save: true },
+    ])
+  })
+
+  it('reducing the count truncates the device map and updates mapPointCount (#222)', async () => {
+    provider.installedMap = [
+      [0, 0],
+      [0.25, 0],
+      [0.5, 0],
+      [0.75, 0],
+    ]
+    useControllerPanelStore.setState({ pixelCount: 4, mapPointCount: 4 })
+    useControllerPanelStore.getState().setPixelCount(2)
+    await flush()
+    expect(provider.pixelCountWrites).toEqual([
+      { value: 2, save: false },
+      { value: 2, save: true },
+    ])
+    expect(provider.mapWrites).toEqual([
+      [
+        [0, 0],
+        [0.25, 0],
+      ],
+    ])
+    expect(useControllerPanelStore.getState().mapPointCount).toBe(2)
+  })
+
+  it('raising the count never touches the device map (#222)', async () => {
+    provider.installedMap = [
+      [0, 0],
+      [1, 0],
+    ]
+    useControllerPanelStore.setState({ pixelCount: 2, mapPointCount: 2 })
+    useControllerPanelStore.getState().setPixelCount(8)
+    await flush()
+    expect(provider.mapWrites).toEqual([])
   })
 
   it('stop() halts polling and resets state', async () => {

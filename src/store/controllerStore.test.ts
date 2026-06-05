@@ -19,6 +19,7 @@ import {
 import { usePatternStore, patternInitialState } from '@/store/patternStore'
 import { useEditorStore, editorInitialState } from '@/store/editorStore'
 import { useMapStore, mapInitialState, type MapRecord } from '@/store/mapStore'
+import { useControllerPanelStore, controllerPanelInitialState } from '@/store/controllerPanelStore'
 import { getControllerBindings, setControllerBindings } from '@/engine/storage'
 
 // A fake per-Controller provider with a real (if minimal) status machine, so we
@@ -128,6 +129,7 @@ beforeEach(async () => {
   usePatternStore.setState(patternInitialState)
   useEditorStore.setState(editorInitialState)
   useMapStore.setState(mapInitialState)
+  useControllerPanelStore.setState(controllerPanelInitialState)
   await setControllerBindings({})
   created.clear()
   setControllerProviderFactory((ip) => {
@@ -417,10 +419,41 @@ describe('controllerStore (keyed)', () => {
 
       const provider = created.get('10.0.0.5')!
       // The pixel-count-only combination: count set to the map's point count, no map write.
-      expect(provider.setPixelCounts).toEqual([2])
+      // Two writes — a live (save:false) apply then a persisted one (#222).
+      expect(provider.setPixelCounts).toEqual([2, 2])
       expect(provider.pushedMaps).toHaveLength(0)
       expect(store().preflight).toBeNull()
       expect(store().mapPushRemedyCount).toBeNull()
+      expect(store().pushResult).toEqual({ ok: true, created: false })
+    })
+
+    it('confirmSetPixelCountOnly truncates the device map when it lowers the count (#222)', async () => {
+      await armMap(256)
+      const provider = created.get('10.0.0.5')!
+      // The device currently runs 8 pixels with an 8-point map; the live panel count
+      // reflects that. The count-only remedy drops it to the map's 2 points.
+      provider.pixelMap = [
+        [0, 0],
+        [0.1, 0],
+        [0.2, 0],
+        [0.3, 0],
+        [0.4, 0],
+        [0.5, 0],
+        [0.6, 0],
+        [0.7, 0],
+      ]
+      useControllerPanelStore.setState({ pixelCount: 8, mapPointCount: 8 })
+      await store().requestMapPush()
+      await store().confirmSetPixelCountOnly()
+
+      expect(provider.setPixelCounts).toEqual([2, 2])
+      // Map truncated to the new count so the firmware drops pixels beyond it.
+      expect(provider.pushedMaps).toHaveLength(1)
+      expect(provider.pushedMaps[0].points).toEqual([
+        [0, 0],
+        [0.1, 0],
+      ])
+      expect(useControllerPanelStore.getState().mapPointCount).toBe(2)
       expect(store().pushResult).toEqual({ ok: true, created: false })
     })
 
