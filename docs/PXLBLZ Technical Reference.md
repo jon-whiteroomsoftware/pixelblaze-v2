@@ -613,6 +613,28 @@ state machine, a keepalive ping, a **liveness watchdog** (declare the device gon
 evict the service worker; a powered-off Controller is expected back, so it keeps
 probing).
 
+### Auto-discovery (cloud, via the helper)
+
+You can't reach a Controller you haven't typed an IP for, so the entry affordance
+offers **Discover** alongside connect-by-address (#197, #206). The browser cannot find
+devices on the LAN — **UDP beacon discovery is impossible from an MV3 extension**
+(`chrome.sockets.udp` is a deprecated Chrome-*Apps* API; extensions get only
+fetch/WebSocket/WebRTC, no raw UDP), so the reference clients' port-1889 beacon path
+(Firestorm, pixelblaze-client) is closed to us. The only viable path is **cloud
+discovery**, and only from the helper: `GET https://discover.electromage.com/discover`
+matches Controllers by *public* IP and returns a JSON array of
+`{ id, ip (WAN), localIp (LAN), name, version, … }`. The page can't read it — no CORS
+header, the same wall as `ws://LAN` — but the extension service worker with a host
+permission can (the same trick as the `/pixelmap.dat` read-back). `background.js` owns
+the fetch (trims records, requires `id`+`localIp`); the result crosses the relay seam as
+a `reqId`-keyed `discover`/`discover-result` round-trip (connection-independent — it
+reuses the ambient detector provider, no Controller need be connected). The seam exposes
+`discover()` on `ControllerProvider` (Null returns `[]`; any failure/timeout also `[]`),
+maps `localIp` → connect `address` and `id` → stable key, and surfaces candidates in the
+`ControllerBar` as clickable rows that drive the existing keyed `addController(address)`.
+This tracer bullet proves the cloud→helper→seam→UI→connect pipe; the full
+multi-Controller list/select model is deferred.
+
 ### The in-app surface (status pills, panel)
 
 - **Status + connect** live in the top-right `ControllerBar` (#210): one interactive
