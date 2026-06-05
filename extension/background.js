@@ -99,6 +99,35 @@ chrome.runtime.onConnect.addListener((port) => {
       return
     }
 
+    // Auto-discovery request (#206): a global, socket-independent cloud lookup. The
+    // helper GETs discover.electromage.com/discover — which the https page can't read
+    // (no CORS header), the same wall as ws://LAN — and returns the candidate list.
+    // UDP beacon discovery is NOT possible here: MV3 extensions have no UDP socket
+    // (chrome.sockets.udp is Chrome-Apps-only, deprecated), so cloud is the only path.
+    if (msg.type === 'discover') {
+      handleDiscover().then(
+        (controllers) =>
+          send({
+            source: RELAY_SOURCE,
+            dir: 'from-helper',
+            type: 'discover-result',
+            reqId: msg.reqId,
+            ok: true,
+            controllers,
+          }),
+        (e) =>
+          send({
+            source: RELAY_SOURCE,
+            dir: 'from-helper',
+            type: 'discover-result',
+            reqId: msg.reqId,
+            ok: false,
+            error: e && e.message ? e.message : String(e),
+          }),
+      )
+      return
+    }
+
     if (msg.type === 'connect') {
       let ws
       try {
@@ -196,6 +225,27 @@ async function handleGetMap(msg) {
   const buf = await resp.arrayBuffer()
   if (buf.byteLength === 0) return null
   return new Uint8Array(buf)
+}
+
+// ── cloud discovery (#206) ───────────────────────────────────────────────────
+//
+// GET the cloud discovery service over HTTPS. It matches Controllers by the
+// caller's public IP and returns a JSON array of records (verified live 2026-06-04):
+//   { id, ip (public), localIp (LAN), name, version, boardType, arch, ... }
+// We trim each to the fields the page uses; `localIp` is the address it connects to.
+// Needs the discover.electromage.com host permission in the manifest. An empty list
+// (no devices, or discovery disabled on them) is a normal ok result, not an error;
+// a network/HTTP failure rejects so the page can tell "none found" from "couldn't ask".
+const DISCOVER_URL = 'https://discover.electromage.com/discover'
+
+async function handleDiscover() {
+  const resp = await fetch(DISCOVER_URL)
+  if (!resp.ok) throw new Error(`GET /discover -> ${resp.status}`)
+  const records = await resp.json()
+  if (!Array.isArray(records)) return []
+  return records
+    .filter((r) => r && r.id && r.localIp)
+    .map((r) => ({ id: r.id, localIp: r.localIp, name: r.name, version: r.version }))
 }
 
 // Fetch + gunzip + decode the device web UI (utf-8-sig: strip BOM).

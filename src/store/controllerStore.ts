@@ -4,9 +4,15 @@ import {
   createControllerProvider,
   setControllerProvider,
   detectControllerExtension,
+  discoverControllers,
   getControllerProvider,
 } from '@/engine/controllerProviderRegistry'
-import { NullControllerProvider, type ControllerProvider, type ControllerStatus } from '@/engine/ControllerProvider'
+import {
+  NullControllerProvider,
+  type ControllerProvider,
+  type ControllerStatus,
+  type DiscoveredController,
+} from '@/engine/ControllerProvider'
 import { mapDimension, type MapDimension } from '@/engine/sendToController'
 import { describePreflight, type PreflightWarning } from '@/engine/preflight'
 import { resolveMapPushPoints } from '@/engine/mapPush'
@@ -85,8 +91,17 @@ interface ControllerConnectionState {
    *  the dialog offers only the coupled remedy (set pixel count to this, then push). */
   mapPushRemedyCount: number | null
 
+  /** Controllers surfaced by the last discovery sweep (H14, #206), awaiting connect.
+   *  Cleared when discovery re-runs. */
+  discovered: DiscoveredController[]
+  /** True while a discovery sweep is in flight — drives the dropdown's spinner. */
+  discovering: boolean
+
   /** Probe extension presence and record it (global). */
   detectExtension: () => Promise<boolean>
+  /** Run a cloud discovery sweep and record the candidates (#206). Best-effort:
+   *  a failure or no helper leaves `discovered` empty. */
+  discover: () => Promise<void>
   /** Begin connecting to `ip`: born as a pending pill, made active immediately.
    *  Settles to live (nickname + mapDim read) or error. Re-adding an existing IP
    *  retries it. Rejection is swallowed — the pill reflects the error. */
@@ -156,6 +171,8 @@ export const controllerInitialState = {
   lastPushedMap: {} as Record<string, Record<string, string>>,
   preflight: null as PreflightWarning[] | null,
   mapPushRemedyCount: null as number | null,
+  discovered: [] as DiscoveredController[],
+  discovering: false,
 }
 
 // Live provider per Controller IP, plus each one's status unsubscribe. Kept
@@ -225,6 +242,18 @@ export const useControllerStore = create<ControllerConnectionState>()(
           const present = await detectControllerExtension().catch(() => false)
           set({ extensionPresent: present })
           return present
+        },
+
+        discover: async () => {
+          set({ discovering: true })
+          const found = await discoverControllers().catch(() => [])
+          // Drop already-connected Controllers from the candidate list — connecting
+          // to one again is the manual-IP path's job, not discovery's.
+          const connected = get().controllers
+          set({
+            discovered: found.filter((c) => !connected[c.address]),
+            discovering: false,
+          })
         },
 
         setActive: (ip) => {

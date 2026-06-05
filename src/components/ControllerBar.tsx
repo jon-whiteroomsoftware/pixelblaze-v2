@@ -119,6 +119,9 @@ export function ControllerBar() {
   const controllers = useControllerStore((s) => s.controllers)
   const activeIp = useControllerStore((s) => s.activeIp)
   const detectExtension = useControllerStore((s) => s.detectExtension)
+  const discover = useControllerStore((s) => s.discover)
+  const discovered = useControllerStore((s) => s.discovered)
+  const discovering = useControllerStore((s) => s.discovering)
   const addController = useControllerStore((s) => s.addController)
   const removeController = useControllerStore((s) => s.removeController)
   const setActive = useControllerStore((s) => s.setActive)
@@ -174,6 +177,13 @@ export function ControllerBar() {
     void addController(ip)
   }
 
+  // Connect to a discovered candidate by its LAN address — same path as a manual
+  // IP, so it slots straight into the existing keyed connect (#197 foundation).
+  const onDiscoveredClick = (address: string) => {
+    setOpen(false)
+    void addController(address)
+  }
+
   return (
     <div ref={rootRef} className="relative flex items-center gap-2" data-testid="controller-bar">
       {ips.map((ip) => (
@@ -211,36 +221,79 @@ export function ControllerBar() {
           className="absolute right-0 top-8 z-50 w-72 rounded-lg border border-zinc-700 bg-zinc-900 p-3 shadow-2xl font-mono text-xs text-zinc-300"
         >
           {extensionPresent ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                submitIp()
-              }}
-              className="flex flex-col gap-2"
-            >
-              <label className="text-zinc-400">Connect a Controller by IP</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  aria-label="Controller IP address"
-                  placeholder="Controller IP"
-                  autoFocus
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ''))}
-                  data-testid="controller-ip-input"
-                  className="h-7 flex-1 rounded border border-zinc-500 bg-zinc-950 px-2 text-zinc-200 placeholder:text-zinc-600 hover:border-zinc-400 focus:border-zinc-400 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  data-testid="controller-go"
-                  disabled={!draft.trim()}
-                  className="h-7 rounded border border-zinc-600 bg-zinc-800 px-3 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100 disabled:opacity-30"
-                >
-                  Go
-                </button>
+            <div className="flex flex-col gap-3">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  submitIp()
+                }}
+                className="flex flex-col gap-2"
+              >
+                <label className="text-zinc-400">Connect a Controller by IP</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label="Controller IP address"
+                    placeholder="Controller IP"
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ''))}
+                    data-testid="controller-ip-input"
+                    className="h-7 flex-1 rounded border border-zinc-500 bg-zinc-950 px-2 text-zinc-200 placeholder:text-zinc-600 hover:border-zinc-400 focus:border-zinc-400 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    data-testid="controller-go"
+                    disabled={!draft.trim()}
+                    className="h-7 rounded border border-zinc-600 bg-zinc-800 px-3 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100 disabled:opacity-30"
+                  >
+                    Go
+                  </button>
+                </div>
+              </form>
+
+              {/* Auto-discovery (#206), tracer-bullet surface: a button that runs the
+                  cloud sweep and lists candidates; clicking one connects via the same
+                  keyed path as a manual IP. The full multi-Controller select model is
+                  deferred — this just proves the cloud → helper → seam → connect pipe. */}
+              <div className="flex flex-col gap-2 border-t border-seam pt-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-zinc-400">Or find them on your network</label>
+                  <button
+                    type="button"
+                    onClick={() => void discover()}
+                    disabled={discovering}
+                    data-testid="controller-discover"
+                    className="h-6 rounded border border-zinc-600 bg-zinc-800 px-2 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100 disabled:opacity-40"
+                  >
+                    {discovering ? 'Scanning…' : 'Discover'}
+                  </button>
+                </div>
+                {discovered.length > 0 && (
+                  <ul className="flex flex-col gap-1" data-testid="controller-discovered-list">
+                    {discovered.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => onDiscoveredClick(c.address)}
+                          data-testid="controller-discovered-item"
+                          className="flex w-full items-baseline justify-between gap-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-left hover:border-zinc-500 hover:text-zinc-100"
+                        >
+                          <span className="truncate text-zinc-200">{c.name ?? c.address}</span>
+                          <span className="shrink-0 text-zinc-500">{c.address}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!discovering && discovered.length === 0 && (
+                  <p className="text-zinc-600" data-testid="controller-discover-empty">
+                    No Controllers found yet. They must have network discovery enabled.
+                  </p>
+                )}
               </div>
-            </form>
+            </div>
           ) : (
             <div data-testid="controller-install-pitch" className="flex flex-col gap-2 leading-relaxed">
               <p className="text-zinc-200 font-semibold">Install the Pixelblaze extension</p>

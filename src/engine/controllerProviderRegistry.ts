@@ -16,7 +16,11 @@
 //
 // Pure TypeScript, zero React, zero transport specifics.
 
-import { NullControllerProvider, type ControllerProvider } from './ControllerProvider'
+import {
+  NullControllerProvider,
+  type ControllerProvider,
+  type DiscoveredController,
+} from './ControllerProvider'
 
 let active: ControllerProvider = new NullControllerProvider()
 
@@ -57,6 +61,14 @@ export function createControllerProvider(ip: string): ControllerProvider {
 export function detectControllerExtension(): Promise<boolean> {
   detector ??= factory('__detect__')
   return detector.detectHelper()
+}
+
+/** Discover Controllers on the LAN via the helper's cloud lookup (H14, #206) —
+ *  global, not tied to any one Controller, so it reuses the same ambient provider
+ *  as the extension handshake. Resolves `[]` when no helper is installed. */
+export function discoverControllers(): Promise<DiscoveredController[]> {
+  detector ??= factory('__detect__')
+  return detector.discover()
 }
 
 /** Reset to the default no-extension provider + factory (test teardown / reset). */

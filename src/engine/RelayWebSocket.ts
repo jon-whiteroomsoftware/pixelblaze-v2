@@ -57,6 +57,14 @@ export type RelayMessage =
       address: string
       patternSrc: string
     }
+  // Auto-discovery (H14, issue #206): the cloud discovery service is a plain HTTPS
+  // GET of discover.electromage.com/discover (which matches Controllers by the
+  // caller's public IP). Like compile/get-map it's a one-off request/response keyed
+  // by `reqId` and independent of any connection — and it has NO `address` because
+  // it's a global LAN-wide lookup, not a per-device call. Only the helper can make
+  // it: the endpoint sends no CORS header, so the page can't read it (the same wall
+  // as ws://LAN). UDP beacon discovery is NOT an option — MV3 has no UDP socket.
+  | { source: typeof RELAY_SOURCE; dir: 'to-helper'; type: 'discover'; reqId: string }
   // helper → page
   | { source: typeof RELAY_SOURCE; dir: 'from-helper'; type: 'detect-ack' }
   | {
@@ -84,6 +92,21 @@ export type RelayMessage =
       /** Failure reason when `ok` is false. */
       error?: string
     }
+  // Reply to `discover`. `ok` true carries `controllers` (possibly empty — a clean
+  // "found none"); `ok` false carries `error` (the cloud fetch failed). The wire
+  // shape is the raw cloud record fields the page needs; the provider maps it to
+  // `DiscoveredController`. `localIp` is the LAN address to connect() to; `ip` is
+  // the public/WAN IP the service matched on (unused by the page, kept for parity).
+  | {
+      source: typeof RELAY_SOURCE
+      dir: 'from-helper'
+      type: 'discover-result'
+      reqId: string
+      ok: boolean
+      controllers?: DiscoveredControllerWire[]
+      /** Failure reason when `ok` is false. */
+      error?: string
+    }
   | { source: typeof RELAY_SOURCE; dir: 'from-helper'; type: 'open'; connId: string }
   | {
       source: typeof RELAY_SOURCE
@@ -97,6 +120,17 @@ export type RelayMessage =
 
 /** A frame payload across the seam: text frames as-is, binary as base64. */
 export type RelayPayload = { text: string } | { binary: string }
+
+/** One Controller as the cloud discovery service reports it, trimmed to the fields
+ *  the page uses. Mirrors the `discover.electromage.com/discover` JSON record
+ *  (verified live 2026-06-04): `localIp` is the LAN address to connect to, `id` is
+ *  the stable device id, `name` the nickname, `version` the firmware. */
+export interface DiscoveredControllerWire {
+  id: string
+  localIp: string
+  name?: string
+  version?: string
+}
 
 /** Discriminates this app's relay traffic from any other postMessage chatter. */
 export const RELAY_SOURCE = 'pblz-relay' as const

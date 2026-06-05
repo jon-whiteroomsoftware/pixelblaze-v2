@@ -29,6 +29,10 @@ describe('NullControllerProvider', () => {
     await expect(new NullControllerProvider().detectHelper()).resolves.toBe(false)
   })
 
+  it('discovers nothing (no helper to ask)', async () => {
+    await expect(new NullControllerProvider().discover()).resolves.toEqual([])
+  })
+
   it('reports the no-helper status', () => {
     const status: ControllerStatus = new NullControllerProvider().getStatus()
     expect(status).toEqual({ kind: 'no-extension' })

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pixelblaze IDE Controller Bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Relays ws://LAN Pixelblaze traffic to the Pixelblaze IDE web app, which is served over https and cannot open a LAN websocket directly (mixed content).",
   "icons": {
     "16": "icons/icon-16.png",
@@ -21,7 +21,7 @@
     }
   ],
   "permissions": ["offscreen"],
-  "host_permissions": ["ws://*/*", "http://*/*"],
+  "host_permissions": ["ws://*/*", "http://*/*", "https://discover.electromage.com/*"],
   "sandbox": {
     "pages": ["sandbox.html"]
   },

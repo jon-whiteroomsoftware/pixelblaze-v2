@@ -21,6 +21,7 @@ import {
   type ControllerTarget,
   type ControllerConfig,
   type ControllerTelemetry,
+  type DiscoveredController,
   type ProgramListEntry,
 } from './ControllerProvider'
 import { PixelblazeConnection } from './PixelblazeConnection'
@@ -65,6 +66,9 @@ export interface ExtensionControllerProviderOptions {
    *  resolving null. A plain HTTP GET of `/pixelmap.dat`, so much cheaper than
    *  compile. Default 5000ms. */
   getMapTimeoutMs?: number
+  /** How long a discovery round-trip waits for the helper's reply before resolving
+   *  `[]`. A single HTTPS GET of the cloud discovery service. Default 5000ms. */
+  discoverTimeoutMs?: number
   /** Injectable timers (tests). Default to globals. */
   setTimeout?: (fn: () => void, ms: number) => unknown
   clearTimeout?: (handle: unknown) => void
@@ -93,8 +97,10 @@ export class ExtensionControllerProvider implements ControllerProvider {
   private readonly reconnectDelayMs: number
   private readonly compileTimeoutMs: number
   private readonly getMapTimeoutMs: number
+  private readonly discoverTimeoutMs: number
   private compileSeq = 0
   private mapSeq = 0
+  private discoverSeq = 0
   private readonly _setTimeout: (fn: () => void, ms: number) => unknown
   private readonly _clearTimeout: (h: unknown) => void
 
@@ -108,6 +114,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this.reconnectDelayMs = options.reconnectDelayMs ?? 1000
     this.compileTimeoutMs = options.compileTimeoutMs ?? 20000
     this.getMapTimeoutMs = options.getMapTimeoutMs ?? 5000
+    this.discoverTimeoutMs = options.discoverTimeoutMs ?? 5000
     this._setTimeout = options.setTimeout ?? ((fn, ms) => setTimeout(fn, ms))
     this._clearTimeout =
       options.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>))
@@ -137,6 +144,50 @@ export class ExtensionControllerProvider implements ControllerProvider {
       })
       const timer = this._setTimeout(() => finish(false), this.detectTimeoutMs)
       this.transport.post({ source: RELAY_SOURCE, dir: 'to-helper', type: 'detect' })
+    })
+  }
+
+  /** Discover Controllers via the cloud service (H14, #206). Like compile/get-map
+   *  it's a one-off reqId-keyed relay round-trip — but global (no `address`), since
+   *  it's a LAN-wide cloud lookup. Only the helper can reach the endpoint (no CORS),
+   *  so the page posts `discover` and waits for `discover-result`. Any failure or a
+   *  timeout resolves `[]` (never throws): discovery is best-effort and the UI falls
+   *  back to manual IP entry. The wire records are mapped to DiscoveredController
+   *  (`localIp` → `address`). */
+  discover(): Promise<DiscoveredController[]> {
+    const reqId = `discover-${this.discoverSeq++}`
+    return new Promise<DiscoveredController[]>((resolve) => {
+      let settled = false
+      const finish = (value: DiscoveredController[]) => {
+        if (settled) return
+        settled = true
+        unsubscribe()
+        this._clearTimeout(timer)
+        resolve(value)
+      }
+      const unsubscribe = this.transport.subscribe((msg) => {
+        if (
+          msg.source === RELAY_SOURCE &&
+          msg.dir === 'from-helper' &&
+          msg.type === 'discover-result' &&
+          msg.reqId === reqId
+        ) {
+          if (msg.ok && msg.controllers) {
+            finish(
+              msg.controllers.map((c) => ({
+                id: c.id,
+                address: c.localIp,
+                name: c.name || undefined,
+                version: c.version || undefined,
+              })),
+            )
+          } else {
+            finish([])
+          }
+        }
+      })
+      const timer = this._setTimeout(() => finish([]), this.discoverTimeoutMs)
+      this.transport.post({ source: RELAY_SOURCE, dir: 'to-helper', type: 'discover', reqId })
     })
   }
 

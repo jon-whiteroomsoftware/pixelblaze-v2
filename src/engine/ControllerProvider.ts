@@ -35,6 +35,18 @@ export interface ConnectedController {
   name?: string
 }
 
+/** A Controller surfaced by auto-discovery (H14, issue #206) but not (yet)
+ *  connected. `address` is the LAN IP a subsequent `connect()` targets; `id` is the
+ *  device's stable cloud id (a good de-dupe / binding key); `name`/`version` are the
+ *  reported nickname and firmware when present. This is the candidate list the UI
+ *  offers — distinct from `ConnectedController`, which is a live connection. */
+export interface DiscoveredController {
+  id: string
+  address: string
+  name?: string
+  version?: string
+}
+
 /** Connection status as a discriminated union — the source of truth for the nav
  *  indicator (H4) and the Controller panel (H5+). Deliberately mirrors H4's four
  *  states plus an explicit error.
@@ -97,6 +109,15 @@ export interface ControllerProvider {
   /** Is the relay helper installed/reachable? Drives no-extension vs extension-present.
    *  Cheap and side-effect-free; safe to poll. */
   detectHelper(): Promise<boolean>
+
+  /** Discover Controllers on the LAN via the cloud discovery service (H14, issue
+   *  #206) — a global, not per-Controller, lookup the helper performs (the endpoint
+   *  isn't reachable from the page). Returns the candidates the user can connect to;
+   *  resolves `[]` on any failure (no helper, no devices, service down) so the UI
+   *  degrades to manual IP entry rather than erroring. UDP beacon discovery is not
+   *  available to an MV3 extension, so cloud is the only path; coverage holes (AP
+   *  mode, discovery disabled on the device) keep manual IP the universal fallback. */
+  discover(): Promise<DiscoveredController[]>
 
   /** Synchronous snapshot of the current status. */
   getStatus(): ControllerStatus
@@ -189,6 +210,10 @@ export class NullControllerProvider implements ControllerProvider {
 
   detectHelper(): Promise<boolean> {
     return Promise.resolve(false)
+  }
+
+  discover(): Promise<DiscoveredController[]> {
+    return Promise.resolve([])
   }
 
   getStatus(): ControllerStatus {

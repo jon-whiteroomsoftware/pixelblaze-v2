@@ -35,6 +35,10 @@ function makeDeviceTransport(
     mapError?: string
     /** Program ids the fake device reports from listPrograms. */
     programIds?: string[]
+    /** Wire records the fake helper returns from a `discover` request. */
+    discovered?: { id: string; localIp: string; name?: string; version?: string }[]
+    /** When set, the fake helper fails discover with this error. */
+    discoverError?: string
   } = {},
 ) {
   const detectAck = opts.detectAck ?? true
@@ -88,6 +92,13 @@ function makeDeviceTransport(
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'map-data', reqId: msg.reqId, ok: true, mapData: bytesToBase64(opts.mapData) })
           } else {
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'map-data', reqId: msg.reqId, ok: true })
+          }
+          return
+        case 'discover':
+          if (opts.discoverError) {
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'discover-result', reqId: msg.reqId, ok: false, error: opts.discoverError })
+          } else {
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'discover-result', reqId: msg.reqId, ok: true, controllers: opts.discovered ?? [] })
           }
           return
         case 'send': {
@@ -258,6 +269,47 @@ describe('ExtensionControllerProvider', () => {
     it('setPixelMap rejects when not connected', async () => {
       const p = new ExtensionControllerProvider({ transport: makeDeviceTransport().transport })
       await expect(p.setPixelMap([[0, 0]])).rejects.toThrow(/Not connected/)
+    })
+  })
+
+  describe('auto-discovery (H14, #206)', () => {
+    it('round-trips a reqId-keyed discover and maps localIp → address', async () => {
+      const d = makeDeviceTransport({
+        discovered: [
+          { id: 'pixelblaze_pb32_abc', localIp: '192.168.8.224', name: 'Burner bag', version: '3.67' },
+          { id: 'pixelblaze_pb32_def', localIp: '192.168.8.99' },
+        ],
+      })
+      const p = new ExtensionControllerProvider({ transport: d.transport })
+      await expect(p.discover()).resolves.toEqual([
+        { id: 'pixelblaze_pb32_abc', address: '192.168.8.224', name: 'Burner bag', version: '3.67' },
+        { id: 'pixelblaze_pb32_def', address: '192.168.8.99', name: undefined, version: undefined },
+      ])
+    })
+
+    it('resolves [] when the helper reports a discovery failure', async () => {
+      const d = makeDeviceTransport({ discoverError: 'GET /discover -> 503' })
+      const p = new ExtensionControllerProvider({ transport: d.transport })
+      await expect(p.discover()).resolves.toEqual([])
+    })
+
+    it('resolves [] when the helper never answers (timeout)', async () => {
+      const d = makeDeviceTransport()
+      const orig = d.transport.post
+      d.transport.post = (m) => {
+        if (m.type !== 'discover') orig(m)
+      }
+      const p = new ExtensionControllerProvider({ transport: d.transport, discoverTimeoutMs: 10 })
+      await expect(p.discover()).resolves.toEqual([])
+    })
+
+    it('discovers without needing a live connection (global lookup, no address)', async () => {
+      const d = makeDeviceTransport({ discovered: [{ id: 'x', localIp: '10.0.0.5' }] })
+      const p = new ExtensionControllerProvider({ transport: d.transport })
+      // No connect() first — discovery is connection-independent.
+      await expect(p.discover()).resolves.toEqual([
+        { id: 'x', address: '10.0.0.5', name: undefined, version: undefined },
+      ])
     })
   })
 
