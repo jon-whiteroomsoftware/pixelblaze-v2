@@ -1,11 +1,16 @@
-# Pixelblaze IDE v2
+# PXLBLZ-IDE
 
 A browser-based IDE for authoring, previewing, and exporting Pixelblaze LED patterns offline, with reusable code libraries the stock ElectroMage editor lacks.
 
 ## Language
 
+**PXLBLZ-IDE** (the product / this repo):
+The product we build and ship, and the name of this repository — in **all** contexts, customer-facing and internal docs alike. Deliberately *not* spelled "Pixelblaze IDE": that is ElectroMage's own existing product, a name collision we avoid on purpose. The short wordmark **PXLBLZ** (used in the app shell and visual branding) is the same product; "the IDE" is acceptable shorthand in prose once context is clear, but the *name*, when named, is PXLBLZ-IDE.
+_Avoid_: "Pixelblaze IDE", "Pixelblaze-v2", "pixelblaze-v2" (the old repo name being expunged). Saying "pixelblaze" aloud for our product is pronunciation convenience only — never write it that way.
+
 **Pixelblaze**:
-A hardware LED controller sold by ElectroMage, and the broader ecosystem (hardware, firmware, tooling) around it.
+The spelled-out name (P-I-X-E-L-B-L-A-Z-E) is reserved **exclusively** for ElectroMage's things: the hardware LED controller it sells, its firmware, its pattern language, its own editor/software, and the broader ecosystem around them. Never our product.
+_Note_: "**Pixelblaze V2**" (and V3 Standard/Pico) names a *hardware controller generation* — vendor terminology, unrelated to the old `pixelblaze-v2` repo name. Keep it verbatim in hardware/firmware/API docs.
 
 **Pattern**:
 A source file in Pixelblaze's JavaScript-derived language that runs on a controller; also the LED display that results from running it. Authored by the user.
