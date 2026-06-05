@@ -9,6 +9,7 @@ import {
   getControllerProvider,
 } from '@/engine/controllerProviderRegistry'
 import {
+  ControllerPermissionDeniedError,
   NullControllerProvider,
   type ControllerStatus,
   type ControllerTarget,
@@ -29,6 +30,9 @@ class FakeProvider extends NullControllerProvider {
   status: ControllerStatus = { kind: 'extension-present' }
   subs = new Set<(s: ControllerStatus) => void>()
   shouldFailConnect = false
+  // Mirror the real provider's per-IP permission decline (#229): reset to idle and
+  // reject with the typed error the store resets on.
+  denyPermission = false
   name: string | undefined = 'pixel-1'
   pixelCount: number | undefined = undefined
   pixelMap: number[][] | null = [
@@ -55,6 +59,10 @@ class FakeProvider extends NullControllerProvider {
   connect(target: ControllerTarget): Promise<void> {
     this.connects.push(target)
     this.emit({ kind: 'connecting', target })
+    if (this.denyPermission) {
+      this.emit({ kind: 'extension-present' })
+      return Promise.reject(new ControllerPermissionDeniedError(target.address))
+    }
     if (this.shouldFailConnect) {
       this.emit({ kind: 'error', message: 'unreachable' })
       return Promise.reject(new Error('unreachable'))
@@ -195,6 +203,21 @@ describe('controllerStore (keyed)', () => {
     })
     await store().addController('10.0.0.9')
     expect(store().controllers['10.0.0.9'].phase).toBe('error')
+    expect(store().lastConnectedIp).toBeNull()
+  })
+
+  it('a declined permission grant drops the entry and resets to no-controller (#229)', async () => {
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.denyPermission = true
+      created.set(ip, p)
+      return p
+    })
+    await store().addController('10.0.0.9')
+    // No lingering entry/pill — the UI is back to the pre-connect state, so the next
+    // Connect re-prompts for the grant.
+    expect(store().controllers['10.0.0.9']).toBeUndefined()
+    expect(store().activeIp).toBeNull()
     expect(store().lastConnectedIp).toBeNull()
   })
 

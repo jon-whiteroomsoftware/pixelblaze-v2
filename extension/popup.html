@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PXLBLZ-IDE Controller Helper</title>
+    <style>
+      /* IBM Plex Mono, bundled (latin 400/600) so the popup matches the IDE even
+         offline — the app loads the same face as a web font. */
+      @font-face {
+        font-family: 'IBM Plex Mono';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'IBM Plex Mono';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('fonts/ibm-plex-mono-latin-600-normal.woff2') format('woff2');
+      }
+      /* Palette mirrors the PXLBLZ-IDE design tokens (src/index.css): near-
+         monochrome, IBM Plex Mono, cool-grey accent discipline — amber (the IDE's
+         --color-live) reserved for the connecting/live signal, no blue. Dark-only:
+         the IDE is a dark-first surface, and an extension popup follows the OS
+         appearance (not the app's theme), so we pin dark rather than let a light-
+         mode OS hand the user a mismatched white panel. */
+      :root {
+        color-scheme: dark;
+        --bg: #141416; /* --color-panel */
+        --fg: #fafafa;
+        --muted: #a1a1aa; /* zinc-400 — the IDE's pattern-list body text */
+        --line: #2e2e34; /* --color-seam */
+        --btn-bg: #e8e8e8; /* --primary (dark) */
+        --btn-fg: #1a1a1c; /* --primary-foreground (dark) */
+        --live: #fbbf24; /* --color-live */
+      }
+      body {
+        font: 13px/1.45 "IBM Plex Mono", ui-monospace, "Cascadia Code", SFMono-Regular, Menlo, monospace;
+        color: var(--fg);
+        background: var(--bg);
+        width: 280px;
+        margin: 0;
+        padding: 14px 16px;
+      }
+      h1 {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--line);
+        font-weight: 600;
+      }
+      .section { margin-bottom: 14px; }
+      .section:last-child { margin-bottom: 0; }
+      .label { color: var(--muted); margin-bottom: 6px; }
+      .ip {
+        display: block;
+        font-weight: 600;
+        margin: 2px 0;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        color: var(--btn-fg);
+        background: var(--btn-bg);
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 8px;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      .empty { color: var(--muted); }
+      ul { margin: 0; padding-left: 16px; }
+      li { margin: 2px 0; }
+      /* A granted controller is "reachable" — use the live amber dot the IDE uses
+         for the connection signal, not a checkmark-green. */
+      .ok { color: var(--fg); }
+      .ok::marker { color: var(--live); }
+    </style>
+  </head>
+  <body>
+    <h1>PXLBLZ-IDE Controller Helper</h1>
+    <div id="root" class="section">
+      <div class="empty">Loading…</div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

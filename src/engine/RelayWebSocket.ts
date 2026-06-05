@@ -107,6 +107,16 @@ export type RelayMessage =
       /** Failure reason when `ok` is false. */
       error?: string
     }
+  // Per-IP JIT host permission (#229, ADR-0015). The LAN reach is an optional
+  // permission granted per device IP from the helper's action popup. These two are
+  // address-keyed (not conn/req-keyed) because the grant is per IP, not per call:
+  //  - `permission-needed` — the helper found no grant for `address` and opened the
+  //    grant popup; informational, lets the page hint "click the toolbar icon" in
+  //    case the popup didn't auto-open.
+  //  - `permission-denied` — the user declined (or the request failed/timed out);
+  //    the page surfaces it instead of showing a silent connect failure.
+  | { source: typeof RELAY_SOURCE; dir: 'from-helper'; type: 'permission-needed'; address: string }
+  | { source: typeof RELAY_SOURCE; dir: 'from-helper'; type: 'permission-denied'; address: string }
   | { source: typeof RELAY_SOURCE; dir: 'from-helper'; type: 'open'; connId: string }
   | {
       source: typeof RELAY_SOURCE

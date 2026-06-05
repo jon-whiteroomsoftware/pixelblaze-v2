@@ -9,6 +9,10 @@
     "128": "icons/icon-128.png"
   },
   "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "PXLBLZ-IDE Controller Helper",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -21,7 +25,8 @@
     }
   ],
   "permissions": ["offscreen"],
-  "host_permissions": ["ws://*/*", "http://*/*", "https://discover.electromage.com/*"],
+  "host_permissions": ["https://discover.electromage.com/*"],
+  "optional_host_permissions": ["http://*/*", "ws://*/*"],
   "sandbox": {
     "pages": ["sandbox.html"]
   },

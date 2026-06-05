@@ -26,6 +26,89 @@ function base64ToBytes(b64) {
   return bytes
 }
 
+// ── per-IP just-in-time host permissions (#229, ADR-0015) ────────────────────
+//
+// The LAN reach (http://*, ws://*) is OPTIONAL now; we hold it per device IP and
+// request it just-in-time. `chrome.permissions.request` can only run in an
+// extension page with a user gesture — not here in the SW, not in a content
+// script — so the actual grant happens in the action popup (popup.js). This SW
+// only DETECTS a missing grant, auto-opens the popup, and waits for the grant to
+// land (chrome.permissions.onAdded) or the user to decline (popup reports it, or
+// a safety timeout fires). Every device-bound call (connect, compile fetch,
+// /pixelmap.dat) passes through `ensureHostPermission` first.
+
+const GRANT_TIMEOUT_MS = 60000
+
+// Device-bound calls blocked on a pending grant, by the IP they need.
+const pendingWaiters = []
+
+function pendingGrantIps() {
+  return [...new Set(pendingWaiters.map((w) => w.ip))]
+}
+
+function settleWaiter(waiter, granted) {
+  const i = pendingWaiters.indexOf(waiter)
+  if (i === -1) return
+  pendingWaiters.splice(i, 1)
+  clearTimeout(waiter.timer)
+  waiter.resolve(granted)
+}
+
+// Resolve any waiter whose origins are now actually granted. Driven by
+// chrome.permissions.onAdded (fires no matter where the grant came from) and by
+// the popup's explicit "granted" report.
+async function reconcileGrants() {
+  for (const w of [...pendingWaiters]) {
+    if (await chrome.permissions.contains({ origins: w.origins })) settleWaiter(w, true)
+  }
+}
+
+chrome.permissions.onAdded.addListener(() => {
+  reconcileGrants()
+})
+
+// Popup ↔ SW channel (distinct target from the offscreen compile channel).
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || msg.target !== 'helper-popup') return
+  if (msg.type === 'get-pending') {
+    sendResponse({ ips: pendingGrantIps() })
+    return
+  }
+  if (msg.type === 'grant-outcome') {
+    if (msg.granted) reconcileGrants()
+    // An explicit "Not now" (or a failed request) fails every open waiter so the
+    // queued calls don't hang to the timeout.
+    else for (const w of [...pendingWaiters]) settleWaiter(w, false)
+    sendResponse({ ok: true })
+  }
+})
+
+// Pull the device host out of either a ws:// url or a bare IP/address.
+function hostOf(addressOrUrl) {
+  try {
+    return new URL(addressOrUrl.includes('://') ? addressOrUrl : `http://${addressOrUrl}`).hostname
+  } catch {
+    return null
+  }
+}
+
+// Open the popup (best-effort — openPopup can no-op on some Chrome versions, in
+// which case the page-side "permission-needed" hint tells the user to click the
+// toolbar icon) and wait for the grant or a decline.
+function requestGrantViaPopup(ip, origins) {
+  return new Promise((resolve) => {
+    const waiter = { ip, origins, resolve }
+    pendingWaiters.push(waiter)
+    try {
+      const opened = chrome.action.openPopup()
+      if (opened && opened.catch) opened.catch(() => {})
+    } catch {
+      // openPopup unavailable; rely on the page hint + manual icon click.
+    }
+    waiter.timer = setTimeout(() => settleWaiter(waiter, false), GRANT_TIMEOUT_MS)
+  })
+}
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== RELAY_SOURCE) return
   // Sockets owned by this page, keyed by connId.
@@ -39,13 +122,42 @@ chrome.runtime.onConnect.addListener((port) => {
     }
   }
 
-  port.onMessage.addListener((msg) => {
+  // Gate one device-bound call on holding the per-IP host permission. Returns true
+  // when it's safe to proceed. On a missing grant it tells the page (so it can show
+  // "click the toolbar icon" if the popup didn't auto-open), opens the popup, and
+  // waits; a decline returns false AND emits `permission-denied` so the page can
+  // surface it instead of looking like a silent connect failure.
+  const ensureGate = async (addressOrUrl) => {
+    const ip = hostOf(addressOrUrl)
+    if (!ip) return true // unparseable — let the underlying call fail naturally
+    const origins = [`http://${ip}/*`, `ws://${ip}/*`]
+    if (await chrome.permissions.contains({ origins })) return true
+    send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-needed', address: ip })
+    const granted = await requestGrantViaPopup(ip, origins)
+    if (!granted) {
+      send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-denied', address: ip })
+    }
+    return granted
+  }
+
+  port.onMessage.addListener(async (msg) => {
     if (!msg || msg.source !== RELAY_SOURCE || msg.dir !== 'to-helper') return
 
     // Compile request (#202): correlated by reqId, independent of any socket. The
     // device's own compiler is fetched, extracted, and eval'd in a sandboxed iframe
     // (MV3 CSP forbids eval in the SW), then the bytecode crosses back as base64.
     if (msg.type === 'compile') {
+      if (!(await ensureGate(msg.address))) {
+        send({
+          source: RELAY_SOURCE,
+          dir: 'from-helper',
+          type: 'compile-result',
+          reqId: msg.reqId,
+          ok: false,
+          error: `access to ${hostOf(msg.address)} not authorized`,
+        })
+        return
+      }
       handleCompile(msg).then(
         (bytecode) =>
           send({
@@ -75,6 +187,17 @@ chrome.runtime.onConnect.addListener((port) => {
     // compiler fetch already uses. The blob crosses back as base64; a device with no
     // map (404 or empty body) comes back ok with mapData absent, NOT an error.
     if (msg.type === 'get-map') {
+      if (!(await ensureGate(msg.address))) {
+        send({
+          source: RELAY_SOURCE,
+          dir: 'from-helper',
+          type: 'map-data',
+          reqId: msg.reqId,
+          ok: false,
+          error: `access to ${hostOf(msg.address)} not authorized`,
+        })
+        return
+      }
       handleGetMap(msg).then(
         (mapBytes) =>
           send({
@@ -129,6 +252,13 @@ chrome.runtime.onConnect.addListener((port) => {
     }
 
     if (msg.type === 'connect') {
+      if (!(await ensureGate(msg.url))) {
+        // Denied: report a normal-looking failure for this connId on top of the
+        // permission-denied feedback ensureGate already sent.
+        send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'error', connId: msg.connId, message: 'access not authorized' })
+        send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: msg.connId })
+        return
+      }
       let ws
       try {
         ws = new WebSocket(msg.url)

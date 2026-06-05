@@ -15,6 +15,7 @@
 // relay that emulates a device end-to-end. main.tsx builds the window-backed one.
 
 import {
+  ControllerPermissionDeniedError,
   type ControllerProvider,
   type ControllerCapabilities,
   type ControllerStatus,
@@ -87,6 +88,13 @@ export class ExtensionControllerProvider implements ControllerProvider {
   // True only while we hold a connection we expect to stay up. Gates the close-
   // driven reconnect so a *failed* open (which also fires a close) doesn't retry.
   private expectConnected = false
+  // Set when the helper reports the user declined the per-IP host permission for
+  // the address we're connecting to (#229). It resets the provider to the pre-
+  // connect idle state (extension-present) rather than an error pill, makes the
+  // in-flight connect() reject with a ControllerPermissionDeniedError (so the store
+  // can clear the half-created entry and let the next Connect re-prompt), and halts
+  // the reconnect loop.
+  private permissionBlocked = false
 
   private readonly transport: RelayTransport
   private readonly detectTimeoutMs: number
@@ -118,6 +126,37 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this._setTimeout = options.setTimeout ?? ((fn, ms) => setTimeout(fn, ms))
     this._clearTimeout =
       options.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>))
+
+    // Long-lived watch for per-IP permission feedback (#229). Address-keyed, so it
+    // lives here rather than in a per-call subscription. The helper's popup owns the
+    // actual grant; we only react to a decline, surfacing it as a clear error and
+    // halting reconnect for the address we're targeting.
+    this.transport.subscribe((msg) => {
+      if (msg.source !== RELAY_SOURCE || msg.dir !== 'from-helper') return
+      // Only while we're (re)connecting to this address — a live connection means
+      // the IP is already granted, so a stray denial can't be for it.
+      if (
+        msg.type === 'permission-denied' &&
+        this.target?.address === msg.address &&
+        this.status.kind !== 'connected'
+      ) {
+        this.failPermission()
+      }
+    })
+  }
+
+  /** The user declined the helper's per-IP host-permission prompt. Reset to the
+   *  pre-connect idle state (a decline is a user choice, not an error to dwell on)
+   *  and halt the reconnect loop. We do NOT close the socket here — the helper
+   *  always follows a denial with the connId error/close, which rejects the in-
+   *  flight openConnection; permissionBlocked turns that rejection into a
+   *  ControllerPermissionDeniedError and keeps this idle status from being
+   *  overwritten with an error pill. */
+  private failPermission(): void {
+    this.permissionBlocked = true
+    this.intentionalClose = true
+    this.expectConnected = false
+    this.setStatus({ kind: 'extension-present' })
   }
 
   // ── helper handshake ──────────────────────────────────────────────────────
@@ -210,6 +249,7 @@ export class ExtensionControllerProvider implements ControllerProvider {
     }
     this.target = target
     this.intentionalClose = false
+    this.permissionBlocked = false
     await this.openConnection(target)
   }
 
@@ -231,9 +271,13 @@ export class ExtensionControllerProvider implements ControllerProvider {
     try {
       await conn.connect()
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Connection failed'
       this.conn = null
       this.expectConnected = false
+      // A permission decline already reset us to idle (extension-present); surface
+      // it as the typed error the store resets on, not the generic socket failure
+      // the rejection carries, and leave the idle status in place.
+      if (this.permissionBlocked) throw new ControllerPermissionDeniedError(target.address)
+      const message = e instanceof Error ? e.message : 'Connection failed'
       this.setStatus({ kind: 'error', message })
       throw e
     }
@@ -268,6 +312,9 @@ export class ExtensionControllerProvider implements ControllerProvider {
   /** Bounded reconnect loop. Each attempt reopens the socket; on failure it
    *  chains the next attempt itself (not via the close event) until exhausted. */
   private scheduleReconnect(attemptsLeft: number): void {
+    // A permission decline (or a user disconnect) halts the loop — retrying the
+    // same un-granted IP would only re-prompt and be declined again.
+    if (this.intentionalClose) return
     if (attemptsLeft <= 0) {
       this.conn = null
       this.setStatus({ kind: 'error', message: 'Controller connection lost' })

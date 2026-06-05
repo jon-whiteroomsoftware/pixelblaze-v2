@@ -63,6 +63,19 @@ export type ControllerStatus =
   | { kind: 'connected'; controller: ConnectedController }
   | { kind: 'error'; message: string }
 
+/** Thrown by `connect()` when the user declines the helper's per-IP host-permission
+ *  prompt (#229). It is a *user choice*, not a failure to surface as an error pill —
+ *  the caller catches this specifically and resets to the pre-connect state so the
+ *  next Connect re-prompts. A backend without a permission step never throws it. */
+export class ControllerPermissionDeniedError extends Error {
+  readonly address: string
+  constructor(address: string) {
+    super(`Access to ${address} was not authorized`)
+    this.name = 'ControllerPermissionDeniedError'
+    this.address = address
+  }
+}
+
 /** What a backend can do beyond read/monitor. Push and compile are gated on the
  *  H8 in-extension-compiler spike and the H10 push pipeline; until those land a
  *  backend reports them `false` and the app hides "Send to Controller". Read /

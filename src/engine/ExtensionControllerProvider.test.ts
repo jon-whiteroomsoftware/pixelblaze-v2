@@ -13,6 +13,7 @@ import {
   type RelayMessage,
   type RelayTransport,
 } from './RelayWebSocket'
+import { ControllerPermissionDeniedError } from './ControllerProvider'
 import { encodeBinaryFrames, MessageType } from './PixelblazeConnection'
 import { encodeMapData } from './mapPush'
 import type { ControllerStatus } from './ControllerProvider'
@@ -24,6 +25,10 @@ function makeDeviceTransport(
   opts: {
     detectAck?: boolean
     failConnect?: boolean
+    /** Model a declined per-IP host permission (#229): on connect the helper emits
+     *  permission-needed, then permission-denied, then the connId error/close it
+     *  always sends on a denied connect. */
+    denyPermission?: boolean
     /** Bytecode the fake helper returns from a `compile` request. */
     compileBytecode?: Uint8Array
     /** When set, the fake helper fails compile with this error. */
@@ -66,6 +71,14 @@ function makeDeviceTransport(
           return
         case 'connect':
           lastConnId = msg.connId
+          if (opts.denyPermission) {
+            const address = new URL(msg.url).hostname
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-needed', address })
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-denied', address })
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'error', connId: msg.connId, message: 'access not authorized' })
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: msg.connId })
+            return
+          }
           if (opts.failConnect || silent) {
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'error', connId: msg.connId, message: 'refused' })
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: msg.connId })
@@ -196,6 +209,15 @@ describe('ExtensionControllerProvider', () => {
     const p = new ExtensionControllerProvider({ transport: makeDeviceTransport({ failConnect: true }).transport })
     await expect(p.connect(TARGET)).rejects.toThrow()
     expect(p.getStatus().kind).toBe('error')
+  })
+
+  it('rejects a declined per-IP permission with a typed error and resets to idle (#229)', async () => {
+    const p = new ExtensionControllerProvider({ transport: makeDeviceTransport({ denyPermission: true }).transport })
+    // The typed error lets the store tell a user decline from a real failure and
+    // drop the half-created entry rather than showing an error pill.
+    await expect(p.connect(TARGET)).rejects.toBeInstanceOf(ControllerPermissionDeniedError)
+    // A decline resets to the pre-connect idle state, not an error.
+    expect(p.getStatus()).toEqual({ kind: 'extension-present' })
   })
 
   describe('push surface (H10)', () => {

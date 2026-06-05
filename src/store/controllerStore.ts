@@ -8,6 +8,7 @@ import {
   getControllerProvider,
 } from '@/engine/controllerProviderRegistry'
 import {
+  ControllerPermissionDeniedError,
   NullControllerProvider,
   type ControllerProvider,
   type ControllerStatus,
@@ -302,8 +303,13 @@ export const useControllerStore = create<ControllerConnectionState>()(
 
           try {
             await provider.connect({ address: target })
-          } catch {
-            // The provider's status subscription already flips the pill to error.
+          } catch (e) {
+            // A declined per-IP permission grant (#229) is a user choice, not a
+            // failure to dwell on: drop the half-created entry so the UI returns to
+            // the pre-connect state and the next Connect re-prompts. Any other
+            // failure leaves the entry, whose pill the status subscription has
+            // already flipped to error.
+            if (e instanceof ControllerPermissionDeniedError) await get().removeController(target)
             return
           }
 
