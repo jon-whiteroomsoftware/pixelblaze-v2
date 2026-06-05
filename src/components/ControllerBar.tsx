@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { RotateCw } from 'lucide-react'
 import { useControllerStore } from '@/store/controllerStore'
 import { describeControllerPill, type ControllerPhase } from '@/engine/controllerPillView'
 import type { ControllerStatusTone } from '@/engine/controllerStatusView'
@@ -114,6 +115,28 @@ function ControllerPillButton({
   )
 }
 
+// While the connection dropdown is open, re-sweep the network on this cadence so
+// a Controller that powers up (or drops) shows up without a manual rescan. Cloud
+// discovery, so this costs no Pixelblaze socket slots.
+const DISCOVERY_REFRESH_MS = 10_000
+
+// A manual rescan is usually so fast (cloud-cached, often a no-op) that the real
+// `discovering` flag barely flickers — the click looks like it did nothing. Hold
+// the spinner on for at least this long so the click always reads as "working".
+// Must equal this spinner's rotation period (RESCAN_SPIN_CLASS below) so the icon
+// completes exactly one full turn and lands back at its start angle instead of
+// popping mid-spin. Kept snappy (vs the 1s push spinner) so the click feels quick.
+const MIN_RESCAN_SPIN_MS = 600
+
+// Spin scoped to the rescan icon only — the Send-to-Controller push spinner keeps
+// Tailwind's default `animate-spin` (1s). We deliberately do NOT layer
+// `[animation-duration]` on top of `animate-spin`: the shorthand `animation` and the
+// longhand `animation-duration` then fight, and which wins depends on CSS source
+// order. Instead this is a single self-contained `animation` shorthand (referencing
+// the `spin` keyframes Tailwind already emits) — one declaration, order-independent,
+// no !important. One full rotation in MIN_RESCAN_SPIN_MS so it lands back at start.
+const RESCAN_SPIN_CLASS = '[animation:spin_0.6s_linear_infinite] text-amber-400'
+
 export function ControllerBar() {
   const extensionPresent = useControllerStore((s) => s.extensionPresent)
   const controllers = useControllerStore((s) => s.controllers)
@@ -129,6 +152,9 @@ export function ControllerBar() {
   const [open, setOpen] = useState(false)
   const [panelOpenIp, setPanelOpenIp] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  // Forces the rescan spinner to stay visible for MIN_RESCAN_SPIN_MS after a
+  // manual click, independent of how fast the actual sweep resolves.
+  const [manualSpin, setManualSpin] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   const ips = Object.keys(controllers)
@@ -147,6 +173,37 @@ export function ControllerBar() {
     window.addEventListener('mousedown', onDown)
     return () => window.removeEventListener('mousedown', onDown)
   }, [open, panelOpenIp])
+
+  // Auto-run discovery the moment the dropdown opens (once the extension is
+  // confirmed present), then keep the list fresh on a slow tick while it stays
+  // open. Removes the need to click a "Discover" button at all; the manual
+  // refresh affordance below is just for impatient rescans. The store's
+  // re-entrancy guard keeps the immediate sweep and the tick from overlapping.
+  // We pull `discover` off the store via getState() rather than closing over the
+  // selector value so this effect's deps are exactly the gate (open + presence) —
+  // it sets up/tears down the interval once per open, never per render.
+  useEffect(() => {
+    if (!open || !extensionPresent) return
+    const sweep = () => void useControllerStore.getState().discover()
+    sweep()
+    const id = window.setInterval(sweep, DISCOVERY_REFRESH_MS)
+    return () => window.clearInterval(id)
+  }, [open, extensionPresent])
+
+  // Release the forced spin window after a manual rescan.
+  useEffect(() => {
+    if (!manualSpin) return
+    const t = window.setTimeout(() => setManualSpin(false), MIN_RESCAN_SPIN_MS)
+    return () => window.clearTimeout(t)
+  }, [manualSpin])
+
+  // Manual rescan: kick a sweep and force a visible spin even if it returns instantly.
+  const onRescan = () => {
+    setManualSpin(true)
+    void discover()
+  }
+  // Spin when a real sweep is in flight OR through the forced post-click window.
+  const rescanSpinning = discovering || manualSpin
 
   // Clicking a pill activates that Controller and toggles its panel popover; the
   // panel is bound to the active Controller, so opening one closes any other.
@@ -253,21 +310,34 @@ export function ControllerBar() {
                 </div>
               </form>
 
-              {/* Auto-discovery (#206), tracer-bullet surface: a button that runs the
-                  cloud sweep and lists candidates; clicking one connects via the same
-                  keyed path as a manual IP. The full multi-Controller select model is
-                  deferred — this just proves the cloud → helper → seam → connect pipe. */}
+              {/* Auto-discovery (#206): the sweep runs automatically on open and on
+                  a slow tick (see the effect above); clicking a candidate connects via
+                  the same keyed path as a manual IP. The ↻ affordance is a manual
+                  rescan for impatience — the user no longer has to kick it off. */}
               <div className="flex flex-col gap-2 border-t border-seam pt-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-zinc-400">Or find them on your network</label>
+                  <label className="text-zinc-400">Controllers on your network</label>
+                  {/* Same refresh icon + amber spin as the editor-header push button
+                      (SendToController), just standalone here. Spins while a sweep is
+                      in flight or through the forced min-spin after a manual click. */}
                   <button
                     type="button"
-                    onClick={() => void discover()}
-                    disabled={discovering}
+                    onClick={onRescan}
+                    disabled={rescanSpinning}
+                    aria-busy={rescanSpinning}
                     data-testid="controller-discover"
-                    className="h-6 rounded border border-zinc-600 bg-zinc-800 px-2 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100 disabled:opacity-40"
+                    aria-label="Rescan network"
+                    title="Rescan"
+                    className={`flex h-7 w-7 items-center justify-center rounded border border-zinc-600 bg-zinc-800 text-zinc-300 hover:border-zinc-400 hover:text-zinc-100 ${
+                      rescanSpinning ? 'opacity-100' : 'disabled:opacity-40'
+                    }`}
                   >
-                    {discovering ? 'Scanning…' : 'Discover'}
+                    <RotateCw
+                      size={16}
+                      strokeWidth={2.75}
+                      className={rescanSpinning ? RESCAN_SPIN_CLASS : ''}
+                      aria-hidden
+                    />
                   </button>
                 </div>
                 {discovered.length > 0 && (
@@ -286,6 +356,11 @@ export function ControllerBar() {
                       </li>
                     ))}
                   </ul>
+                )}
+                {discovering && discovered.length === 0 && (
+                  <p className="text-zinc-500" data-testid="controller-discover-scanning">
+                    Scanning…
+                  </p>
                 )}
                 {!discovering && discovered.length === 0 && (
                   <p className="text-zinc-600" data-testid="controller-discover-empty">

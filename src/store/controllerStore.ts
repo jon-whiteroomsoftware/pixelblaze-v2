@@ -253,6 +253,9 @@ export const useControllerStore = create<ControllerConnectionState>()(
         },
 
         discover: async () => {
+          // Re-entrancy guard: auto-on-open, the periodic tick, and the manual
+          // refresh affordance can all fire — never let two sweeps overlap.
+          if (get().discovering) return
           set({ discovering: true })
           const found = await discoverControllers().catch(() => [])
           // Drop already-connected Controllers from the candidate list — connecting

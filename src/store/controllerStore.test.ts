@@ -16,6 +16,7 @@ import {
   type ControllerConfig,
   type ControllerCapabilities,
   type ProgramListEntry,
+  type DiscoveredController,
 } from '@/engine/ControllerProvider'
 import { usePatternStore, patternInitialState } from '@/store/patternStore'
 import { useEditorStore, editorInitialState } from '@/store/editorStore'
@@ -584,6 +585,37 @@ describe('controllerStore (keyed)', () => {
       await store().confirmMapPush()
       expect(store().pushing).toBe(false)
       expect(store().pushResult).toEqual({ ok: false, message: 'socket closed' })
+    })
+  })
+
+  describe('discover', () => {
+    it('ignores a concurrent call while a sweep is already in flight', async () => {
+      // The dropdown now fires discovery on open, on a periodic tick, AND on the
+      // manual refresh — the guard must keep those from stacking overlapping sweeps.
+      let discoverCalls = 0
+      let release!: () => void
+      const gate = new Promise<DiscoveredController[]>((resolve) => {
+        release = () => resolve([])
+      })
+      setControllerProviderFactory((ip) => {
+        const p = new FakeProvider()
+        p.discover = () => {
+          discoverCalls++
+          return gate
+        }
+        created.set(ip, p)
+        return p
+      })
+
+      const first = store().discover() // starts the sweep; discovering latches true
+      await store().discover() // re-entrant — guarded, must not start a second sweep
+      expect(store().discovering).toBe(true)
+      expect(discoverCalls).toBe(1)
+
+      release()
+      await first
+      expect(store().discovering).toBe(false)
+      expect(discoverCalls).toBe(1)
     })
   })
 })
