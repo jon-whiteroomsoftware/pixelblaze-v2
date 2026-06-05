@@ -686,6 +686,21 @@ Two firmware facts gate the rest:
   **fit** mode, by contrast, is *map-bound* — saved with the map, not a standalone
   settings field — so it cannot be shown faithfully as a panel row from `getConfig`
   alone; it rides map read-back too.)
+- **Reducing the count must black out the tail first** (#222, verified on hardware).
+  WS2812s hold their last value until re-clocked and the device only clocks
+  `pixelCount` LEDs, so after a reduction the LEDs beyond the new count freeze on
+  their last colour. Nothing clears them as a side effect — *not* a `pixelCount`
+  write, *not* a `putPixelMap`, and there is no per-pixel wire command (we confirmed
+  the canonical Pixelblaze UI leaves them lit too). The only mechanism is to clock
+  the whole strip black *while the count is still high*, then shrink:
+  `applyControllerPixelCount` zeroes brightness (`save:false`), waits one full-length
+  dark frame (~400 ms), writes the new `pixelCount` (`save:true`), then restores
+  brightness — so the tail freezes black and the first N LEDs resume the pattern. It
+  reads the restore brightness from `getConfig` and skips the blackout if that's
+  unreadable (zeroing a brightness it can't restore would strand the strip dark).
+  Both count-setting flows (the panel `pixels` edit and the map-push "set count only"
+  remedy) go through this one helper. This is a deliberate, hardware-honest maneuver,
+  not a preview invention — it does exactly what you'd do physically.
 
 ---
 
