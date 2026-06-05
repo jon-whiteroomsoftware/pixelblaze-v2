@@ -15,7 +15,6 @@ import {
   DeckGrid,
   DeckCell,
   DeckTelemetry,
-  DeckStat,
 } from '@/components/Deck'
 import { DeckSlider } from '@/components/DeckSlider'
 
@@ -139,6 +138,7 @@ export function ControllerPanel() {
   const brightness = useControllerPanelStore((s) => s.brightness)
   const activeProgramId = useControllerPanelStore((s) => s.activeProgramId)
   const programs = useControllerPanelStore((s) => s.programs)
+  const programLabels = useControllerPanelStore((s) => s.programLabels)
   const fps = useControllerPanelStore((s) => s.fps)
   const pixelCount = useControllerPanelStore((s) => s.pixelCount)
   const mapPointCount = useControllerPanelStore((s) => s.mapPointCount)
@@ -159,10 +159,11 @@ export function ControllerPanel() {
     if (c.description) controlDescriptions[c.exportName] = c.description
   }
 
-  const { patternName, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch } =
+  const { patternName, patternUnsaved, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch } =
     describeControllerPanel({
       activeProgramId,
       programs,
+      programLabels,
       fps,
       pixelCount,
       mapPointCount,
@@ -175,8 +176,24 @@ export function ControllerPanel() {
     <div className="font-mono pl-3 text-xs" data-testid="controller-panel">
       <DeckSection label="Pixelblaze" hint={PANEL_HINT}>
         <DeckGrid gapY="gap-y-2">
-          {/* Row 1: pattern + brightness, both stacked for the width they need. */}
-          <DeckStat label="pattern" value={patternName} />
+          {/* Row 1: pattern + brightness, both stacked for the width they need. The
+              pattern carries an "unsaved" marker when its name came from the local label
+              cache (a run-only push) rather than the device's saved program list (#237). */}
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-zinc-400 truncate">pattern</span>
+            <span className="text-live truncate" title={patternName}>
+              {patternName}
+              {patternUnsaved && (
+                <span
+                  className="text-zinc-500 not-italic"
+                  title="Running but not saved on the device — a run-only push (#237)."
+                  data-testid="controller-pattern-unsaved"
+                >
+                  {' · unsaved'}
+                </span>
+              )}
+            </span>
+          </div>
           <DeckSlider
             label="brightness"
             ariaLabel="Controller brightness"

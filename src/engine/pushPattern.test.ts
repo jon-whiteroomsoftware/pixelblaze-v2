@@ -52,9 +52,12 @@ describe('pushPattern — run-only (default)', () => {
     const result = await pushPattern(deps)
 
     expect(result).toEqual({ programId: 'MINTED00000000000', created: true })
+    // #237: the run path sends an empty name — a run-only program is never persisted,
+    // so a name on its setCode would be a phantom. The display name lives in the local
+    // label cache (recorded by the caller against the returned id), not on the device.
     expect(deps.provider.pushBytecode).toHaveBeenCalledWith(expect.any(Uint8Array), {
       id: 'MINTED00000000000',
-      name: 'My Pattern',
+      name: '',
     })
     // The #236 reframe: run-only never consults the program list or persists a binding.
     expect(deps.provider.listPrograms).not.toHaveBeenCalled()

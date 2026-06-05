@@ -10,6 +10,11 @@ export interface ControllerPanelTelemetry {
   activeProgramId?: string
   /** The Controller's stored program list, used to resolve the id to a name. */
   programs: ProgramListEntry[]
+  /** Per-program label cache for this Controller (program id → label) populated on
+   *  push (#237). Resolves the name of a run-only program that never enters the
+   *  device's program list, so the panel shows the IDE pattern's name instead of the
+   *  raw generated id. Absent/empty until a push records a label. */
+  programLabels?: Record<string, string>
   /** Device-reported frame rate; `null` until a frame rate has been reported. */
   fps: number | null
   /** The device's configured pixel count; `null`/absent until read. Editable from
@@ -23,8 +28,14 @@ export interface ControllerPanelTelemetry {
 }
 
 export interface ControllerPanelView {
-  /** Human label for the active pattern: its name, else the raw id, else '—'. */
+  /** Human label for the active pattern: device-list name, else the local label
+   *  cache, else the raw id, else '—'. */
   patternName: string
+  /** True when `patternName` came from the local label cache rather than the device's
+   *  program list — i.e. the program is running but not saved on the device (a run-only
+   *  push). Lets the panel mark the running-but-unsaved state honestly instead of having
+   *  it read identical to a saved pattern. */
+  patternUnsaved: boolean
   /** FPS to one decimal, or '—' when not yet reported. */
   fpsLabel: string
   /** Pixel count as an integer string, or '—' when not yet read. */
@@ -39,24 +50,43 @@ export interface ControllerPanelView {
 
 const PLACEHOLDER = '—'
 
+/** Resolve the active program's display name through three tiers: the device's
+ *  program list (a saved program) → the local label cache (a run-only push we made)
+ *  → the raw id (a program we know nothing about). `unsaved` is true only for the
+ *  middle tier — the name is ours but the device hasn't saved it. Pure (#237). */
+export function resolveActiveProgramName(
+  activeProgramId: string | undefined,
+  programs: ProgramListEntry[],
+  programLabels?: Record<string, string>,
+): { patternName: string; patternUnsaved: boolean } {
+  if (!activeProgramId) return { patternName: PLACEHOLDER, patternUnsaved: false }
+  const listed = programs.find((p) => p.id === activeProgramId)
+  if (listed) return { patternName: listed.name, patternUnsaved: false }
+  const cached = programLabels?.[activeProgramId]
+  if (cached) return { patternName: cached, patternUnsaved: true }
+  return { patternName: activeProgramId, patternUnsaved: false }
+}
+
 /** Describe the polled Controller state for the panel's read-only telemetry. */
 export function describeControllerPanel({
   activeProgramId,
   programs,
+  programLabels,
   fps,
   pixelCount,
   mapPointCount,
 }: ControllerPanelTelemetry): ControllerPanelView {
-  const match = activeProgramId
-    ? programs.find((p) => p.id === activeProgramId)
-    : undefined
-  const patternName = match?.name ?? activeProgramId ?? PLACEHOLDER
+  const { patternName, patternUnsaved } = resolveActiveProgramName(
+    activeProgramId,
+    programs,
+    programLabels,
+  )
   const fpsLabel = fps === null ? PLACEHOLDER : fps.toFixed(1)
   const pixelsLabel = pixelCount == null ? PLACEHOLDER : String(pixelCount)
   const mapPointsLabel = mapPointCount == null ? PLACEHOLDER : String(mapPointCount)
   const mapCountMismatch =
     pixelCount != null && mapPointCount != null && pixelCount !== mapPointCount
-  return { patternName, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch }
+  return { patternName, patternUnsaved, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch }
 }
 
 // ── live controls + watched vars (H7, issue #199) ────────────────────────────

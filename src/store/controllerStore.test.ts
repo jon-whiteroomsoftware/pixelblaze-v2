@@ -22,7 +22,11 @@ import { usePatternStore, patternInitialState } from '@/store/patternStore'
 import { useEditorStore, editorInitialState } from '@/store/editorStore'
 import { useMapStore, mapInitialState, type MapRecord } from '@/store/mapStore'
 import { useControllerPanelStore, controllerPanelInitialState } from '@/store/controllerPanelStore'
-import { getControllerBindings, setControllerBindings } from '@/engine/storage'
+import {
+  getControllerBindings,
+  setControllerBindings,
+  getProgramLabels,
+} from '@/engine/storage'
 
 // A fake per-Controller provider with a real (if minimal) status machine, so we
 // can assert the keyed store's orchestration end-to-end. detectHelper acks true
@@ -384,15 +388,24 @@ describe('controllerStore (keyed)', () => {
 
       const provider = created.get('10.0.0.5')!
       expect(provider.pushed).toHaveLength(1)
-      expect(provider.pushed[0].opts.name).toBe('Twinkle')
+      // #237: the run path sends an empty setCode name — a run-only program is never
+      // persisted, so the name lives in the local label cache instead, keyed by the
+      // throwaway program id we pushed to.
+      expect(provider.pushed[0].opts.name).toBe('')
+      const pushedId = provider.pushed[0].opts.id
       expect(store().pushing).toBe(false)
       expect(store().pushResult).toEqual({ ok: true, created: true })
       // The pushed source is remembered (dirty gate) so a re-push is a no-op.
       expect(store().lastPushedSource['10.0.0.5']['pat-1']).toBe(PATTERN_SRC)
-      // Run-only push mints a throwaway id and records NO binding (the #236 reframe —
-      // overwrite-in-place applies only to saved patterns, not run-only pushes).
+      // Run-only push mints a throwaway id and records NO overwrite binding (the #236
+      // reframe — overwrite-in-place applies only to saved patterns, not run-only pushes).
       const bindings = await getControllerBindings()
       expect(bindings['10.0.0.5']).toBeUndefined()
+      // ...but it DOES record the program label (#237) so the panel resolves the running
+      // program's name instead of the raw generated id.
+      const labels = await getProgramLabels()
+      expect(labels['10.0.0.5'][pushedId]).toBe('Twinkle')
+      expect(useControllerPanelStore.getState().programLabels[pushedId]).toBe('Twinkle')
     })
 
     it('is a no-op when no pattern is active', async () => {

@@ -74,9 +74,14 @@ export async function pushPattern(deps: PushPatternDeps): Promise<PushPatternRes
   }
 
   // Run-only: throwaway id, load + run, no list read and no binding (the #236 reframe).
+  // The name is deliberately empty (matching the reference client's `setCode` —
+  // `name:""`): a run-only program is never persisted, so a name here would only ever be
+  // a phantom on a throwaway id. The display name lives in the local label cache instead
+  // (the caller records it against the returned id), and the real name only persists
+  // inside a saved PBP blob (the persist branch below). #237.
   if (!deps.persist) {
     const programId = mint()
-    await deps.provider.pushBytecode(bytecode, { id: programId, name: deps.name ?? '' })
+    await deps.provider.pushBytecode(bytecode, { id: programId, name: '' })
     return { programId, created: true }
   }
 

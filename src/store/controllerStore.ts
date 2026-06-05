@@ -20,7 +20,13 @@ import { resolveMapPushPoints } from '@/engine/mapPush'
 import { applyControllerPixelCount } from '@/engine/applyControllerPixelCount'
 import type { ControllerPhase } from '@/engine/controllerPillView'
 import { pushPattern } from '@/engine/pushPattern'
-import { getControllerBindings, setControllerBindings } from '@/engine/storage'
+import {
+  getControllerBindings,
+  setControllerBindings,
+  getProgramLabels,
+  setProgramLabels,
+} from '@/engine/storage'
+import { withProgramLabel } from '@/engine/controllerBinding'
 import { bundle } from '@/engine/bundle'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { usePatternStore } from '@/store/patternStore'
@@ -532,7 +538,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
             // emit — never raw editor source. Use the last *clean* preview source so a
             // broken edit is never compiled and pushed.
             const { code } = bundle(previewSource, LIBRARIES)
-            const { created } = await pushPattern({
+            const { created, programId } = await pushPattern({
               provider: getControllerProvider(),
               controllerId,
               patternId,
@@ -541,6 +547,20 @@ export const useControllerStore = create<ControllerConnectionState>()(
               loadBindings: getControllerBindings,
               saveBindings: setControllerBindings,
             })
+            // Record the name we pushed against the device program id (#237) so the
+            // panel resolves a run-only program — which never enters the device's
+            // program list — to the pattern's name instead of the raw generated id.
+            // Persist the cache and mirror it into the panel store for immediate display.
+            if (previewPatternName) {
+              const labels = withProgramLabel(
+                await getProgramLabels(),
+                controllerId,
+                programId,
+                previewPatternName,
+              )
+              await setProgramLabels(labels)
+              useControllerPanelStore.getState().noteProgramLabel(programId, previewPatternName)
+            }
             // Remember the clean source we just pushed so the dirty gate disables a
             // redundant re-push until the pattern is edited again.
             set((s) => ({

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   describeControllerPanel,
+  resolveActiveProgramName,
   shapeControllerControls,
   describeControllerVars,
 } from './controllerPanelView'
@@ -19,6 +20,63 @@ describe('describeControllerPanel', () => {
   it('falls back to the raw id when no program matches', () => {
     const view = describeControllerPanel({ activeProgramId: 'ghost', programs, fps: null })
     expect(view.patternName).toBe('ghost')
+  })
+
+  it('resolves a run-only program from the local label cache and flags it unsaved', () => {
+    const view = describeControllerPanel({
+      activeProgramId: 'throwaway1',
+      programs,
+      programLabels: { throwaway1: 'My Sketch' },
+      fps: null,
+    })
+    expect(view.patternName).toBe('My Sketch')
+    expect(view.patternUnsaved).toBe(true)
+  })
+
+  it('prefers the device program list over the label cache (a saved program is not unsaved)', () => {
+    const view = describeControllerPanel({
+      activeProgramId: 'def',
+      programs,
+      programLabels: { def: 'Stale Name' },
+      fps: null,
+    })
+    expect(view.patternName).toBe('Nebula')
+    expect(view.patternUnsaved).toBe(false)
+  })
+
+  it('does not mark a list-resolved or raw-id name as unsaved', () => {
+    expect(describeControllerPanel({ activeProgramId: 'def', programs, fps: null }).patternUnsaved).toBe(false)
+    expect(describeControllerPanel({ activeProgramId: 'ghost', programs, fps: null }).patternUnsaved).toBe(false)
+  })
+})
+
+describe('resolveActiveProgramName', () => {
+  it('resolves through the program list first (saved, not unsaved)', () => {
+    expect(resolveActiveProgramName('abc', programs, { abc: 'cached' })).toEqual({
+      patternName: 'Aurora',
+      patternUnsaved: false,
+    })
+  })
+
+  it('falls to the label cache when the list misses (unsaved)', () => {
+    expect(resolveActiveProgramName('zzz', programs, { zzz: 'Run Only' })).toEqual({
+      patternName: 'Run Only',
+      patternUnsaved: true,
+    })
+  })
+
+  it('falls to the raw id when neither resolves', () => {
+    expect(resolveActiveProgramName('zzz', programs, {})).toEqual({
+      patternName: 'zzz',
+      patternUnsaved: false,
+    })
+  })
+
+  it('returns the placeholder when no program is active', () => {
+    expect(resolveActiveProgramName(undefined, programs)).toEqual({
+      patternName: '—',
+      patternUnsaved: false,
+    })
   })
 
   it('shows an em-dash placeholder when no pattern is active', () => {

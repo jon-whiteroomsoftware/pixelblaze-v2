@@ -684,7 +684,8 @@ multi-Controller list/select model is deferred.
   flashes its IP.
 - **The live panel** is a pinned popover under the active pill (#211). `controllerPanelStore`
   polls (`CONTROLLER_POLL_INTERVAL_MS`, 1s) a small live slice; `controllerPanelView`
-  renders it: the active pattern (id resolved to a name via the program list), reported
+  renders it: the active pattern (id resolved to a name via program-list → local label
+  cache → raw id, #237), reported
   FPS, the device `pixelCount`, the installed-map point count, and the live controls. On
   connect the panel is **warm-seeded** once (#225) so it opens populated rather than
   empty-then-jumping as the first poll lands.
@@ -704,7 +705,10 @@ runs in one of **two modes** (#236):
   run via `pushBytecode` — the firmware's `setCode`/`putByteCode`/`pause:false`
   sequence (the reference client's `sendPatternToRenderer`). The pattern runs but is
   **not persisted**: it never enters the device's Saved Patterns list and its id
-  resolves to no name. Run-only deliberately does **not** consult or write the binding.
+  resolves to no name. The `setCode` name is sent **empty** (`name:""`, matching the
+  reference): a name on a throwaway id would be a phantom — the display name lives in
+  the local label cache instead (below, #237). Run-only deliberately does **not**
+  consult or write the overwrite binding.
 - **Save** (`persist: true`): compile, encode a **PBP blob** (`encodePbp`, `pbpEncode.ts`)
   — a 17-char id plus a 36-byte header of nine LE uint32s (version, then offset/length
   pairs for name/jpeg/bytecode/source) followed by the concatenated sections; the source
@@ -720,7 +724,21 @@ the device program id it last saved to and reuses it (a remembered id the user d
 the device is silently re-minted, detected against the live `listPrograms`). Run-only's
 id never lists, so binding it would always miss and churn a fresh id every push — hence
 the reframe. Control values are never in either push; the binding is identity only,
-persisted in IndexedDB. `sendToController` is the pure
+persisted in IndexedDB.
+
+**Program label cache** (`withProgramLabel`, #237) is a *parallel* structure to the
+overwrite binding, persisted under its own IndexedDB key and keyed by **device program
+id** (not pattern id). Every push — run-only or save — records the pushed name against
+the program id it landed on, so the panel can name a running program the device list
+doesn't know. The panel resolves the active program's name in three tiers:
+**program-list name → local label → raw id** (`resolveActiveProgramName`); a label-tier
+hit is a run-only program the device hasn't saved, surfaced with an *unsaved* marker so
+running-but-not-saved reads honestly instead of looking identical to a saved pattern.
+The two stores stay separate deliberately: a run-only throwaway id must never clobber a
+pattern's saved overwrite target, since they answer different questions ("what is this
+program called?" vs. "which program do I overwrite for this pattern?").
+
+`sendToController` is the pure
 gate for the editor-header button: enabled only when a Controller is connected, the
 pattern compiles, and — *when known* — its dimensionality matches the installed map
 (an unknown map dim never blocks; a permanently-disabled Send would be worse). Before a

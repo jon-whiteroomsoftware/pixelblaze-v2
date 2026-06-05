@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { applyControllerPixelCount } from '@/engine/applyControllerPixelCount'
+import { getProgramLabels } from '@/engine/storage'
 import type { ProgramListEntry } from '@/engine/PixelblazeConnection'
 
 // Polling orchestration for the live Controller panel (H6, issue #198).
@@ -26,6 +27,11 @@ interface ControllerPanelState {
   activeProgramId?: string
   /** The Controller's program list, fetched once on start for id→name resolution. */
   programs: ProgramListEntry[]
+  /** Per-program label cache for the active Controller (program id → label), loaded
+   *  on seed and merged after each push (#237). Resolves a run-only program's name —
+   *  one that never enters the device list — so the panel shows the pattern's name
+   *  rather than the raw generated id. */
+  programLabels: Record<string, string>
   /** Device-reported frame rate; null until reported. */
   fps: number | null
   /** The device's configured pixel count; null until read. Editable via
@@ -67,6 +73,10 @@ interface ControllerPanelState {
   setPixelCount: (value: number) => void
   /** Set one control value on the device — volatile, never `save:true`. Optimistic. */
   setControl: (name: string, value: number) => void
+  /** Merge a freshly-pushed program label into the local cache for immediate display
+   *  (#237). The push path persists the cache to storage; this only mirrors it into the
+   *  live slice so the panel resolves the new name without waiting for a reseed. */
+  noteProgramLabel: (programId: string, label: string) => void
 }
 
 export const controllerPanelInitialState = {
@@ -78,6 +88,7 @@ export const controllerPanelInitialState = {
   mapPointCount: null,
   activeControls: {} as Record<string, number>,
   vars: {} as Record<string, number>,
+  programLabels: {} as Record<string, string>,
 }
 
 // Interval handle kept module-local (not in store state) so it never serializes
@@ -116,6 +127,12 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
     getControllerProvider()
       .getPixelMap()
       .then((map) => set({ mapPointCount: map ? map.length : null }))
+      .catch(() => {})
+    // Load this Controller's program label cache (#237) so a previously run-only push
+    // resolves to its name on reopen rather than the raw id. Keyed by Controller ip;
+    // an unknown ip yields an empty cache (only the device list resolves names then).
+    getProgramLabels()
+      .then((store) => set({ programLabels: ip ? store[ip] ?? {} : {} }))
       .catch(() => {})
     void get().poll()
   },
@@ -189,5 +206,9 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
     void getControllerProvider()
       .setControls({ [name]: value }, false)
       .catch(() => {})
+  },
+
+  noteProgramLabel: (programId, label) => {
+    set((s) => ({ programLabels: { ...s.programLabels, [programId]: label } }))
   },
 }))

@@ -1,5 +1,5 @@
 import type { Settings } from './settings'
-import type { BindingStore } from './controllerBinding'
+import type { BindingStore, ProgramLabelStore } from './controllerBinding'
 
 const DB_NAME = 'pixelblaze-ide'
 const DB_VERSION = 2
@@ -263,6 +263,27 @@ export async function setControllerBindings(
   db?: IDBDatabase,
 ): Promise<void> {
   await setSetting(CONTROLLER_BINDINGS_KEY, bindings, db)
+}
+
+// Per-Controller program label cache (#237), persisted as its own blob alongside the
+// overwrite bindings. Kept separate because it answers a different question (running
+// program id → name, vs. pattern id → overwrite target) and keying them apart stops a
+// run-only push from clobbering a saved pattern's overwrite binding. Pure logic lives
+// in controllerBinding.ts (withProgramLabel).
+const CONTROLLER_PROGRAM_LABELS_KEY = 'controller-program-labels'
+
+export async function getProgramLabels(
+  db?: IDBDatabase,
+): Promise<ProgramLabelStore> {
+  const stored = await getSetting<ProgramLabelStore>(CONTROLLER_PROGRAM_LABELS_KEY, db)
+  return stored ?? {}
+}
+
+export async function setProgramLabels(
+  labels: ProgramLabelStore,
+  db?: IDBDatabase,
+): Promise<void> {
+  await setSetting(CONTROLLER_PROGRAM_LABELS_KEY, labels, db)
 }
 
 export function resetDbCache(): void {

@@ -57,3 +57,35 @@ export function withBinding(
     [controllerId]: { ...(store[controllerId] ?? {}), [patternId]: programId },
   }
 }
+
+// ── Program label cache (#237) ───────────────────────────────────────────────
+// A run-only push loads + runs under a throwaway program id that never enters the
+// device's program list, so the panel's id→name lookup misses and falls to the raw
+// id (the post-push junk-id flicker). The label cache remembers, per Controller, the
+// display name we pushed for each program id — keyed by *program id* (not pattern id)
+// because the panel resolves the device's reported active program, which is what runs
+// regardless of which IDE pattern is open. It is a parallel structure to the overwrite
+// binding above (which is keyed by pattern id and is save-mode only): the two answer
+// different questions — "which program do I overwrite for this pattern?" vs. "what is
+// this running program called?" — and conflating them would let a run-only push clobber
+// a saved pattern's overwrite target.
+
+/** A Controller's label cache: device program id → the label last pushed for it. */
+export type ProgramLabels = Record<string, string>
+
+/** All label caches, keyed by Controller id. */
+export type ProgramLabelStore = Record<string, ProgramLabels>
+
+/** Return a new ProgramLabelStore with `(controllerId, programId) → label` recorded,
+ *  without mutating the input (siblings preserved). */
+export function withProgramLabel(
+  store: ProgramLabelStore,
+  controllerId: string,
+  programId: string,
+  label: string,
+): ProgramLabelStore {
+  return {
+    ...store,
+    [controllerId]: { ...(store[controllerId] ?? {}), [programId]: label },
+  }
+}

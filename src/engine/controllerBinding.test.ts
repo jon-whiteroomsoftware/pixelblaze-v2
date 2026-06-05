@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePushTarget, withBinding, type BindingStore } from './controllerBinding'
+import {
+  resolvePushTarget,
+  withBinding,
+  withProgramLabel,
+  type BindingStore,
+  type ProgramLabelStore,
+} from './controllerBinding'
 
 const mint = () => 'NEWID00000000000'
 
@@ -49,6 +55,33 @@ describe('withBinding', () => {
     const store: BindingStore = { 'ctrl-A': { 'pat-1': 'OLD' } }
     expect(withBinding(store, 'ctrl-A', 'pat-1', 'NEW')).toEqual({
       'ctrl-A': { 'pat-1': 'NEW' },
+    })
+  })
+})
+
+describe('withProgramLabel', () => {
+  it('records a program label without mutating the input', () => {
+    const store: ProgramLabelStore = {}
+    const next = withProgramLabel(store, 'ctrl-A', 'PROG1', 'Aurora')
+    expect(next).toEqual({ 'ctrl-A': { PROG1: 'Aurora' } })
+    expect(store).toEqual({})
+  })
+
+  it('preserves sibling controllers and sibling programs', () => {
+    const store: ProgramLabelStore = {
+      'ctrl-A': { PROG1: 'Aurora' },
+      'ctrl-B': { PROG9: 'Nebula' },
+    }
+    expect(withProgramLabel(store, 'ctrl-A', 'PROG2', 'Plasma')).toEqual({
+      'ctrl-A': { PROG1: 'Aurora', PROG2: 'Plasma' },
+      'ctrl-B': { PROG9: 'Nebula' },
+    })
+  })
+
+  it('overwrites the label for an existing program id', () => {
+    const store: ProgramLabelStore = { 'ctrl-A': { PROG1: 'Old' } }
+    expect(withProgramLabel(store, 'ctrl-A', 'PROG1', 'New')).toEqual({
+      'ctrl-A': { PROG1: 'New' },
     })
   })
 })

@@ -6,6 +6,8 @@ import {
   controllerPanelInitialState,
 } from '@/store/controllerPanelStore'
 import { useEditorStore, editorInitialState } from '@/store/editorStore'
+import { useControllerStore } from '@/store/controllerStore'
+import { setProgramLabels } from '@/engine/storage'
 import { setControllerProvider, resetControllerProvider } from '@/engine/controllerProviderRegistry'
 import {
   NullControllerProvider,
@@ -89,6 +91,20 @@ describe('ControllerPanel', () => {
     await waitFor(() => expect(screen.getByText('Nebula')).toBeInTheDocument())
     expect(screen.getByText('30.0')).toBeInTheDocument()
     expect(screen.getByLabelText('Controller brightness')).toBeInTheDocument()
+  })
+
+  it('resolves a run-only program to its label-cache name with an unsaved marker (#237)', async () => {
+    // A run-only program id the device list does not know about, but the local label
+    // cache (loaded for the active Controller) does.
+    await setProgramLabels({ '10.0.0.9': { 'run-xyz': 'My Sketch' } })
+    useControllerStore.setState({ activeIp: '10.0.0.9' })
+    const provider = new ConnectedProvider()
+    provider.config = { ...provider.config, activeProgramId: 'run-xyz' }
+    setControllerProvider(provider)
+    render(<ControllerPanel />)
+
+    await waitFor(() => expect(screen.getByText('My Sketch')).toBeInTheDocument())
+    expect(screen.getByTestId('controller-pattern-unsaved')).toBeInTheDocument()
   })
 
   it('renders the running pattern controls and watched vars when connected', async () => {
