@@ -5,6 +5,7 @@ import {
   useControllerPanelStore,
   controllerPanelInitialState,
 } from '@/store/controllerPanelStore'
+import { useEditorStore, editorInitialState } from '@/store/editorStore'
 import { setControllerProvider, resetControllerProvider } from '@/engine/controllerProviderRegistry'
 import {
   NullControllerProvider,
@@ -62,6 +63,7 @@ class ConnectedProvider extends NullControllerProvider {
 
 beforeEach(() => {
   useControllerPanelStore.setState(controllerPanelInitialState)
+  useEditorStore.setState(editorInitialState)
 })
 
 afterEach(() => {
@@ -80,7 +82,10 @@ describe('ControllerPanel', () => {
     setControllerProvider(new ConnectedProvider())
     render(<ControllerPanel />)
     expect(screen.getByTestId('controller-panel')).toBeInTheDocument()
-    expect(screen.getByText('Living Room')).toBeInTheDocument()
+    // The first section is labeled "Pixelblaze" (matching the preview deck); the
+    // device's IP shows in its own box, not as the section header.
+    expect(screen.getByText('Pixelblaze')).toBeInTheDocument()
+    expect(screen.getByText('10.0.0.9')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('Nebula')).toBeInTheDocument())
     expect(screen.getByText('30.0')).toBeInTheDocument()
     expect(screen.getByLabelText('Controller brightness')).toBeInTheDocument()
@@ -94,6 +99,26 @@ describe('ControllerPanel', () => {
     // Watched var name + formatted value.
     expect(screen.getByText('phase')).toBeInTheDocument()
     expect(screen.getByText('0.50')).toBeInTheDocument()
+  })
+
+  it('shows the pattern-controls help only when the loaded pattern has descriptions', async () => {
+    setControllerProvider(new ConnectedProvider())
+    // No description metadata loaded → no help affordance on the controls section.
+    const { rerender } = render(<ControllerPanel />)
+    await waitFor(() => expect(screen.getByLabelText('sliderSpeed')).toBeInTheDocument())
+    expect(
+      screen.queryByLabelText('About the pattern controls section'),
+    ).not.toBeInTheDocument()
+
+    // Load the matching pattern metadata with a description → the "?" appears, and
+    // its content describes the control.
+    useEditorStore.getState().setControls([
+      { exportName: 'sliderSpeed', kind: 'slider', label: 'Speed', description: 'How fast it goes.' },
+    ])
+    rerender(<ControllerPanel />)
+    const help = await screen.findByLabelText('About the pattern controls section')
+    fireEvent.click(help)
+    expect(screen.getByText(/How fast it goes\./)).toBeInTheDocument()
   })
 
   it('writes a control through the provider (volatile) when a slider moves', async () => {

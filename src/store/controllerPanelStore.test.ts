@@ -222,15 +222,34 @@ describe('controllerPanelStore', () => {
     expect(provider.brightnessWrites).toEqual([])
   })
 
-  it('stop() halts polling and resets state', async () => {
-    useControllerPanelStore.getState().start()
+  it('stop() halts polling but keeps the last values for a seamless reopen', async () => {
+    useControllerPanelStore.getState().start('1.2.3.4')
     await flush()
+    expect(useControllerPanelStore.getState().fps).toBe(30)
     useControllerPanelStore.getState().stop()
-    expect(useControllerPanelStore.getState()).toMatchObject(controllerPanelInitialState)
-    // No further polls after stop.
+    // State is preserved (no blank flash on reopen), but no further polls run.
+    expect(useControllerPanelStore.getState().fps).toBe(30)
     provider.telemetry = { fps: 99 }
     await vi.advanceTimersByTimeAsync(CONTROLLER_POLL_INTERVAL_MS * 3)
+    expect(useControllerPanelStore.getState().fps).toBe(30)
+  })
+
+  it('reopening the same device keeps values; a different device clears them first', async () => {
+    useControllerPanelStore.getState().start('1.2.3.4')
+    await flush()
+    useControllerPanelStore.getState().stop()
+
+    // Reopen the SAME device: values survive into the new session immediately.
+    useControllerPanelStore.getState().start('1.2.3.4')
+    expect(useControllerPanelStore.getState().fps).toBe(30)
+    await flush()
+    useControllerPanelStore.getState().stop()
+
+    // Open a DIFFERENT device: stale values are cleared before the warm fetch lands.
+    useControllerPanelStore.getState().start('5.6.7.8')
     expect(useControllerPanelStore.getState().fps).toBeNull()
+    await flush()
+    expect(useControllerPanelStore.getState().fps).toBe(30)
   })
 
   it('tolerates a failing poll without throwing', async () => {

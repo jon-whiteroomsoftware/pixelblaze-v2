@@ -79,6 +79,10 @@ export interface ControllerControl {
   kind: 'slider' | 'toggle'
   /** Current value (0..1 for sliders, 0/1 for toggles). */
   value: number
+  /** End-user description of the control, when known. The device reports controls
+   *  without descriptions, so this is supplied by the caller (matched by name to the
+   *  loaded pattern's metadata, #190) and is absent for user/imported patterns. */
+  description?: string
 }
 
 const KNOWN_PREFIXES = ['hsvPicker', 'rgbPicker', 'slider', 'toggle'] as const
@@ -89,9 +93,12 @@ function labelFromSuffix(suffix: string): string {
 
 /** Shape the device's flat `activeControls` map into a list the panel can render.
  *  Kind is recovered from the name prefix; toggles render as checkboxes, everything
- *  else as a slider. Insertion order is preserved. */
+ *  else as a slider. Insertion order is preserved. An optional `descriptions` lookup
+ *  (control name → text) attaches end-user help when the loaded pattern's metadata
+ *  carries it (#190); names with no entry simply omit the description. */
 export function shapeControllerControls(
   activeControls?: Record<string, number>,
+  descriptions?: Record<string, string>,
 ): ControllerControl[] {
   if (!activeControls) return []
   const out: ControllerControl[] = []
@@ -100,7 +107,8 @@ export function shapeControllerControls(
     const prefix = KNOWN_PREFIXES.find((p) => name.startsWith(p) && name.length > p.length)
     const label = prefix ? labelFromSuffix(name.slice(prefix.length)) || name : name
     const kind = prefix === 'toggle' ? 'toggle' : 'slider'
-    out.push({ name, label, kind, value: raw })
+    const description = descriptions?.[name]?.trim() || undefined
+    out.push({ name, label, kind, value: raw, description })
   }
   return out
 }

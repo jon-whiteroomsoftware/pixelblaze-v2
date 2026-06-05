@@ -93,8 +93,10 @@ function ControllerPillButton({
         >
           <div className="flex items-center justify-between gap-2 border-b border-seam px-3 py-2">
             <span className="flex min-w-0 items-baseline gap-1.5">
+              {/* One identity only: the device name once known, else its IP. The IP
+                  also appears as a labeled box inside the panel, so showing it here
+                  too would be redundant. */}
               <span className="truncate text-zinc-200">{nickname ?? ip}</span>
-              {nickname && <span className="shrink-0 text-zinc-500">{ip}</span>}
             </span>
             <button
               type="button"

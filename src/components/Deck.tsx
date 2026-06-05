@@ -17,12 +17,12 @@ export function DeckSectionHint({
   intro,
   items,
 }: {
-  intro: string
+  intro?: string
   items: [string, string][]
 }) {
   return (
     <div className="flex flex-col gap-2 normal-case tracking-normal">
-      <p className="text-zinc-300 leading-snug">{intro}</p>
+      {intro && <p className="text-zinc-300 leading-snug">{intro}</p>}
       <div className="flex flex-col gap-1.5">
         {items.map(([label, desc]) => (
           <div key={label} className="leading-snug">
@@ -106,5 +106,17 @@ export function DeckTelemetry({ label, value }: { label: string; value: string }
     <DeckCell label={label}>
       <span className="text-live tabular-nums truncate">{value}</span>
     </DeckCell>
+  )
+}
+
+// A stacked (two-line) read-only stat: label above, the live amber value below — the
+// text counterpart to DeckSlider's stacked layout. Use it for a value that needs the
+// full cell width (a long pattern name) where the one-line DeckTelemetry would clip.
+export function DeckStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-zinc-400 truncate">{label}</span>
+      <span className="text-live truncate">{value}</span>
+    </div>
   )
 }

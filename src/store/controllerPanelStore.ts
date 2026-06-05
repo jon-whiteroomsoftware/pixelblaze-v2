@@ -45,12 +45,17 @@ interface ControllerPanelState {
   vars: Record<string, number>
   /** One-shot warm fetch: program list + installed map + a single poll, without
    *  starting the interval. Called on connect (#225) so the panel opens populated
-   *  instead of empty-then-jumping, and reused by `start()` as its first tick. */
-  seed: () => void
+   *  instead of empty-then-jumping, and reused by `start()` as its first tick. The
+   *  optional `ip` identifies which Controller the state belongs to: reseeding the
+   *  *same* device keeps the last-known values (no blank flash on a panel reopen),
+   *  while a *different* device clears stale values first. */
+  seed: (ip?: string) => void
   /** Begin polling (idempotent). Seeds once, then polls config + telemetry + vars
    *  on the interval. */
-  start: () => void
-  /** Stop polling and reset to the disconnected baseline. */
+  start: (ip?: string) => void
+  /** Stop polling. Keeps the last-known values so the next open shows them
+   *  immediately while a fresh poll refreshes them; stale values from a *different*
+   *  device are cleared by `seed()`, not here. */
   stop: () => void
   /** One poll tick: read config + telemetry + vars, tolerating transient failures. */
   poll: () => Promise<void>
@@ -84,11 +89,23 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 // when this differs from the reported active program, then leaves them slider-owned.
 let controlsSeededFor: string | undefined
 
+// Which Controller the current panel state belongs to. Module-local identity used
+// to decide whether a reseed should keep the existing values (same device — a panel
+// reopen) or clear them first (a genuine device switch). Undefined until first seed.
+let seededForIp: string | undefined
+
 export const useControllerPanelStore = create<ControllerPanelState>()((set, get) => ({
   ...controllerPanelInitialState,
 
-  seed: () => {
-    controlsSeededFor = undefined
+  seed: (ip) => {
+    // Clear stale values only when opening a *different* Controller. A reopen of the
+    // same device keeps its last-known values so the panel renders populated at once
+    // and the warm fetch below just refreshes them — no blank-then-populate flash.
+    if (ip !== seededForIp) {
+      seededForIp = ip
+      controlsSeededFor = undefined
+      set(controllerPanelInitialState)
+    }
     // Program names rarely change; fetch the list once and tolerate failure.
     getControllerProvider()
       .listPrograms()
@@ -103,9 +120,9 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
     void get().poll()
   },
 
-  start: () => {
+  start: (ip) => {
     if (pollTimer !== null) return
-    get().seed()
+    get().seed(ip)
     pollTimer = setInterval(() => void get().poll(), CONTROLLER_POLL_INTERVAL_MS)
   },
 
@@ -114,8 +131,12 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
       clearInterval(pollTimer)
       pollTimer = null
     }
+    // Deliberately keep the visible state and `seededForIp`: closing the panel must
+    // not wipe the populated UI, so the next open of the same device shows its values
+    // immediately (a device switch resets them in seed()). `controlsSeededFor` is
+    // cleared so the next poll re-adopts the device's controls — those equal the last
+    // local values (we wrote them through), so it's identical on screen, no flash.
     controlsSeededFor = undefined
-    set(controllerPanelInitialState)
   },
 
   poll: async () => {

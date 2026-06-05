@@ -93,8 +93,10 @@ describe('ControllerBar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle Desk panel' }))
     const popover = screen.getByTestId('controller-panel-popover')
+    // The header shows one identity only: the device name, not the IP (the IP moved
+    // into a labeled box inside the panel, so duplicating it here was redundant).
     expect(popover).toHaveTextContent('Desk')
-    expect(popover).toHaveTextContent('10.0.0.5')
+    expect(popover).not.toHaveTextContent('10.0.0.5')
     expect(screen.getByTestId('controller-pill-remove')).toHaveAccessibleName('Disconnect Desk')
   })
 

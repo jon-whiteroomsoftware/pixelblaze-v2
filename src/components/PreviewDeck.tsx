@@ -31,7 +31,6 @@ import {
 // section is renderer-only and never leaves the browser.
 const PIXELBLAZE_HINT = (
   <DeckSectionHint
-    intro="Real Pixelblaze device settings — these live on the controller and carry over to hardware."
     items={[
       ['pixel count', 'how many LEDs the pattern drives'],
       ['fit', 'how the pixel map is normalized into pattern space — Contain keeps the aspect ratio, Fill stretches each axis to fill it'],
@@ -42,7 +41,7 @@ const PIXELBLAZE_HINT = (
 
 const PREVIEW_HINT = (
   <DeckSectionHint
-    intro="Preview-only — these shape how the pattern looks in the browser and are never sent to a Pixelblaze."
+    intro="Preview only — these controls affect the IDE but are never sent to the controller."
     items={[
       ['light size', 'on-screen size of each rendered LED'],
       ['diffusion', 'soft glow and blending between neighbouring lights'],

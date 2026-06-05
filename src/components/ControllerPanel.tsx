@@ -3,12 +3,20 @@ import { clampPixelCount } from '@/engine/camera'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { useControllerStore } from '@/store/controllerStore'
 import { useControllerPanelStore } from '@/store/controllerPanelStore'
+import { useEditorStore } from '@/store/editorStore'
 import {
   describeControllerPanel,
   shapeControllerControls,
   describeControllerVars,
 } from '@/engine/controllerPanelView'
-import { DeckSection, DeckSectionHint, DeckGrid, DeckCell, DeckTelemetry } from '@/components/Deck'
+import {
+  DeckSection,
+  DeckSectionHint,
+  DeckGrid,
+  DeckCell,
+  DeckTelemetry,
+  DeckStat,
+} from '@/components/Deck'
 import { DeckSlider } from '@/components/DeckSlider'
 
 // The live Controller panel (H6, issue #198). A dashboard built from the *same*
@@ -23,25 +31,35 @@ import { DeckSlider } from '@/components/DeckSlider'
 
 const PANEL_HINT = (
   <DeckSectionHint
-    intro="Live state read from the connected Pixelblaze. Brightness is sent to the device immediately and is not persisted to flash."
     items={[
       ['pattern', 'the pattern the Controller is currently running'],
-      ['fps', 'frame rate the device reports'],
-      ['pixel count', 'number of pixels configured on the device — editable; saved to the device so it survives a reboot'],
       ['brightness', 'master output level on the device — applied live'],
+      ['map points', 'number of coordinates in the device’s installed pixel map'],
+      ['pixel count', 'number of pixels configured on the device — editable; saved to the device so it survives a reboot'],
+      ['IP', 'the device’s address on the local network'],
+      ['fps', 'frame rate the device reports'],
     ]}
   />
 )
 
-const CONTROLS_HINT = (
-  <DeckSectionHint
-    intro="The running pattern's UI controls, read live from the device. Changes are sent to the Controller immediately and are not persisted to flash."
-    items={[
-      ['sliders', 'continuous values the pattern exposes — applied live'],
-      ['toggles', 'on/off switches the pattern exposes — applied live'],
-    ]}
-  />
-)
+// The pattern-controls help hint, built from whatever descriptions we have for the
+// running pattern's controls (matched by name to the loaded pattern's metadata, #190).
+// Mirrors the preview deck's pattern-controls hover: a label-keyed list of what each
+// control does. Returns null when no control carries a description, so the caller can
+// omit the help affordance entirely rather than show an empty "?".
+function buildControlsHint(controls: { name: string; label: string; description?: string }[]) {
+  if (!controls.some((c) => c.description)) return null
+  return (
+    <div className="flex flex-col gap-1.5 normal-case tracking-normal">
+      {controls.map((c) => (
+        <div key={c.name} className="leading-snug">
+          <span className="text-zinc-200">{c.label}</span>
+          {c.description && <span className="text-zinc-400"> — {c.description}</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const VARS_HINT = (
   <DeckSectionHint
@@ -114,7 +132,7 @@ export function ControllerPanel() {
   // device (a fresh seed of brightness/controls) rather than fighting stale state.
   useEffect(() => {
     if (!connected) return
-    start()
+    start(activeIp ?? undefined)
     return () => stop()
   }, [connected, activeIp, start, stop])
 
@@ -128,8 +146,18 @@ export function ControllerPanel() {
   const vars = useControllerPanelStore((s) => s.vars)
   const setBrightness = useControllerPanelStore((s) => s.setBrightness)
   const setControl = useControllerPanelStore((s) => s.setControl)
+  // Control help text isn't reported by the device; borrow it from the loaded
+  // pattern's metadata, matched by control name (#190). When the editor holds a
+  // different pattern (or a user/imported one with no descriptions) nothing matches
+  // and the controls section shows no help affordance at all.
+  const editorControls = useEditorStore((s) => s.controls)
 
   if (!connected) return null
+
+  const controlDescriptions: Record<string, string> = {}
+  for (const c of editorControls) {
+    if (c.description) controlDescriptions[c.exportName] = c.description
+  }
 
   const { patternName, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch } =
     describeControllerPanel({
@@ -139,20 +167,26 @@ export function ControllerPanel() {
       pixelCount,
       mapPointCount,
     })
-  const controls = shapeControllerControls(activeControls)
+  const controls = shapeControllerControls(activeControls, controlDescriptions)
+  const controlsHint = buildControlsHint(controls)
   const watchedVars = describeControllerVars(vars)
-  // The section header carries the Controller's identity (device name, else its address).
-  const label = status.controller.name ?? status.controller.address
 
   return (
     <div className="font-mono pl-3 text-xs" data-testid="controller-panel">
-      <DeckSection label={label} hint={PANEL_HINT}>
-        <DeckGrid gapY="gap-y-1" className="mb-2">
-          <DeckTelemetry label="pattern" value={patternName} />
-          <DeckTelemetry label="fps" value={fpsLabel} />
-          <DeckCell label="pixel count">
-            <ControllerPixelCountInput />
-          </DeckCell>
+      <DeckSection label="Pixelblaze" hint={PANEL_HINT}>
+        <DeckGrid gapY="gap-y-2">
+          {/* Row 1: pattern + brightness, both stacked for the width they need. */}
+          <DeckStat label="pattern" value={patternName} />
+          <DeckSlider
+            label="brightness"
+            ariaLabel="Controller brightness"
+            value={brightness ?? 0}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={setBrightness}
+          />
+          {/* Row 2: map points + pixel count. */}
           <DeckCell label="map points">
             <span
               className={`tabular-nums truncate ${mapCountMismatch ? 'text-amber-400' : 'text-live'}`}
@@ -166,22 +200,17 @@ export function ControllerPanel() {
               {mapPointsLabel}
             </span>
           </DeckCell>
-        </DeckGrid>
-        <DeckGrid>
-          <DeckSlider
-            label="brightness"
-            ariaLabel="Controller brightness"
-            value={brightness ?? 0}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={setBrightness}
-          />
+          <DeckCell label="pixel count">
+            <ControllerPixelCountInput />
+          </DeckCell>
+          {/* Row 3: IP + fps. */}
+          <DeckTelemetry label="IP" value={status.controller.address} />
+          <DeckTelemetry label="fps" value={fpsLabel} />
         </DeckGrid>
       </DeckSection>
 
       {controls.length > 0 && (
-        <DeckSection label="controls" hint={CONTROLS_HINT}>
+        <DeckSection label="pattern controls" hint={controlsHint ?? undefined}>
           <DeckGrid>
             {controls.map((c) =>
               c.kind === 'toggle' ? (
