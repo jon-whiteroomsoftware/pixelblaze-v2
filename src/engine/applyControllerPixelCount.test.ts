@@ -1,90 +1,83 @@
 import { describe, it, expect } from 'vitest'
 import { applyControllerPixelCount } from './applyControllerPixelCount'
-import { NullControllerProvider } from './ControllerProvider'
+import { NullControllerProvider, type ControllerConfig } from './ControllerProvider'
 
 class StubProvider extends NullControllerProvider {
-  installedMap: number[][] | null = null
+  config: ControllerConfig = { brightness: 0.5 }
+  configRejects = false
+  calls: string[] = []
   pixelCountWrites: Array<{ value: number; save: boolean }> = []
-  mapWrites: number[][][] = []
-  getPixelMapCalls = 0
+  brightnessWrites: Array<{ value: number; save: boolean }> = []
 
+  getConfig(): Promise<ControllerConfig> {
+    this.calls.push('getConfig')
+    return this.configRejects
+      ? Promise.reject(new Error('no config'))
+      : Promise.resolve(this.config)
+  }
   setPixelCount(value: number, save = true): Promise<void> {
+    this.calls.push(`setPixelCount(${value},${save})`)
     this.pixelCountWrites.push({ value, save })
     return Promise.resolve()
   }
-  getPixelMap(): Promise<number[][] | null> {
-    this.getPixelMapCalls++
-    return Promise.resolve(this.installedMap)
-  }
-  setPixelMap(points: number[][]): Promise<void> {
-    this.mapWrites.push(points)
+  setBrightness(value: number, save = false): Promise<void> {
+    this.calls.push(`setBrightness(${value},${save})`)
+    this.brightnessWrites.push({ value, save })
     return Promise.resolve()
   }
 }
 
-const grid = (n: number): number[][] => Array.from({ length: n }, (_, i) => [i, 0])
-
-// Each apply issues a live (save:false) write to clear the tail, then a persisted
-// (save:true) write so the count survives a reboot.
-const pcWrites = (v: number) => [
-  { value: v, save: false },
-  { value: v, save: true },
-]
+// Pass an instant sleep so the dark-frame wait doesn't slow the suite.
+const noSleep = () => Promise.resolve()
 
 describe('applyControllerPixelCount', () => {
-  it('reduction with an oversized map truncates and re-sends the slice', async () => {
+  it('reduction blacks out the strip, shrinks, then restores brightness (#222)', async () => {
     const p = new StubProvider()
-    p.installedMap = grid(128)
-    const result = await applyControllerPixelCount(p, 58, 128)
-    expect(p.pixelCountWrites).toEqual(pcWrites(58))
-    expect(p.mapWrites).toHaveLength(1)
-    expect(p.mapWrites[0]).toEqual(grid(58))
-    expect(result).toBe(58)
+    p.config = { brightness: 0.17 }
+    await applyControllerPixelCount(p, 4, 256, noSleep)
+    // Drive every (old-length) LED to black, *then* drop the count so the tail
+    // freezes at black, then bring brightness back to where it was.
+    expect(p.calls).toEqual([
+      'getConfig',
+      'setBrightness(0,false)',
+      'setPixelCount(4,true)',
+      'setBrightness(0.17,false)',
+    ])
   })
 
-  it('reduction with no installed map writes only the count', async () => {
+  it('reduction with unreadable brightness falls back to a plain count write', async () => {
+    // Without a known brightness we cannot safely zero it (we could strand the
+    // strip dark), so skip the blackout entirely.
     const p = new StubProvider()
-    p.installedMap = null
-    const result = await applyControllerPixelCount(p, 58, 128)
-    expect(p.pixelCountWrites).toEqual(pcWrites(58))
-    expect(p.mapWrites).toEqual([])
-    expect(result).toBeNull()
+    p.configRejects = true
+    await applyControllerPixelCount(p, 4, 256, noSleep)
+    expect(p.brightnessWrites).toEqual([])
+    expect(p.pixelCountWrites).toEqual([{ value: 4, save: true }])
   })
 
-  it('reduction with a map already small enough leaves the map alone', async () => {
+  it('reduction with no brightness in config falls back to a plain count write', async () => {
     const p = new StubProvider()
-    p.installedMap = grid(40)
-    const result = await applyControllerPixelCount(p, 58, 128)
-    expect(p.mapWrites).toEqual([])
-    expect(result).toBeNull()
+    p.config = {}
+    await applyControllerPixelCount(p, 4, 256, noSleep)
+    expect(p.brightnessWrites).toEqual([])
+    expect(p.pixelCountWrites).toEqual([{ value: 4, save: true }])
   })
 
-  it('raising the count never reads or writes the map', async () => {
+  it('raising the count just writes it — no blackout, no config read', async () => {
     const p = new StubProvider()
-    p.installedMap = grid(128)
-    const result = await applyControllerPixelCount(p, 200, 128)
-    expect(p.pixelCountWrites).toEqual(pcWrites(200))
-    expect(p.getPixelMapCalls).toBe(0)
-    expect(p.mapWrites).toEqual([])
-    expect(result).toBeNull()
+    await applyControllerPixelCount(p, 256, 4, noSleep)
+    expect(p.calls).toEqual(['setPixelCount(256,true)'])
   })
 
-  it('unknown previous count writes only the count (no truncation guess)', async () => {
+  it('unchanged count just writes it', async () => {
     const p = new StubProvider()
-    p.installedMap = grid(128)
-    const result = await applyControllerPixelCount(p, 58, null)
-    expect(p.pixelCountWrites).toEqual(pcWrites(58))
-    expect(p.getPixelMapCalls).toBe(0)
-    expect(p.mapWrites).toEqual([])
-    expect(result).toBeNull()
+    await applyControllerPixelCount(p, 64, 64, noSleep)
+    expect(p.calls).toEqual(['setPixelCount(64,true)'])
   })
 
-  it('tolerates a failing map read-back — count still written', async () => {
+  it('unknown previous count just writes it (cannot tell a reduction)', async () => {
     const p = new StubProvider()
-    p.getPixelMap = () => Promise.reject(new Error('no map endpoint'))
-    const result = await applyControllerPixelCount(p, 58, 128)
-    expect(p.pixelCountWrites).toEqual(pcWrites(58))
-    expect(p.mapWrites).toEqual([])
-    expect(result).toBeNull()
+    await applyControllerPixelCount(p, 4, null, noSleep)
+    expect(p.calls).toEqual(['setPixelCount(4,true)'])
   })
 })

@@ -1,6 +1,30 @@
 # Handoff — Issue #222: reducing the Controller pixel count doesn't darken the LEDs beyond the new limit
 
-**Status:** UNRESOLVED on hardware. Two approaches tried; first disproven on hardware, second (current code) **not yet hardware-tested**. This doc captures everything learned so the next agent can pick up without re-deriving it.
+**Status: RESOLVED on hardware (2026-06-04).** The fix is the blackout-then-shrink maneuver in `applyControllerPixelCount.ts` — verified live on the user's device. The history below is kept for the record; the resolution is in the next section.
+
+## Resolution (verified on hardware 2026-06-04)
+
+We captured the canonical Pixelblaze UI's behavior directly (WebSocket hook on the device's own web page) and observed, on the physical strip:
+
+1. **The canonical UI does NOT clear the tail on a count reduction.** The original assumption behind #222 was false — reducing the count in the gold-standard editor leaves LEDs beyond the new count frozen at their last colour, exactly like ours did.
+2. **Pushing a smaller map does NOT clear the tail either** (tested directly). So the map-truncation approach in the old code never did the job it was added for. (Both `pixelCount` and map writes from the device UI go over **HTTP**, not WebSocket — only `ping`/`sendUpdates` cross the WS.)
+3. **There is no per-pixel wire command.** You cannot walk the strip and disable pixels individually.
+
+**The working fix** (the only mechanism that darkens the tail, since WS2812s hold their last value until re-clocked and the device only clocks `pixelCount` LEDs): clock the whole strip black *while the count is still high*, then shrink.
+
+```
+reduce(oldCount -> newCount):
+  setBrightness(0, save:false)     // drive every old-length LED black
+  wait ~400ms                      // let the device render >=1 full-length black frame
+  setPixelCount(newCount, save:true)
+  setBrightness(restore, save:false)  // first newCount resume the pattern; tail frozen black
+```
+
+Brightness is read from `getConfig()`; if it can't be read we skip the blackout (zeroing a brightness we can't restore would strand the strip dark) and fall back to a plain count write. Only runs on a genuine reduction. Lives in `src/engine/applyControllerPixelCount.ts` (returns `void` now — the old map-truncation and its return value are gone). Verified live: the tail goes dark and stays dark, first N LEDs resume the pattern. Full suite green (1288), `tsc` clean.
+
+---
+
+## Original investigation (superseded; kept for the record)
 
 ## The problem
 

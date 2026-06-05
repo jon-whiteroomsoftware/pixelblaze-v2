@@ -148,17 +148,11 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
 
   setPixelCount: (value) => {
     // Capture the live device count before the optimistic local set so the helper
-    // can tell a reduction (which must truncate the device map, #222) from a raise.
+    // can tell a reduction (which blacks out the strip before shrinking so the tail
+    // LEDs go dark, #222) from a raise.
     const prev = get().pixelCount
     set({ pixelCount: value })
-    void applyControllerPixelCount(getControllerProvider(), value, prev)
-      .then((newMapCount) => {
-        // The map was truncated to match the smaller count — reflect its new point
-        // count so the panel's points/pixels readout stays truthful (mapPointCount
-        // is otherwise only read once on start).
-        if (newMapCount != null) set({ mapPointCount: newMapCount })
-      })
-      .catch(() => {})
+    void applyControllerPixelCount(getControllerProvider(), value, prev).catch(() => {})
   },
 
   setControl: (name, value) => {

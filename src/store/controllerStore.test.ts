@@ -419,19 +419,21 @@ describe('controllerStore (keyed)', () => {
 
       const provider = created.get('10.0.0.5')!
       // The pixel-count-only combination: count set to the map's point count, no map write.
-      // Two writes — a live (save:false) apply then a persisted one (#222).
-      expect(provider.setPixelCounts).toEqual([2, 2])
+      expect(provider.setPixelCounts).toEqual([2])
       expect(provider.pushedMaps).toHaveLength(0)
       expect(store().preflight).toBeNull()
       expect(store().mapPushRemedyCount).toBeNull()
       expect(store().pushResult).toEqual({ ok: true, created: false })
     })
 
-    it('confirmSetPixelCountOnly truncates the device map when it lowers the count (#222)', async () => {
+    it('confirmSetPixelCountOnly leaves the device map alone when it lowers the count (#222)', async () => {
       await armMap(256)
       const provider = created.get('10.0.0.5')!
       // The device currently runs 8 pixels with an 8-point map; the live panel count
-      // reflects that. The count-only remedy drops it to the map's 2 points.
+      // reflects that. The count-only remedy drops it to the map's 2 points. The tail
+      // is darkened by the blackout-then-shrink maneuver in applyControllerPixelCount,
+      // NOT by rewriting the map — pushing a smaller map does not clear LEDs (verified
+      // on hardware), so the device map is left untouched.
       provider.pixelMap = [
         [0, 0],
         [0.1, 0],
@@ -446,14 +448,9 @@ describe('controllerStore (keyed)', () => {
       await store().requestMapPush()
       await store().confirmSetPixelCountOnly()
 
-      expect(provider.setPixelCounts).toEqual([2, 2])
-      // Map truncated to the new count so the firmware drops pixels beyond it.
-      expect(provider.pushedMaps).toHaveLength(1)
-      expect(provider.pushedMaps[0].points).toEqual([
-        [0, 0],
-        [0.1, 0],
-      ])
-      expect(useControllerPanelStore.getState().mapPointCount).toBe(2)
+      expect(provider.setPixelCounts).toEqual([2])
+      expect(provider.pushedMaps).toHaveLength(0)
+      expect(useControllerPanelStore.getState().mapPointCount).toBe(8)
       expect(store().pushResult).toEqual({ ok: true, created: false })
     })
 
