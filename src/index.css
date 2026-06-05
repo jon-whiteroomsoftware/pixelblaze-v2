@@ -218,3 +218,29 @@
     --cycle: 4.2s;
   }
 }
+/* Controller "connecting" indicator: a fast green/black blink, like a network
+   device's link LED searching for signal. It shares the connected green (--color-ok)
+   but blinks hard (stepped, not a soft fade) until the link settles to a solid dot.
+   A separate tone from the amber "working" pulse so the editor's compile badge keeps
+   its own vocabulary. */
+@keyframes blink-connect {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.12;
+  }
+}
+.animate-blink-connect {
+  animation: blink-connect 0.22s steps(1, end) infinite;
+}
+/* Honour reduce-motion: drop the blink to a steady-but-dimmed green so the
+   "connecting" state still reads as distinct from solid "connected". */
+@media (prefers-reduced-motion: reduce) {
+  .animate-blink-connect {
+    animation: none;
+    opacity: 0.55;
+  }
+}

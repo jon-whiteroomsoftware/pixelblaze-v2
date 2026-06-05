@@ -48,10 +48,19 @@ describe('ControllerBar', () => {
     expect(screen.getByTestId('controller-entry-button')).toHaveTextContent('+')
   })
 
-  it('a pending pill labels by IP', () => {
+  it('a pending pill keeps a known name (no IP flash on reconnect churn)', () => {
     useControllerStore.setState({
       activeIp: '10.0.0.5',
       controllers: { '10.0.0.5': { ip: '10.0.0.5', nickname: 'Desk', phase: 'pending', mapDim: null } },
+    })
+    render(<ControllerBar />)
+    expect(screen.getByTestId('controller-pill')).toHaveTextContent('Desk')
+  })
+
+  it('a pending pill with no known name still labels by IP', () => {
+    useControllerStore.setState({
+      activeIp: '10.0.0.5',
+      controllers: { '10.0.0.5': { ip: '10.0.0.5', phase: 'pending', mapDim: null } },
     })
     render(<ControllerBar />)
     expect(screen.getByTestId('controller-pill')).toHaveTextContent('10.0.0.5')

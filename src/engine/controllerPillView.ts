@@ -15,8 +15,11 @@ export interface ControllerEntryView {
 }
 
 export interface ControllerPillView {
-  /** Pill label: the nickname once live and named, else the IP (or "Connecting…"
-   *  while pending with nothing better to show). */
+  /** Pill label: the nickname whenever one is known, else the IP (or "Connecting…"
+   *  with nothing better to show). The name is *sticky across phases* — once we know
+   *  it, a transient drop to `pending`/`error` (a reconnect churn, or the seeded
+   *  auto-reconnect on reload) must not flash the bare IP. The dot tone alone carries
+   *  the connecting/error state. */
   label: string
   /** The IP, surfaced as the pill's tooltip in every state. */
   tooltip: string
@@ -28,10 +31,9 @@ export interface ControllerPillView {
 
 /** Describe a Controller entry for its pill. */
 export function describeControllerPill(entry: ControllerEntryView): ControllerPillView {
-  const label =
-    entry.phase === 'live' && entry.nickname
-      ? entry.nickname
-      : entry.ip || 'Connecting…'
+  // Name is sticky: show it in every phase once known. Only fall back to the IP
+  // when we have no name at all — never *replace* a known name with the IP.
+  const label = entry.nickname || entry.ip || 'Connecting…'
 
   const tone: ControllerStatusTone | null =
     entry.phase === 'pending' ? 'pending' : entry.phase === 'live' ? 'live' : 'error'

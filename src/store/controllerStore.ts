@@ -67,6 +67,10 @@ interface ControllerConnectionState {
   /** The last Controller to reach `live`, persisted so it alone auto-connects on
    *  reload. Cleared when that Controller is explicitly removed. */
   lastConnectedIp: string | null
+  /** The nickname of the last-connected Controller, persisted alongside its IP so the
+   *  pill is born with the name on reload rather than the bare IP (#215). Refreshed
+   *  from the device's `getConfig` once it reconnects — a rename on the device wins. */
+  lastConnectedNickname: string | null
   /** True while a Send-to-Controller push is in flight (#202) — disables the button. */
   pushing: boolean
   /** Last push outcome, surfaced transiently on the Send button. `null` = idle. */
@@ -104,8 +108,10 @@ interface ControllerConnectionState {
   discover: () => Promise<void>
   /** Begin connecting to `ip`: born as a pending pill, made active immediately.
    *  Settles to live (nickname + mapDim read) or error. Re-adding an existing IP
-   *  retries it. Rejection is swallowed — the pill reflects the error. */
-  addController: (ip: string) => Promise<void>
+   *  retries it. Rejection is swallowed — the pill reflects the error.
+   *  `seedNickname` pre-labels the pending pill (used by auto-reconnect, #215); it is
+   *  overwritten once the device reports its real name. */
+  addController: (ip: string, seedNickname?: string) => Promise<void>
   /** Disconnect + drop a Controller. If it was active, activates another (or none).
    *  Clears the remembered last-connected IP if it was this one. */
   removeController: (ip: string) => Promise<void>
@@ -165,6 +171,7 @@ export const controllerInitialState = {
   controllers: {} as Record<string, ControllerEntry>,
   activeIp: null as string | null,
   lastConnectedIp: null as string | null,
+  lastConnectedNickname: null as string | null,
   pushing: false,
   pushResult: null as PushResult | null,
   lastPushedSource: {} as Record<string, Record<string, string>>,
@@ -261,7 +268,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
           setControllerProvider(providers.get(ip) ?? new NullControllerProvider())
         },
 
-        addController: async (ip) => {
+        addController: async (ip, seedNickname) => {
           const target = ip.trim()
           if (!target) return
 
@@ -283,7 +290,12 @@ export const useControllerStore = create<ControllerConnectionState>()(
           set((s) => ({
             controllers: {
               ...s.controllers,
-              [target]: { ip: target, phase: 'pending', mapDim: null },
+              [target]: {
+                ip: target,
+                phase: 'pending',
+                mapDim: null,
+                nickname: seedNickname || undefined,
+              },
             },
           }))
           get().setActive(target)
@@ -305,7 +317,10 @@ export const useControllerStore = create<ControllerConnectionState>()(
             nickname: config?.name || undefined,
             mapDim: mapDimension(map),
           })
-          set({ lastConnectedIp: target })
+          // Remember the IP *and* the freshly-read name (#215). A device rename since
+          // last session lands here, so the persisted nickname always reflects the
+          // device's current name rather than a stale seed.
+          set({ lastConnectedIp: target, lastConnectedNickname: config?.name || null })
           // Warm the panel store immediately so it opens populated rather than
           // empty-then-jumping as the first lazy poll lands (#225). The panel still
           // owns the polling interval (started on open); this is a one-shot seed.
@@ -328,6 +343,8 @@ export const useControllerStore = create<ControllerConnectionState>()(
               controllers,
               activeIp: nextActive,
               lastConnectedIp: s.lastConnectedIp === ip ? null : s.lastConnectedIp,
+              lastConnectedNickname:
+                s.lastConnectedIp === ip ? null : s.lastConnectedNickname,
             }
           })
           // Re-point the active provider at the new active Controller (or none).
@@ -338,7 +355,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
         autoConnect: async () => {
           const remembered = get().lastConnectedIp?.trim()
           if (!remembered) return
-          await get().addController(remembered)
+          await get().addController(remembered, get().lastConnectedNickname ?? undefined)
         },
 
         clearPushResult: () => set({ pushResult: null }),
@@ -519,7 +536,10 @@ export const useControllerStore = create<ControllerConnectionState>()(
     },
     {
       name: 'pixelblaze-controller',
-      partialize: (s) => ({ lastConnectedIp: s.lastConnectedIp }),
+      partialize: (s) => ({
+        lastConnectedIp: s.lastConnectedIp,
+        lastConnectedNickname: s.lastConnectedNickname,
+      }),
     },
   ),
 )

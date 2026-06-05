@@ -17,14 +17,14 @@ import { ControllerPanel } from './ControllerPanel'
 // controls survive being dragged. Disconnect lives in the popover header beside
 // the nickname/IP — there is no longer an inline remove affordance on the pill.
 
-// Bridge the pill's status tone vocabulary to the shared StatusDot tones, so a
-// connected Controller reads with the same amber `live` accent as a "good"
-// compile, and "connecting" reads as the distinct working-grey pulse (not a
-// second amber that's indistinguishable from connected).
+// Bridge the pill's status tone vocabulary to the shared StatusDot tones. A live
+// Controller reads as solid green `ok`; a connecting one blinks that same green
+// hard (like a modem's link LED) and then settles to the solid dot — so the two
+// states share a colour and differ only by motion, reading as one signal locking in.
 const PILL_TONE: Record<ControllerStatusTone, StatusTone> = {
   absent: 'absent',
   idle: 'idle',
-  pending: 'working',
+  pending: 'connecting',
   live: 'ok',
   error: 'error',
 }

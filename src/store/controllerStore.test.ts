@@ -248,6 +248,48 @@ describe('controllerStore (keyed)', () => {
     expect(Object.keys(store().controllers)).toHaveLength(0)
   })
 
+  it('persists the nickname alongside the IP on connect (#215)', async () => {
+    await store().addController('10.0.0.5')
+    expect(store().lastConnectedNickname).toBe('pixel-1')
+    expect(localStorage.getItem('pixelblaze-controller')).toContain('pixel-1')
+  })
+
+  it('autoConnect seeds the pill with the remembered name before reconnecting (#215)', async () => {
+    // Mimic a reload: only the persisted slice is present, no live providers.
+    useControllerStore.setState({
+      lastConnectedIp: '10.0.0.5',
+      lastConnectedNickname: 'living-room',
+    })
+    // A provider that never finishes connecting, so we observe the pending pill.
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.connect = () => new Promise<void>(() => {})
+      created.set(ip, p)
+      return p
+    })
+    void store().autoConnect()
+    await new Promise((r) => setTimeout(r, 0))
+    const entry = store().controllers['10.0.0.5']
+    expect(entry.phase).toBe('pending')
+    expect(entry.nickname).toBe('living-room')
+  })
+
+  it('a device rename overwrites the remembered name on reconnect (#215)', async () => {
+    useControllerStore.setState({
+      lastConnectedIp: '10.0.0.5',
+      lastConnectedNickname: 'old-name',
+    })
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.name = 'new-name'
+      created.set(ip, p)
+      return p
+    })
+    await store().autoConnect()
+    expect(store().controllers['10.0.0.5'].nickname).toBe('new-name')
+    expect(store().lastConnectedNickname).toBe('new-name')
+  })
+
   describe('pushActivePattern (#202)', () => {
     const PATTERN_SRC = 'export function render(index) {\n  hsv(index, 1, 1)\n}\n'
 

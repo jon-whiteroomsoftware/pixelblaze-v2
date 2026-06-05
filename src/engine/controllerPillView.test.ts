@@ -13,8 +13,16 @@ describe('describeControllerPill', () => {
     expect(v.label).toBe('10.0.0.5')
   })
 
-  it('labels a pending pill by its IP and pulses', () => {
+  it('keeps a known name through a pending churn, conveying connecting via the dot', () => {
+    // A seeded reconnect (or a transient live→pending churn) must not flash the IP:
+    // the name is sticky, only the dot tone reverts to pending.
     const v = describeControllerPill({ ip: '10.0.0.5', nickname: 'Desk', phase: 'pending' })
+    expect(v.label).toBe('Desk')
+    expect(v.tone).toBe('pending')
+  })
+
+  it('labels a nameless pending pill by its IP and pulses', () => {
+    const v = describeControllerPill({ ip: '10.0.0.5', phase: 'pending' })
     expect(v.label).toBe('10.0.0.5')
     expect(v.tone).toBe('pending')
   })
