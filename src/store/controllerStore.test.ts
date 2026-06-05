@@ -422,9 +422,11 @@ describe('controllerStore (keyed)', () => {
       await store().pushActivePattern()
 
       const provider = created.get('10.0.0.5')!
-      // Save mode persists via saveProgram, not a run-only pushBytecode.
+      // Save-and-run (#238): save mode persists via saveProgram AND runs the same id so
+      // the device switches to the saved program (LEDs change, marker clears).
       expect(provider.saved).toHaveLength(1)
-      expect(provider.pushed).toHaveLength(0)
+      expect(provider.pushed).toHaveLength(1)
+      expect(provider.pushed[0].opts.id).toBe(provider.saved[0].opts.id)
       expect(store().pushResult).toEqual({ ok: true, created: true })
       // The dirty gate is recorded in the SAVE map, not the run map — so flipping the
       // toggle back to run leaves run-mode Send enabled.

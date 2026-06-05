@@ -83,8 +83,29 @@ describe('pushPattern — save mode (persist: true)', () => {
     expect(deps.provider.saveProgram).toHaveBeenCalledWith(expect.any(Uint8Array), {
       id: 'MINTED00000000000',
     })
-    expect(deps.provider.pushBytecode).not.toHaveBeenCalled()
+    // Save-and-run (#238): the saved program is also run under the SAME stable id so
+    // the device switches to it (LEDs change, config.activeProgramId becomes S) and the
+    // panel resolves it via the list tier. Unlike run-only, the run carries the real name.
+    expect(deps.provider.pushBytecode).toHaveBeenCalledWith(expect.any(Uint8Array), {
+      id: 'MINTED00000000000',
+      name: 'My Pattern',
+    })
     expect(saved).toEqual([{ 'ctrl-A': { 'pat-1': 'MINTED00000000000' } }])
+  })
+
+  it('runs the saved program under the SAME id used to save it', async () => {
+    const { deps } = makeDeps({
+      persist: true,
+      loadBindings: async () => ({ 'ctrl-A': { 'pat-1': 'DEVPROG1' } }),
+      provider: makeProvider({
+        listPrograms: vi.fn().mockResolvedValue([{ id: 'DEVPROG1', name: 'x' }]),
+      }),
+    })
+    await pushPattern(deps)
+    const saveId = (deps.provider.saveProgram as ReturnType<typeof vi.fn>).mock.calls[0][1].id
+    const runId = (deps.provider.pushBytecode as ReturnType<typeof vi.fn>).mock.calls[0][1].id
+    expect(runId).toBe(saveId)
+    expect(runId).toBe('DEVPROG1')
   })
 
   it('encodes the PBP blob with the pattern name and source', async () => {

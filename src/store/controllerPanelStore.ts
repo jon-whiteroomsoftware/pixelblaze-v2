@@ -65,6 +65,10 @@ interface ControllerPanelState {
   stop: () => void
   /** One poll tick: read config + telemetry + vars, tolerating transient failures. */
   poll: () => Promise<void>
+  /** Re-fetch the device's program list into `programs`. Called after a save-mode push
+   *  (#238) so the freshly-saved id is in the list and the panel resolves it via the list
+   *  tier → the `unsaved` marker clears. Tolerates transient failure. */
+  refreshPrograms: () => Promise<void>
   /** Set brightness on the device — volatile, never `save:true`. Optimistic local. */
   setBrightness: (value: number) => void
   /** Set the device's pixel count — persisted (`save:true`), since it is wiring
@@ -118,10 +122,7 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
       set(controllerPanelInitialState)
     }
     // Program names rarely change; fetch the list once and tolerate failure.
-    getControllerProvider()
-      .listPrograms()
-      .then((programs) => set({ programs }))
-      .catch(() => {})
+    void get().refreshPrograms()
     // The installed map rarely changes and read-back is a one-off HTTP fetch, so
     // read it once (not every poll) to surface its point count (#205).
     getControllerProvider()
@@ -183,6 +184,15 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
     }
     if (telemetry) set({ fps: telemetry.fps })
     if (vars) set({ vars })
+  },
+
+  refreshPrograms: async () => {
+    try {
+      const programs = await getControllerProvider().listPrograms()
+      set({ programs })
+    } catch {
+      // Transient — keep the last-known list.
+    }
   },
 
   setBrightness: (value) => {

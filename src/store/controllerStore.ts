@@ -556,6 +556,13 @@ export const useControllerStore = create<ControllerConnectionState>()(
               await setProgramLabels(labels)
               useControllerPanelStore.getState().noteProgramLabel(programId, previewPatternName)
             }
+            // Save-and-run (#238): the saved program is now on the device and active, but
+            // the panel's `programs` list was last fetched on seed and so is stale —
+            // refresh it so the freshly-saved id resolves via the list tier and the
+            // `unsaved` marker clears. Run-only pushes never enter the list, so skip.
+            if (persist) {
+              void useControllerPanelStore.getState().refreshPrograms()
+            }
             // Remember the clean source we just pushed so the dirty gate disables a
             // redundant re-push until the pattern is edited again — into the run or save
             // record per the armed mode (#238), so flipping the toggle re-enables Send.

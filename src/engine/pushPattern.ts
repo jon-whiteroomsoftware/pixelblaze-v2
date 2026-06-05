@@ -106,6 +106,16 @@ export async function pushPattern(deps: PushPatternDeps): Promise<PushPatternRes
   })
   await deps.provider.saveProgram(blob, { id: programId })
 
+  // Save-and-run (#238): persisting writes the PBP record to flash but does not make it
+  // the active program, so the device keeps running whatever it ran before and the panel
+  // never reflects the save. Explicitly run the same bytecode under the *same* stable id
+  // so the device switches to the saved program (LEDs change, config.activeProgramId
+  // becomes S, the panel's list tier resolves it → no `unsaved` marker). This matches the
+  // stock IDE's save-and-run and is robust whether or not firmware auto-activates on
+  // putSourceCode. Unlike run-only, the run carries the real name — S is a real saved
+  // program, so its setCode name is no phantom.
+  await deps.provider.pushBytecode(bytecode, { id: programId, name: deps.name ?? '' })
+
   if (isNew) {
     await deps.saveBindings(withBinding(bindings, deps.controllerId, deps.patternId, programId))
   }
