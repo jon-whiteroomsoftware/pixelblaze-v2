@@ -236,9 +236,11 @@ export function ControllerBar() {
 
   // Connect to a discovered candidate by its LAN address — same path as a manual
   // IP, so it slots straight into the existing keyed connect (#197 foundation).
-  const onDiscoveredClick = (address: string) => {
+  // Seed the discovered name so the pending pill is born named rather than flashing
+  // the bare IP until the device's getConfig lands (#230).
+  const onDiscoveredClick = (address: string, name?: string) => {
     setOpen(false)
-    void addController(address)
+    void addController(address, name)
   }
 
   return (
@@ -346,7 +348,7 @@ export function ControllerBar() {
                       <li key={c.id}>
                         <button
                           type="button"
-                          onClick={() => onDiscoveredClick(c.address)}
+                          onClick={() => onDiscoveredClick(c.address, c.name)}
                           data-testid="controller-discovered-item"
                           className="flex w-full items-baseline justify-between gap-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-left hover:border-zinc-500 hover:text-zinc-100"
                         >

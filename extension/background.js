@@ -269,10 +269,7 @@ chrome.runtime.onConnect.addListener((port) => {
       }
       ws.binaryType = 'arraybuffer'
       sockets.set(msg.connId, ws)
-      // TEMP DEBUG (#230): trace the real socket lifecycle per connId.
-      console.log(`[pblz-helper] connect ${msg.connId} → ${msg.url} (sockets=${sockets.size})`)
       ws.addEventListener('open', () => {
-        console.log(`[pblz-helper] open ${msg.connId}`)
         send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'open', connId: msg.connId })
       })
       ws.addEventListener('message', (ev) => {
@@ -281,12 +278,10 @@ chrome.runtime.onConnect.addListener((port) => {
         send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'message', connId: msg.connId, payload })
       })
       ws.addEventListener('error', () => {
-        console.log(`[pblz-helper] error ${msg.connId}`)
         send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'error', connId: msg.connId, message: 'websocket error' })
       })
       ws.addEventListener('close', (ev) => {
         sockets.delete(msg.connId)
-        console.log(`[pblz-helper] close ${msg.connId} code=${ev.code} (sockets=${sockets.size})`)
         send({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: msg.connId, code: ev.code })
       })
       return
@@ -303,7 +298,6 @@ chrome.runtime.onConnect.addListener((port) => {
         // Socket not open / already gone; the close path reports it.
       }
     } else if (msg.type === 'close') {
-      console.log(`[pblz-helper] page-close ${msg.connId} (readyState=${ws.readyState})`)
       try {
         ws.close()
       } catch {

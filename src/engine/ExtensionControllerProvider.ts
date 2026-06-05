@@ -290,18 +290,11 @@ export class ExtensionControllerProvider implements ControllerProvider {
     conn.on('close', () => this.onSocketClosed())
     conn.on('stale', () => this.onSocketStale())
     this.conn = conn
-    // TEMP DEBUG (#230): trace each (re)connect attempt and its outcome.
-    const t0 = Date.now()
-    console.log(`[pblz-reconnect] attempt → ${target.address}`)
     try {
       await conn.connect()
     } catch (e) {
       this.conn = null
       this.expectConnected = false
-      console.log(
-        `[pblz-reconnect] attempt FAILED after ${Date.now() - t0}ms:`,
-        e instanceof Error ? e.message : e,
-      )
       // A permission decline already reset us to idle (extension-present); surface
       // it as the typed error the store resets on, not the generic socket failure
       // the rejection carries, and leave the idle status in place.
@@ -310,7 +303,6 @@ export class ExtensionControllerProvider implements ControllerProvider {
       // fatal initial connect (error pill) or a reconnect attempt (stay connecting).
       throw e
     }
-    console.log(`[pblz-reconnect] attempt OPENED after ${Date.now() - t0}ms → connected`)
     this.expectConnected = true
     this.setStatus({
       kind: 'connected',

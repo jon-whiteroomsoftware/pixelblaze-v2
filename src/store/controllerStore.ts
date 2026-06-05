@@ -276,6 +276,13 @@ export const useControllerStore = create<ControllerConnectionState>()(
           const target = ip.trim()
           if (!target) return
 
+          // Reconnecting to the controller we last connected to? Seed the pending pill
+          // from the cached name so it never flashes the bare IP before getConfig lands
+          // (#230). The live read below still overwrites it if the device was renamed.
+          const seed =
+            seedNickname ??
+            (target === get().lastConnectedIp ? get().lastConnectedNickname ?? undefined : undefined)
+
           // Reuse an existing provider (retry) or mint a fresh one.
           let provider = providers.get(target)
           if (!provider) {
@@ -298,7 +305,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
                 ip: target,
                 phase: 'pending',
                 mapDim: null,
-                nickname: seedNickname || undefined,
+                nickname: seed || undefined,
               },
             },
           }))
@@ -323,13 +330,21 @@ export const useControllerStore = create<ControllerConnectionState>()(
           ])
           patchController(target, {
             phase: 'live',
-            nickname: config?.name || undefined,
+            // Sticky name: only overwrite when getConfig actually returned one. During
+            // the reconnect churn (#230) getConfig can land on a torn-down socket and
+            // reject (→ null here); clobbering the name to undefined would flash the
+            // pill back to the bare IP. Keep the seeded/last-known name instead.
+            ...(config?.name ? { nickname: config.name } : {}),
             mapDim: mapDimension(map),
           })
           // Remember the IP *and* the freshly-read name (#215). A device rename since
-          // last session lands here, so the persisted nickname always reflects the
-          // device's current name rather than a stale seed.
-          set({ lastConnectedIp: target, lastConnectedNickname: config?.name || null })
+          // last session lands here, so the persisted nickname reflects the device's
+          // current name. Only overwrite the remembered name when we actually read one
+          // — a transient getConfig failure must not poison the seed for next reload.
+          set({
+            lastConnectedIp: target,
+            ...(config?.name ? { lastConnectedNickname: config.name } : {}),
+          })
           // Warm the panel store immediately so it opens populated rather than
           // empty-then-jumping as the first lazy poll lands (#225). The panel still
           // owns the polling interval (started on open); this is a one-shot seed.

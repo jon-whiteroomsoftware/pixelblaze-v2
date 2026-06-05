@@ -314,6 +314,64 @@ describe('controllerStore (keyed)', () => {
     expect(store().lastConnectedNickname).toBe('new-name')
   })
 
+  it('seeds the pending pill from the cached name when reconnecting unseeded (#230)', async () => {
+    // The last-connected controller, but addController called WITHOUT a seed (manual
+    // IP re-entry / discovery click). The pill must be born named, not flash the IP.
+    useControllerStore.setState({
+      lastConnectedIp: '10.0.0.5',
+      lastConnectedNickname: 'burner-bag',
+    })
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.connect = () => new Promise<void>(() => {}) // never resolves: observe pending
+      created.set(ip, p)
+      return p
+    })
+    void store().addController('10.0.0.5')
+    await new Promise((r) => setTimeout(r, 0))
+    const entry = store().controllers['10.0.0.5']
+    expect(entry.phase).toBe('pending')
+    expect(entry.nickname).toBe('burner-bag')
+  })
+
+  it('keeps the known name when getConfig fails on connect — no IP flash (#230)', async () => {
+    // Reconnect churn can reject getConfig on a torn-down socket. The pill must hold
+    // the seeded name rather than clobbering back to the bare IP.
+    useControllerStore.setState({
+      lastConnectedIp: '10.0.0.5',
+      lastConnectedNickname: 'burner-bag',
+    })
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      // The real provider's `connected` status carries no name — only getConfig does.
+      p.name = undefined
+      p.getConfig = () => Promise.reject(new Error('socket gone'))
+      created.set(ip, p)
+      return p
+    })
+    await store().addController('10.0.0.5')
+    expect(store().controllers['10.0.0.5'].phase).toBe('live')
+    expect(store().controllers['10.0.0.5'].nickname).toBe('burner-bag')
+    // The persisted seed must survive a transient failure for the next reload.
+    expect(store().lastConnectedNickname).toBe('burner-bag')
+  })
+
+  it('does not seed a different IP from the cached name (#230)', async () => {
+    useControllerStore.setState({
+      lastConnectedIp: '10.0.0.5',
+      lastConnectedNickname: 'burner-bag',
+    })
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.connect = () => new Promise<void>(() => {})
+      created.set(ip, p)
+      return p
+    })
+    void store().addController('10.0.0.9')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(store().controllers['10.0.0.9'].nickname).toBeUndefined()
+  })
+
   describe('pushActivePattern (#202)', () => {
     const PATTERN_SRC = 'export function render(index) {\n  hsv(index, 1, 1)\n}\n'
 
