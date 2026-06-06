@@ -2,6 +2,8 @@
 
 A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED controllers — write, preview, and tune patterns entirely offline, then copy the result onto your device or push it live to a controller on your network.
 
+![PXLBLZ](docs/screenshots/promo-marquee.jpg)
+
 ![Edit patterns in a real code editor](docs/screenshots/promo-edit.jpg)
 
 ![Hardware-faithful live preview](docs/screenshots/promo-preview.jpg)
