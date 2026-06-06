@@ -412,8 +412,10 @@ export function Preview() {
     const tick = (now: number) => {
       const dt = now - last
       last = now
-      const { autoOrbit, camera, setCamera } = useCameraStore.getState()
-      if (autoOrbit) setCamera(advanceAutoOrbit(camera, dt))
+      const { autoOrbit, dragging, camera, setCamera } = useCameraStore.getState()
+      // Hold the spin still while dragging; it resumes on release. Only the
+      // play/pause control changes the persistent `autoOrbit` intent.
+      if (autoOrbit && !dragging) setCamera(advanceAutoOrbit(camera, dt))
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)

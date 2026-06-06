@@ -19,7 +19,8 @@ import { poleMaxCols, defaultPoleCols, clampPoleCols } from '@/engine/shapes'
 //   • drag         → orbit: horizontal yaws azimuth, vertical tilts pitch, both
 //                    axes at once. Elevation is clamped to a stable horizon, so
 //                    horizontal always reads as left/right (no view-axis roll).
-//   • grabbing the model pauses auto-orbit until re-armed (play/pause)
+//   • grabbing the model holds the spin still; it resumes on release. Only the
+//     play/pause control toggles the persistent spinning/stopped state.
 //   • reset returns to the default angle and re-arms auto-orbit
 export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }) {
   const autoOrbit = useCameraStore((s) => s.autoOrbit)
@@ -53,8 +54,9 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
       dragging = true
       lastX = e.clientX
       lastY = e.clientY
-      // Grabbing the model pauses auto-orbit until re-armed.
-      useCameraStore.getState().setAutoOrbit(false)
+      // Grabbing the model holds the auto-orbit spin still; it resumes on release.
+      // The persistent armed state is only changed by the play/pause control.
+      useCameraStore.getState().setDragging(true)
       canvas.setPointerCapture(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
@@ -69,6 +71,8 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
     }
     const onUp = (e: PointerEvent) => {
       dragging = false
+      // Release resumes the spin (if it was armed); the persistent state is untouched.
+      useCameraStore.getState().setDragging(false)
       if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId)
     }
 
