@@ -76,14 +76,18 @@ A hard split, enforced by convention and load-bearing for the test strategy:
 
 - **Engine** (`src/engine/`) — pure TypeScript, **zero React imports**: transpiler,
   validator, runtime shim, fixed-point engine, map generators, shapes/surfaces,
-  camera projection, render loop, storage, normals, and the whole Controller
-  connectivity stack (provider seam, extension backend, relay socket, push/preflight
-  /binding/map-push logic, view-models — §13). This is the primary test target; the
-  tricky math and the transport-agnostic connectivity logic are unit-testable with
-  no DOM (a fake relay emulates a device end-to-end).
+  camera projection, render loop, storage, normals, the rail's dimension-lens/search
+  predicates (`dimLens.ts`), the trailing-throttle helper (`throttleTrailing.ts`), and
+  the whole Controller connectivity stack (provider seam, extension backend, relay
+  socket, push/preflight/binding/map-push logic, view-models — §13). This is the primary
+  test target; the tricky math and the transport-agnostic connectivity logic are
+  unit-testable with no DOM (a fake relay emulates a device end-to-end).
 - **UI** (`src/components/`, `src/App.tsx`) — React components that call engine
   functions and read Zustand stores. Logic beyond rendering and event delegation
-  belongs in the engine.
+  belongs in the engine. The rail filter (`RailFilterBar` — dimension pills + type-down
+  search) and the header `LibrariesMenu` are thin views over `dimLens.ts` predicates and
+  `patternStore`; the deck splits its layout dropdowns into `MapSelect` (PIXELBLAZE
+  block) and `EmbeddingSelect` (transport row) — see §8.
 
 ### Zustand stores (`src/store/`)
 
@@ -95,8 +99,8 @@ A hard split, enforced by convention and load-bearing for the test strategy:
 | `mapStore` | `activeMapId`, `activeShapeId`, `activeSurfaceId`, `activePixelCount`, `activeNormalizeMode` (Fill/Contain), `activeSolidity`, `userMaps`, stock catalogue. |
 | `controlStore` | current pattern UI control values (transient). |
 | `cameraStore` | ephemeral orbit angle, auto-orbit flag, pole wrap density (`poleCols`). |
-| `controllerStore` | live-Controller connectivity (§13): keyed map of connected Controllers (IP → phase/nickname/installed-map dim), the active one, extension presence, last-connected IP (auto-reconnect), and the Send/preflight/push slices. Persists only the last-connected IP. |
-| `controllerPanelStore` | the connected Controller's polled live slice: active program (+ program list), reported FPS, device `pixelCount`, installed-map point count, and the volatile panel-owned brightness + live controls. |
+| `controllerStore` | live-Controller connectivity (§13): keyed map of connected Controllers (IP → phase/nickname/installed-map dim), the active one, extension presence, last-connected IP (auto-reconnect), the Send/push slices, and the sticky `saveArmed` run-vs-save toggle with mode-split dirty tracking (`lastPushedSource` / `lastSavedSource`). Persists the last-connected IP (+ nickname) and `saveArmed`. |
+| `controllerPanelStore` | the connected Controller's polled live slice: active program (+ program list, refreshable via `refreshPrograms`), reported FPS, device `pixelCount` (with an in-flight `pixelCountPending` hold), installed-map point count, and the volatile panel-owned brightness + live controls. `seed`/`start` take the owning IP so a same-device reopen keeps last-known values (no blank flash) while a device switch clears; `stop` preserves state rather than resetting. |
 
 Zustand is chosen specifically because the **render loop and other engine code read
 and write state outside React**. Each store exports `*InitialState`; tests reset with
@@ -314,8 +318,8 @@ runs — single source of truth, no parallel TS generator to drift. Stock maps
 
 The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (label "Square"), `wide`
 ("Wide 2:1"), `seed-ring-2d` ("Ring") — 2D; and the 3D set, named by the **shell /
-volume** scheme (ADR-0012): `cube` ("Cube (volume)"), `cube-shell` ("Cube (shell)"),
-`star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere (shell)"),
+volume** scheme (ADR-0012): `cube` ("Cube volume"), `cube-shell` ("Cube shell"),
+`star-shell`/`star-volume`, `seed-sphere-3d` ("Sphere shell"),
 `sphere-volume`, and `tetra-shell`/`tetra-volume` (a four-sided die / d4). Shell
 entries carry a `normals` recipe
 (`'face' | 'star' | 'tetra' | 'centroid'`), whose presence is the solid-eligibility gate
@@ -376,8 +380,14 @@ Two orthogonal controls, not one union dropdown (ADR-0010): a **Map** control (o
 `sample`, filtered by sample-arity) and an **embedding** control (owns `pos` —
 shapes for 1D, surfaces gated on the map's `gridDims` for 2D). `resolveLayoutSelection`
 restores a persisted selection if still valid, else a default, optionally honouring a
-demo's `recommendedMapId`. `LayoutSelector.tsx` hides a control with no real choice
-(so a 1D pattern shows one, a 2D pattern with a wrappable map two, a 3D pattern one).
+demo's `recommendedMapId`. `LayoutSelector.tsx` factors the shared logic into a
+`useLayoutControls()` hook and exports the two controls **separately** so the deck can
+place them by what they *are* (#253): `MapSelect` (owns `sample`) renders inside the
+PIXELBLAZE block as a stacked full-width `DeckSelect` (`block` mode, stock/user
+subgroups) and returns nothing when there's no map (1D); `EmbeddingSelect` (owns `pos`)
+renders on the transport row and only when it offers more than one choice. Each still
+hides a control with no real choice (so a 1D pattern shows one embedding and no map, a
+2D pattern with a wrappable map shows both, a 3D pattern shows just the map).
 
 `resolveLayout(input, deps): ResolvedLayout` is the single seam from a Layout
 *selection* to its **resolved layout** — the drawn realization. It folds together
@@ -688,10 +698,25 @@ multi-Controller list/select model is deferred.
   cache → raw id, #237), reported
   FPS, the device `pixelCount`, the installed-map point count, and the live controls. On
   connect the panel is **warm-seeded** once (#225) so it opens populated rather than
-  empty-then-jumping as the first poll lands.
+  empty-then-jumping as the first poll lands. A same-device close/reopen keeps the
+  last-known slice (`stop` preserves state, `seed` clears only on a device switch — §3),
+  so the panel never flashes blank. Layout is rows of `DeckStat`/`DeckField`/`DeckSlider`
+  (#63): pattern name + brightness, then map-points + pixel count, then IP + FPS; section
+  labels and the pattern-controls help hover mirror the preview deck, the latter sourced
+  from the loaded pattern's control descriptions (omitted entirely when none exist).
   **Brightness is panel-owned and volatile** — seeded once from the device's first
   reported value, then slider-owned (later polls don't overwrite it), always `save:false`
-  (flash wear). Control writes are likewise volatile.
+  (flash wear). Control writes are likewise volatile. Both brightness and control writes
+  are coalesced through `throttleTrailing` (`throttleTrailing.ts` — leading + guaranteed
+  trailing flush, injectable clock) to ~10/s so dragging stays smooth without flooding
+  the socket. The brightness slider is **logarithmic** (`DeckSlider`'s `curve` prop maps
+  position→value via a gamma, position-only — callers still pass real `0..1`). A pixel-
+  count edit holds the entered value in `pixelCountPending` (input dimmed/disabled) until
+  the slow `save:true` write settles, so a mid-write poll can't flash the stale count
+  back. A control whose device value isn't a finite `0..1` (`controllerSliderValue`
+  returns `null`) renders `DeckSlider`'s **indeterminate** hollow-ring state with a `—`
+  readout — still draggable — covering run-only patterns (no `getControls`) and saved
+  patterns whose `activeProgram.controls` report drifted bound-variable values.
 
 ### Send to Controller — pattern push (`pushPattern`, `controllerBinding`)
 
@@ -699,7 +724,12 @@ multi-Controller list/select model is deferred.
 #200, returned GO): the device's own compiler runs inside the helper's offscreen
 sandbox (the only MV3-legal place to eval the remote compiler), turning source into
 bytecode; `pushBytecode` sends it over the socket. `pushPattern` owns the *policy*, and
-runs in one of **two modes** (#236):
+runs in one of **two modes** (#236), chosen by a sticky **Save toggle** beside the Send
+button (`controllerStore.saveArmed`, persisted): the button's glyph (Play vs. Save) and
+tooltip follow the armed mode via `describeSendAction` (`sendToController.ts`). Run and
+save are tracked as **independent acts** — the dirty gate (`isAlreadyPushed`) keys off
+`lastPushedSource` for run and `lastSavedSource` for save, so a clean run push doesn't
+satisfy a pending save (flipping the toggle re-arms Send). The modes:
 
 - **Run-only** (today's default): compile, mint a *throwaway* program id, and load +
   run via `pushBytecode` — the firmware's `setCode`/`putByteCode`/`pause:false`
@@ -715,7 +745,12 @@ runs in one of **two modes** (#236):
   rides as the firmware-required `{"main":<source>}` JSON container, LZString-compressed,
   and the preview JPEG is an empty section — and write it via `saveProgram`
   (`putSourceCode`, binary type 1, payload = id bytes + blob). This creates the `/p/{id}`
-  record that shows in Saved Patterns with its name. Mirrors `PBP.fromComponents` /
+  record that shows in Saved Patterns with its name. Save then **activates** the program
+  immediately: it `pushBytecode`s under the *same* stable id (carrying the real name, not
+  a phantom) so the device switches to running the freshly saved program (#238), and the
+  store calls `controllerPanelStore.refreshPrograms()` so the panel's program list picks
+  up the new id and resolves it to its name (dropping the "unsaved" marker). Mirrors
+  `PBP.fromComponents` /
   `PBP.toPixelblaze` in [pixelblaze-client](https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L2992).
 
 **Overwrite-in-place** (`controllerBinding`) applies to **save mode only**, because only
@@ -741,10 +776,15 @@ program called?" vs. "which program do I overwrite for this pattern?").
 `sendToController` is the pure
 gate for the editor-header button: enabled only when a Controller is connected, the
 pattern compiles, and — *when known* — its dimensionality matches the installed map
-(an unknown map dim never blocks; a permanently-disabled Send would be worse). Before a
-push, `preflight` reconciles the pattern's modeled pixel count against the device count
-and surfaces a non-blocking, acknowledgeable warning (the push sends bytecode only and
-keeps the device's existing map, so a mismatch is "this won't look right", not an error).
+(an unknown map dim never blocks; a permanently-disabled Send would be worse). **Demos
+are pushable too** (#218): the dirty gate and overwrite binding key off
+`activePushKey(patternStore)` — the user pattern's id, or a `demo:`-namespaced key for a
+read-only demo — so a demo can be sent without forking it into a user pattern first.
+There is **no pre-push preflight for pattern pushes** any more: the old pixel-count
+reconciliation was misleading (a pattern push sends bytecode only and keeps the device's
+existing map, so a count mismatch is cosmetic, not an error), so `preflight` now returns
+no warnings unless `pushingMap` is set — preflight survives only for the map-push path
+below.
 
 ### Send map to Controller, and map read-back
 
@@ -822,9 +862,11 @@ Pure engine functions are the primary target (transpiler, validator, fixed-point
 camera projection, map/shape/surface generators, normals, dimensionality derivation,
 storage). React components get smoke coverage only. Library fidelity tests
 (`*.fidelity.test.ts`) assert Fast/Precise agreement per function;
-`fixedpoint.bench.ts` benchmarks the multiply hot path. The Husky pre-commit hook runs
-`npm run lint && npm test`; the live hardware tier is excluded from the gate and run
-out-of-band.
+`fixedpoint.bench.ts` benchmarks the multiply hot path, and a standalone
+**hardware-built-in cost microbenchmark** (`test/perf-harness/`, #245) profiles the
+relative cost of the shim's built-ins to guide pattern-perf advice. The Husky pre-commit
+hook runs `npm run lint && npm test`; the live hardware tier is excluded from the gate
+and run out-of-band.
 
 ---
 
