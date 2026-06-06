@@ -57,9 +57,12 @@ it draws the pattern on a configurable arrangement of glowing LED dots you can w
 animate in real time.
 
 For 3D patterns (and for 1D/2D patterns wrapped onto a 3D form) you get an **orbit
-viewport**: it auto-spins by default, you can drag to turntable it, Shift-drag to
-free-tumble, and reset the view. Nearer dots are drawn larger and brighter (depth
-cueing) and properly occlude the ones behind, so a sphere reads as a sphere.
+viewport**: it auto-spins by default, and you can drag to freely orbit it — horizontal
+drags yaw, vertical drags tilt (dragging down tips the top toward you), with the
+horizon held level so you never roll. Grabbing the model just holds the spin still;
+it resumes the instant you let go. Only play/pause and reset change whether it spins.
+Nearer dots are drawn larger and brighter (depth cueing) and properly occlude the ones
+behind, so a sphere reads as a sphere.
 
 ### The map is yours, not the device's
 

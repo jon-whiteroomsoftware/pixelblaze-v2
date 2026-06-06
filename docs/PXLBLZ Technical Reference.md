@@ -97,7 +97,7 @@ A hard split, enforced by convention and load-bearing for the test strategy:
 | `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`, `solidEligible`, `editorFlavor` (`'pattern' \| 'map'`). |
 | `mapStore` | `activeMapId`, `activeShapeId`, `activeSurfaceId`, `activePixelCount`, `activeNormalizeMode` (Fill/Contain), `activeSolidity`, `userMaps`, stock catalogue. |
 | `controlStore` | current pattern UI control values (transient). |
-| `cameraStore` | ephemeral orbit angle, auto-orbit flag, pole wrap density (`poleCols`). |
+| `cameraStore` | ephemeral orbit angle, persistent auto-orbit flag (spinning/stopped, set only by play/pause + reset), a transient `dragging` flag that just holds the spin still and releases on pointer-up, pole wrap density (`poleCols`). |
 | `controllerStore` | live-Controller connectivity (§13): keyed map of connected Controllers (IP → phase/nickname/installed-map dim), the active one, extension presence, last-connected IP (auto-reconnect), the Send/push slices, and the sticky `saveArmed` run-vs-save toggle with mode-split dirty tracking (`lastPushedSource` / `lastSavedSource`). Persists the last-connected IP (+ nickname) and `saveArmed`. |
 | `controllerPanelStore` | the connected Controller's polled live slice: active program (+ program list, refreshable via `refreshPrograms`), reported FPS, device `pixelCount` (with an in-flight `pixelCountPending` hold), installed-map point count, and the volatile panel-owned brightness + live controls. `seed`/`start` take the owning IP so a same-device reopen keeps last-known values (no blank flash) while a device switch clears; `stop` preserves state rather than resetting. |
 
