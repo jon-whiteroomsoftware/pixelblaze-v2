@@ -11,7 +11,6 @@ import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, PatternRecord, LastActive, LAST_ACTIVE_KEY } from '@/store/patternStore'
 import { useMapStore, MapRecord } from '@/store/mapStore'
 import { forkSettingsSnapshotForDemo } from '@/store/settingsCascade'
-import { LibraryHoverCard } from '@/components/LibraryHoverCard'
 import {
   AlertDialogRoot,
   AlertDialogTrigger,
@@ -30,7 +29,6 @@ function newPatternRecord(name: string, src: string): PatternRecord {
   return { id, name, src, controls: {}, updatedAt: Date.now() }
 }
 
-const LIBRARY_NAMES = Object.keys(LIBRARIES).sort()
 const DEMO_NAMES = Object.keys(DEMOS).sort()
 
 const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
@@ -467,11 +465,9 @@ export function PatternList() {
   const setIsReadOnly = useEditorStore((s) => s.setIsReadOnly)
   const setPreviewSource = useEditorStore((s) => s.setPreviewSource)
   const setPreviewPatternName = useEditorStore((s) => s.setPreviewPatternName)
-  const activeLibraryName = usePatternStore((s) => s.activeLibraryName)
   const activeDemoName = usePatternStore((s) => s.activeDemoName)
   const activePatternId = usePatternStore((s) => s.activePatternId)
   const userPatterns = usePatternStore((s) => s.userPatterns)
-  const setActiveLibrary = usePatternStore((s) => s.setActiveLibrary)
   const setActiveDemo = usePatternStore((s) => s.setActiveDemo)
   const setActivePattern = usePatternStore((s) => s.setActivePattern)
   const loadPatterns = usePatternStore((s) => s.loadPatterns)
@@ -536,45 +532,6 @@ export function PatternList() {
   const [query, setQuery] = useState('')
 
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
-  const [hoveredLib, setHoveredLib] = useState<string | null>(null)
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
-  const hoveredLibRef = useRef<string | null>(null)
-  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (showTimerRef.current) clearTimeout(showTimerRef.current)
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
-    }
-  }, [])
-
-  function startShow(name: string, el: HTMLElement) {
-    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null }
-    if (hoveredLibRef.current !== null) {
-      setAnchorRect(el.getBoundingClientRect())
-      setHoveredLib(name)
-      hoveredLibRef.current = name
-      return
-    }
-    showTimerRef.current = setTimeout(() => {
-      setAnchorRect(el.getBoundingClientRect())
-      setHoveredLib(name)
-      hoveredLibRef.current = name
-    }, 250)
-  }
-
-  function startHide() {
-    if (showTimerRef.current) { clearTimeout(showTimerRef.current); showTimerRef.current = null }
-    hideTimerRef.current = setTimeout(() => {
-      setHoveredLib(null)
-      hoveredLibRef.current = null
-    }, 100)
-  }
-
-  function cancelHide() {
-    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null }
-  }
 
   useEffect(() => {
     // Hydrate user maps (and seed the stock custom maps, #140) so the layout
@@ -636,13 +593,6 @@ export function PatternList() {
       }
     })
   }, [loadPatterns])
-
-  function openLibrary(name: string) {
-    closeMapEditor()
-    setActiveLibrary(name)
-    setSource(LIBRARIES[name])
-    setIsReadOnly(true)
-  }
 
   function openDemo(name: string) {
     closeMapEditor()
@@ -807,34 +757,6 @@ export function PatternList() {
       })()}
 
       <SectionHeader
-        label="Libraries"
-        collapsed={isCollapsed('Libraries')}
-        onToggle={() => toggleCollapsed('Libraries')}
-      />
-      {!isCollapsed('Libraries') && (
-        <ul>
-          <li
-            onMouseEnter={(e) => startShow('PixelBlaze', e.currentTarget)}
-            onMouseLeave={startHide}
-            style={{ paddingLeft: ROW_PAD_FIRST }}
-            className="pr-3 min-h-[19px] py-px select-none flex items-center gap-1.5 cursor-default hover:text-zinc-300 hover:bg-zinc-800/60 text-zinc-400"
-          >
-            PixelBlaze
-          </li>
-          {LIBRARY_NAMES.map((name) => (
-            <ListItem
-              key={name}
-              label={name}
-              active={activeLibraryName === name}
-              onClick={() => openLibrary(name)}
-              onMouseEnter={(e) => startShow(name, e.currentTarget)}
-              onMouseLeave={startHide}
-            />
-          ))}
-        </ul>
-      )}
-
-      <SectionHeader
         label="Demos"
         collapsed={isCollapsed('Demos')}
         onToggle={() => toggleCollapsed('Demos')}
@@ -874,15 +796,6 @@ export function PatternList() {
             </div>
           )
         })}
-
-      {hoveredLib && anchorRect && (
-        <LibraryHoverCard
-          name={hoveredLib}
-          anchorRect={anchorRect}
-          onMouseEnter={cancelHide}
-          onMouseLeave={startHide}
-        />
-      )}
     </div>
   )
 }

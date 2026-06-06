@@ -6,6 +6,7 @@ import { PatternList } from '@/components/PatternList'
 import { Preview } from '@/components/Preview'
 import { PaneHeader } from '@/components/PaneHeader'
 import { ControllerBar } from '@/components/ControllerBar'
+import { LibrariesMenu } from '@/components/LibrariesMenu'
 import { SendToController } from '@/components/SendToController'
 import { useControllerStore } from '@/store/controllerStore'
 import { MapModeHeader } from '@/components/MapModeHeader'
@@ -161,6 +162,11 @@ export default function App() {
               </span>
             ))}
           </span>
+        </span>
+        {/* Left zone = identity + authoring reference (#254): Libraries sits beside
+            the wordmark, mirroring the Controller pill family on the right. */}
+        <span className="ml-5 flex items-center">
+          <LibrariesMenu />
         </span>
         <span className="ml-auto flex items-center gap-2.5">
           <ControllerBar />
