@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy - PXLBLZ-IDE Controller Helper</title>
+    <style>
+      :root {
+        color-scheme: dark light;
+        --bg: #141416;
+        --fg: #fafafa;
+        --muted: #a1a1aa;
+        --line: #2e2e34;
+        --accent: #fbbf24;
+      }
+      body {
+        font: 16px/1.6 ui-monospace, "IBM Plex Mono", "Cascadia Code", SFMono-Regular, Menlo, monospace;
+        color: var(--fg);
+        background: var(--bg);
+        margin: 0;
+        padding: 48px 20px;
+      }
+      main { max-width: 720px; margin: 0 auto; }
+      h1 { font-size: 22px; letter-spacing: 0.04em; }
+      h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-top: 36px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+      .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+      a { color: var(--accent); }
+      code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+      ul { padding-left: 22px; }
+      li { margin: 6px 0; }
+      .lede { font-size: 18px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy Policy</h1>
+      <p class="meta">PXLBLZ-IDE Controller Helper (Chrome extension) &middot; Last updated 6 June 2026</p>
+
+      <p class="lede">
+        The PXLBLZ-IDE Controller Helper collects no personal data, stores no
+        personal data, and transmits no personal data to us or to any third party.
+        There is no analytics, no tracking, and no account.
+      </p>
+
+      <h2>What the extension does</h2>
+      <p>
+        The extension is a local-network transport relay. The
+        <a href="https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/">PXLBLZ-IDE</a>
+        web app is served over HTTPS, but a Pixelblaze LED controller speaks plain
+        <code>ws://</code> on your local network, which a secure web page cannot
+        open directly. The extension owns that local connection on the page's behalf
+        and relays the controller's WebSocket and HTTP traffic back and forth.
+      </p>
+
+      <h2>Data we collect</h2>
+      <p>
+        None. The extension does not collect, log, sell, or share any user data.
+        It contains no analytics or telemetry of any kind.
+      </p>
+
+      <h2>Where data goes</h2>
+      <ul>
+        <li>
+          <strong>Controller traffic stays on your local network.</strong> Pattern
+          source you compile, the bytecode sent to a controller, control values,
+          brightness, and pixel-map data travel only between your browser and the
+          controller at the local IP address you connect to. None of it is sent to
+          us or stored anywhere outside your own devices.
+        </li>
+        <li>
+          <strong>Device discovery (optional).</strong> When you open the "discover"
+          control in the app, the extension makes a single HTTPS request to
+          <code>discover.electromage.com</code> &mdash; the official Pixelblaze cloud
+          discovery service operated by the controller's manufacturer (Electromage)
+          &mdash; which returns the local IP addresses of your own controllers as
+          matched by your network's public IP. This is the only request the
+          extension makes outside your local network, it is triggered only by you,
+          and it is governed by Electromage's own privacy practices. You can connect
+          entirely by typing a local IP address and never trigger it.
+        </li>
+        <li>
+          <strong>Remote code.</strong> To compile a pattern the extension downloads
+          the controller's own compiler from the controller itself (over your local
+          network) and runs it in an isolated sandbox. No code is loaded from any
+          server we operate.
+        </li>
+      </ul>
+
+      <h2>Permissions</h2>
+      <ul>
+        <li>
+          <strong>Access to a controller's local address</strong> (optional, granted
+          per device): requested only when you connect to a specific controller, and
+          scoped to that controller's exact IP address. It is used solely to relay
+          that controller's traffic.
+        </li>
+        <li>
+          <strong>discover.electromage.com</strong>: used only for the optional
+          device discovery described above.
+        </li>
+      </ul>
+
+      <h2>Changes</h2>
+      <p>
+        If this policy changes, the updated version will be posted at this URL with a
+        new "last updated" date.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions: <a href="mailto:jon@whiteroomsoftware.com">jon@whiteroomsoftware.com</a>.
+      </p>
+    </main>
+  </body>
+</html>

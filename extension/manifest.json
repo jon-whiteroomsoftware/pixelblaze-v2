@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
   "name": "PXLBLZ-IDE Controller Helper",
-  "version": "0.3.0",
+  "version": "1.0.0",
+  "minimum_chrome_version": "127",
   "description": "Connects the PXLBLZ-IDE web app to Pixelblaze controllers on your local network. It relays the controller's WebSocket traffic.",
+  "homepage_url": "https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/",
+  "author": "White Room Software",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -31,6 +34,6 @@
     "pages": ["sandbox.html"]
   },
   "content_security_policy": {
-    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'none';"
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval'; child-src 'none';"
   }
 }
