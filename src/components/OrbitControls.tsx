@@ -3,11 +3,8 @@ import { Play, Pause, RotateCcw } from 'lucide-react'
 import { useCameraStore } from '@/store/cameraStore'
 import { useMapStore, DEFAULT_SHAPE_PIXEL_COUNT } from '@/store/mapStore'
 import {
-  applyTurntableDrag,
-  applyTrackballDrag,
-  dominantAxis,
+  applyOrbitDrag,
   clampPixelCount,
-  type DragAxis,
 } from '@/engine/camera'
 import { poleMaxCols, defaultPoleCols, clampPoleCols } from '@/engine/shapes'
 
@@ -19,9 +16,9 @@ import { poleMaxCols, defaultPoleCols, clampPoleCols } from '@/engine/shapes'
 // header play/pause which runs the pattern itself.
 //
 // Interaction:
-//   • plain drag   → turntable, locked to one cardinal axis per gesture
-//                    (horizontal = azimuth, vertical = clamped pitch)
-//   • shift-drag   → free trackball, both axes at once (no clamp)
+//   • drag         → orbit: horizontal yaws azimuth, vertical tilts pitch, both
+//                    axes at once. Elevation is clamped to a stable horizon, so
+//                    horizontal always reads as left/right (no view-axis roll).
 //   • grabbing the model pauses auto-orbit until re-armed (play/pause)
 //   • reset returns to the default angle and re-arms auto-orbit
 export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }) {
@@ -48,25 +45,14 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
     const canvas = canvasRef.current
     if (!canvas) return
 
-    // Lock plain drag to one cardinal axis once the gesture clears this much
-    // travel (px) from the down point, so a near-vertical drag never bleeds yaw
-    // and vice versa. Shift-drag is exempt (free trackball, both axes).
-    const AXIS_LOCK_THRESHOLD = 4
-
     let dragging = false
     let lastX = 0
     let lastY = 0
-    let downX = 0
-    let downY = 0
-    let shift = false
-    let axis: DragAxis | null = null
 
     const onDown = (e: PointerEvent) => {
       dragging = true
-      lastX = downX = e.clientX
-      lastY = downY = e.clientY
-      shift = e.shiftKey
-      axis = null
+      lastX = e.clientX
+      lastY = e.clientY
       // Grabbing the model pauses auto-orbit until re-armed.
       useCameraStore.getState().setAutoOrbit(false)
       canvas.setPointerCapture(e.pointerId)
@@ -78,23 +64,8 @@ export function OrbitControls({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEl
       lastX = e.clientX
       lastY = e.clientY
       const cam = useCameraStore.getState().camera
-      // Trackball keeps the screen-down-tilts-top convention (negated dy).
-      if (e.shiftKey || shift) {
-        useCameraStore.getState().setCamera(applyTrackballDrag(cam, dx, -dy))
-        return
-      }
-      // Plain drag: lock to the dominant axis once past the threshold, then
-      // feed only that axis to the turntable so the other stays put.
-      if (axis === null) {
-        const totalX = e.clientX - downX
-        const totalY = e.clientY - downY
-        if (Math.max(Math.abs(totalX), Math.abs(totalY)) < AXIS_LOCK_THRESHOLD) return
-        axis = dominantAxis(totalX, totalY)
-      }
-      const next = axis === 'x'
-        ? applyTurntableDrag(cam, dx, 0)
-        : applyTurntableDrag(cam, 0, dy)
-      useCameraStore.getState().setCamera(next)
+      // Drag-down tilts the model's top toward the viewer (dy as-is).
+      useCameraStore.getState().setCamera(applyOrbitDrag(cam, dx, dy))
     }
     const onUp = (e: PointerEvent) => {
       dragging = false

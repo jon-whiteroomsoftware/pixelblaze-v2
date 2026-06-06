@@ -29,9 +29,7 @@ import {
   depthCue,
   terminatorFade,
   TERMINATOR_WIDTH,
-  applyTurntableDrag,
-  applyTrackballDrag,
-  dominantAxis,
+  applyOrbitDrag,
   advanceAutoOrbit,
   type OrbitCamera,
 } from './camera'
@@ -423,23 +421,11 @@ describe('camera — depth cueing', () => {
 })
 
 describe('camera — orbit interaction', () => {
-  it('turntable drag yaws azimuth and clamps elevation', () => {
-    const next = applyTurntableDrag(DEFAULT_ORBIT, 50, 10000)
-    expect(next.azimuth).toBeGreaterThan(DEFAULT_ORBIT.azimuth)
+  it('orbit drag moves both axes at once but clamps elevation to the horizon', () => {
+    const next = applyOrbitDrag({ azimuth: 0, elevation: 0, roll: 0 }, 50, 10000, 0.01)
+    expect(next.azimuth).toBeGreaterThan(0)
     expect(next.elevation).toBeCloseTo(MAX_ELEVATION, 10)
-    expect(next.roll).toBe(DEFAULT_ORBIT.roll)
-  })
-
-  it('trackball drag pitches freely past the horizon clamp', () => {
-    const next = applyTrackballDrag({ azimuth: 0, elevation: 0, roll: 0 }, 0, 10000, 0.01)
-    expect(next.elevation).toBeGreaterThan(MAX_ELEVATION)
-  })
-
-  it('dominant axis picks the larger travel, ties favour x', () => {
-    expect(dominantAxis(10, 3)).toBe('x')
-    expect(dominantAxis(3, 10)).toBe('y')
-    expect(dominantAxis(-10, 3)).toBe('x')
-    expect(dominantAxis(5, 5)).toBe('x')
+    expect(next.roll).toBe(0)
   })
 
   it('auto-orbit advances azimuth over time', () => {

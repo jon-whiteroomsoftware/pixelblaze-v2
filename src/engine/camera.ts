@@ -214,7 +214,7 @@ export interface OrbitCamera {
 export const DEFAULT_ORBIT: OrbitCamera = { azimuth: 0.6, elevation: 0.5, roll: 0 }
 
 // Turntable elevation clamp — just shy of straight down/up so the horizon stays
-// stable (no gimbal flip). Plain drag is clamped to this; trackball is free.
+// stable (no gimbal flip). Both plain and shift drag clamp to this.
 export const MAX_ELEVATION = (Math.PI / 2) * 0.98
 
 export function clampElevation(e: number): number {
@@ -553,19 +553,11 @@ export function terminatorFade(facing: number, solidity: number): number {
 
 // ── Orbit interaction (pure drag math) ──────────────────────────────────────
 
-// Plain drag is constrained to a single cardinal axis (the spec): one gesture
-// either yaws or pitches, never both. `dominantAxis` picks which from the
-// gesture's accumulated travel; the caller locks it for the rest of the drag.
-// 'x' → horizontal → azimuth; 'y' → vertical → elevation. Ties favour 'x'.
-export type DragAxis = 'x' | 'y'
-
-export function dominantAxis(dx: number, dy: number): DragAxis {
-  return Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'
-}
-
-// Plain drag = turntable: horizontal pixels yaw azimuth, vertical pixels pitch
-// elevation (clamped to a stable horizon). Roll is untouched.
-export function applyTurntableDrag(
+// The sole drag mode: horizontal pixels yaw azimuth, vertical pixels pitch
+// elevation, both axes at once. Elevation is clamped to a stable horizon —
+// passing vertical would turn a horizontal yaw into a view-axis roll (gimbal
+// lock), so horizontal always reads as left/right. Roll is untouched.
+export function applyOrbitDrag(
   cam: OrbitCamera,
   dx: number,
   dy: number,
@@ -574,21 +566,6 @@ export function applyTurntableDrag(
   return {
     azimuth: cam.azimuth + dx * sensitivity,
     elevation: clampElevation(cam.elevation + dy * sensitivity),
-    roll: cam.roll,
-  }
-}
-
-// Shift-drag = free trackball: horizontal yaws, vertical pitches WITHOUT clamp,
-// so the model can tumble past vertical and accumulate roll-like freedom.
-export function applyTrackballDrag(
-  cam: OrbitCamera,
-  dx: number,
-  dy: number,
-  sensitivity: number = 0.01,
-): OrbitCamera {
-  return {
-    azimuth: cam.azimuth + dx * sensitivity,
-    elevation: cam.elevation + dy * sensitivity,
     roll: cam.roll,
   }
 }
