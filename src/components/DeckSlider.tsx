@@ -16,7 +16,13 @@ export function DeckSlider({
 }: {
   label: string
   ariaLabel?: string
-  value: number
+  /** The current value, or `null` when not yet known — e.g. a live device value
+   *  still being read, or a control whose device-reported value is out of range and
+   *  so unusable as a position (#speed-slider). A null value renders an
+   *  *indeterminate* slider — a dimmed, empty track and a `—` readout — rather than a
+   *  misleading 0 (or a wild `2.4e+21`) that pops to a real value once known. The
+   *  slider stays draggable while indeterminate: dragging is how the user sets it. */
+  value: number | null
   min: number
   max: number
   step: number
@@ -24,6 +30,7 @@ export function DeckSlider({
   format?: (v: number) => string
   className?: string
 }) {
+  const indeterminate = value == null
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
       <span className="text-zinc-400">{label}</span>
@@ -34,11 +41,18 @@ export function DeckSlider({
           min={min}
           max={max}
           step={step}
-          value={value}
+          // Indeterminate: a hollow accent ring centered on an empty track (no fill
+          // that would imply a value) — reads as an interactive, not-yet-set control,
+          // not a disabled one. Stays enabled: dragging is how the user sets it.
+          value={indeterminate ? (min + max) / 2 : value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-2/3 accent-live"
+          className={`w-2/3 ${indeterminate ? 'deck-slider-unset' : 'accent-live'}`}
         />
-        <span className="flex-1 text-right text-live tabular-nums">{format(value)}</span>
+        <span
+          className={`flex-1 text-right tabular-nums ${indeterminate ? 'text-zinc-500' : 'text-live'}`}
+        >
+          {indeterminate ? '—' : format(value)}
+        </span>
       </div>
     </label>
   )

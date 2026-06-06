@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { applyControllerPixelCount } from '@/engine/applyControllerPixelCount'
+import { throttleTrailing } from '@/engine/throttleTrailing'
 import { getProgramLabels } from '@/engine/storage'
 import type { ProgramListEntry } from '@/engine/PixelblazeConnection'
 
@@ -20,6 +21,18 @@ import type { ProgramListEntry } from '@/engine/PixelblazeConnection'
 
 export const CONTROLLER_POLL_INTERVAL_MS = 1000
 
+/** Damp brightness-slider traffic: a drag fires onChange on every pixel of travel,
+ *  but the device only needs ~10 updates/sec to track smoothly. Local state stays
+ *  instant; only the WebSocket write is throttled. Trailing flush guarantees the
+ *  final value lands so the device never settles on a stale brightness. */
+export const BRIGHTNESS_SEND_INTERVAL_MS = 100
+
+const sendBrightness = throttleTrailing((value: number) => {
+  void getControllerProvider()
+    .setBrightness(value, false)
+    .catch(() => {})
+}, BRIGHTNESS_SEND_INTERVAL_MS)
+
 interface ControllerPanelState {
   /** Last read brightness (0..1), seeded once then slider-owned. null until read. */
   brightness: number | null
@@ -37,6 +50,12 @@ interface ControllerPanelState {
   /** The device's configured pixel count; null until read. Editable via
    *  `setPixelCount` (#213) and refreshed from the device each poll. */
   pixelCount: number | null
+  /** The count an in-flight `setPixelCount` is applying, or null when idle. While
+   *  non-null the panel shows this value (the optimistic edit, never the device's
+   *  stale poll) and disables/dims the input so the slow saved-count write reads as
+   *  deliberate rather than janky (#213 follow-up). The poll ignores the device's
+   *  reported count until it matches this, so the input never flashes back. */
+  pixelCountPending: number | null
   /** Number of coordinates in the device's installed pixel map, read back once on
    *  start (H13, #205); null until read or when the device has no map. Surfaced
    *  next to pixelCount so a count mismatch — silently dropped by firmware (#204) —
@@ -89,6 +108,7 @@ export const controllerPanelInitialState = {
   programs: [] as ProgramListEntry[],
   fps: null,
   pixelCount: null,
+  pixelCountPending: null,
   mapPointCount: null,
   activeControls: {} as Record<string, number>,
   vars: {} as Record<string, number>,
@@ -177,7 +197,13 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
           // Pixel count is device config (editable via setPixelCount, #213);
           // refresh it from each poll, falling back to the last known value. An
           // optimistic local edit is reconciled here once the device reports back.
-          pixelCount: config.pixelCount ?? s.pixelCount,
+          // While a write is in flight (`pixelCountPending` set) keep showing the
+          // pending value — a poll mid-write still reports the *old* count and would
+          // flash the input back to it. The hold is owned and always cleared by
+          // `setPixelCount` (in its finally), so poll only reads it, never clears it —
+          // a poll alone can't strand the input disabled.
+          pixelCount:
+            s.pixelCountPending != null ? s.pixelCountPending : config.pixelCount ?? s.pixelCount,
           activeControls: reseed ? config.activeControls ?? {} : s.activeControls,
         }
       })
@@ -197,18 +223,33 @@ export const useControllerPanelStore = create<ControllerPanelState>()((set, get)
 
   setBrightness: (value) => {
     set({ brightness: value })
-    void getControllerProvider()
-      .setBrightness(value, false)
-      .catch(() => {})
+    sendBrightness(value)
   },
 
-  setPixelCount: (value) => {
+  setPixelCount: async (value) => {
     // Capture the live device count before the optimistic local set so the helper
     // can tell a reduction (which blacks out the strip before shrinking so the tail
     // LEDs go dark, #222) from a raise.
     const prev = get().pixelCount
-    set({ pixelCount: value })
-    void applyControllerPixelCount(getControllerProvider(), value, prev).catch(() => {})
+    // Show the new value at once and mark the write in flight: the panel dims and
+    // disables the input, and the poll holds this value instead of flashing back to
+    // the device's stale count while the slow saved write lands.
+    set({ pixelCount: value, pixelCountPending: value })
+    try {
+      await applyControllerPixelCount(getControllerProvider(), value, prev)
+      // Poll immediately so the device's freshly-reported count clears the hold now
+      // rather than after the next interval tick — re-enabling the input promptly.
+      await get().poll()
+    } catch {
+      // Tolerate a failed write; the finally releases the hold either way.
+    } finally {
+      // Always release the hold once the write sequence has completed. The confirming
+      // poll above clears it on success; this guards the case where the firmware
+      // *silently drops* the write (#204) so the device never reports the new count —
+      // without it the input would stay disabled forever. With the hold released, the
+      // next poll reconciles the displayed count to the device's real value.
+      if (get().pixelCountPending != null) set({ pixelCountPending: null })
+    }
   },
 
   setControl: (name, value) => {

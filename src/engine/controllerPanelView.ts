@@ -143,6 +143,21 @@ export function shapeControllerControls(
   return out
 }
 
+/** The position to show for a slider control, or `null` when the device's reported
+ *  value is unusable as a 0..1 position — so the panel shows an *unset* slider rather
+ *  than a misleading bar.
+ *
+ *  Pixelblaze sliders are 0..1, but the live `activeProgram.controls` map reports the
+ *  control's bound *variable*, not its UI position. Patterns that bind a slider to an
+ *  exported var the render loop also mutates (e.g. an accumulator) report wildly
+ *  out-of-range values — `sliderOctaves: 2.37e+21`, `sliderZoom: 1.98` — and the
+ *  stored controls (`getControls`) are empty for a run-only program, so there is no
+ *  clean position to recover (#speed-slider, verified on hardware 2026-06-05). Treat
+ *  anything outside [0,1] (or non-finite) as unset; the user sets it by dragging. */
+export function controllerSliderValue(raw: number): number | null {
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : null
+}
+
 /** A read-only watched variable: its name and a display-formatted value. */
 export interface ControllerVarView {
   name: string

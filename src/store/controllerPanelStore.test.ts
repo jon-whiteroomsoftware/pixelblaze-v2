@@ -222,6 +222,59 @@ describe('controllerPanelStore', () => {
     expect(provider.brightnessWrites).toEqual([])
   })
 
+  it('marks the write in flight so the panel can dim/disable the input', () => {
+    useControllerPanelStore.setState({ pixelCount: 16 })
+    void useControllerPanelStore.getState().setPixelCount(256)
+    // Synchronously: the entered value shows and the in-flight flag is set.
+    expect(useControllerPanelStore.getState().pixelCount).toBe(256)
+    expect(useControllerPanelStore.getState().pixelCountPending).toBe(256)
+  })
+
+  it('a poll mid-write keeps the entered count — never flashes back to the stale device value', async () => {
+    // Write in flight (pending 256); the device still reports the old 16.
+    useControllerPanelStore.setState({ pixelCount: 256, pixelCountPending: 256 })
+    provider.config = { ...provider.config, pixelCount: 16 }
+    await useControllerPanelStore.getState().poll()
+    expect(useControllerPanelStore.getState().pixelCount).toBe(256)
+    expect(useControllerPanelStore.getState().pixelCountPending).toBe(256)
+  })
+
+  it('poll holds the pending value and never clears it (setPixelCount owns clearing)', async () => {
+    // Even when the device already reports the target, poll must not clear the hold —
+    // clearing is the writer's responsibility, so poll alone can never strand the UI.
+    useControllerPanelStore.setState({ pixelCount: 256, pixelCountPending: 256 })
+    provider.config = { ...provider.config, pixelCount: 256 }
+    await useControllerPanelStore.getState().poll()
+    expect(useControllerPanelStore.getState().pixelCountPending).toBe(256)
+    expect(useControllerPanelStore.getState().pixelCount).toBe(256)
+  })
+
+  it('setPixelCount clears the hold once its write sequence completes', async () => {
+    provider.config = { ...provider.config, pixelCount: 8 }
+    useControllerPanelStore.setState({ pixelCount: 8 })
+    const done = useControllerPanelStore.getState().setPixelCount(256)
+    // Held while in flight so a mid-write poll can't flash it back.
+    expect(useControllerPanelStore.getState().pixelCountPending).toBe(256)
+    await flush()
+    await done
+    expect(useControllerPanelStore.getState().pixelCountPending).toBeNull()
+  })
+
+  it('releases the hold even when the firmware silently drops the write (#204) — no stuck input', async () => {
+    // Device keeps reporting the OLD count: the write was silently dropped, so it
+    // never confirms. The hold must still clear so the input does not stay disabled.
+    // A raise (8 → 256) avoids the reduction blackout's real 400ms sleep.
+    provider.config = { ...provider.config, pixelCount: 8 }
+    useControllerPanelStore.setState({ pixelCount: 8 })
+    const done = useControllerPanelStore.getState().setPixelCount(256)
+    await flush()
+    await done
+    expect(useControllerPanelStore.getState().pixelCountPending).toBeNull()
+    // A later poll reconciles the display back to the device's real (unchanged) value.
+    await useControllerPanelStore.getState().poll()
+    expect(useControllerPanelStore.getState().pixelCount).toBe(8)
+  })
+
   it('stop() halts polling but keeps the last values for a seamless reopen', async () => {
     useControllerPanelStore.getState().start('1.2.3.4')
     await flush()

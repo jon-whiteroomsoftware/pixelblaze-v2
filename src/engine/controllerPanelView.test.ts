@@ -3,6 +3,7 @@ import {
   describeControllerPanel,
   resolveActiveProgramName,
   shapeControllerControls,
+  controllerSliderValue,
   describeControllerVars,
 } from './controllerPanelView'
 
@@ -161,6 +162,26 @@ describe('shapeControllerControls', () => {
   it('preserves the device order', () => {
     const names = shapeControllerControls({ sliderB: 0.1, sliderA: 0.2 }).map((c) => c.name)
     expect(names).toEqual(['sliderB', 'sliderA'])
+  })
+})
+
+describe('controllerSliderValue', () => {
+  it('passes through an in-range 0..1 value', () => {
+    expect(controllerSliderValue(0)).toBe(0)
+    expect(controllerSliderValue(0.67)).toBe(0.67)
+    expect(controllerSliderValue(1)).toBe(1)
+  })
+
+  it('returns null for the drifted out-of-range values the device reports', () => {
+    // The real values seen on hardware for run-only patterns (#speed-slider).
+    expect(controllerSliderValue(2.368264e21)).toBeNull()
+    expect(controllerSliderValue(1.984327)).toBeNull()
+    expect(controllerSliderValue(-1.554502e-15)).toBeNull()
+  })
+
+  it('returns null for non-finite values', () => {
+    expect(controllerSliderValue(NaN)).toBeNull()
+    expect(controllerSliderValue(Infinity)).toBeNull()
   })
 })
 

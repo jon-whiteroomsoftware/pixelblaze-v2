@@ -218,6 +218,55 @@
     --cycle: 4.2s;
   }
 }
+/* Indeterminate ("unset") DeckSlider: a control whose position we don't know — a
+   device value still loading, or a pattern control the firmware reports out of range
+   (#speed-slider). It must read as an *interactive, not-yet-set* control, NOT a
+   disabled one: a hollow accent ring (empty = unset, accent = live/grabbable) centered
+   on an empty track, with no fill that would imply a value. Fully custom because the
+   hollow thumb needs pseudo-element styling that `accent-color` can't express. */
+.deck-slider-unset {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: grab;
+}
+.deck-slider-unset:active {
+  cursor: grabbing;
+}
+.deck-slider-unset::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-seam);
+}
+.deck-slider-unset::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-seam);
+}
+.deck-slider-unset::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  border-radius: 9999px;
+  background: transparent;
+  border: 2px solid var(--color-live);
+  transition: box-shadow 0.12s ease;
+}
+.deck-slider-unset::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: transparent;
+  border: 2px solid var(--color-live);
+}
+/* Hover/focus: a soft accent halo so the ring clearly invites a drag. */
+.deck-slider-unset:hover::-webkit-slider-thumb,
+.deck-slider-unset:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.18);
+}
+
 /* Controller "connecting" indicator: a fast green/black blink, like a network
    device's link LED searching for signal. It shares the connected green (--color-ok)
    but blinks hard (stepped, not a soft fade) until the link settles to a solid dot.

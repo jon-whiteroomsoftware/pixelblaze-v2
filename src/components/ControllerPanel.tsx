@@ -7,6 +7,7 @@ import { useEditorStore } from '@/store/editorStore'
 import {
   describeControllerPanel,
   shapeControllerControls,
+  controllerSliderValue,
   describeControllerVars,
 } from '@/engine/controllerPanelView'
 import {
@@ -76,6 +77,9 @@ const VARS_HINT = (
 function ControllerPixelCountInput() {
   const pixelCount = useControllerPanelStore((s) => s.pixelCount)
   const setPixelCount = useControllerPanelStore((s) => s.setPixelCount)
+  // While a saved count write is in flight the input is dimmed and disabled so the
+  // slow write reads as deliberate, and it keeps showing the entered value (#213).
+  const pending = useControllerPanelStore((s) => s.pixelCountPending) != null
 
   const [draft, setDraft] = useState(pixelCount == null ? '' : String(pixelCount))
 
@@ -105,10 +109,11 @@ function ControllerPixelCountInput() {
       type="text"
       inputMode="numeric"
       value={draft}
+      disabled={pending}
       onChange={(e) => setDraft(e.target.value.replace(/\D/g, ''))}
       onKeyDown={(e) => e.key === 'Enter' && commit()}
       onBlur={commit}
-      className="w-[42px] h-5 px-0.5 rounded border border-zinc-500 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-400 focus:outline-none focus:border-live"
+      className="w-[42px] h-5 px-0.5 rounded border border-zinc-500 text-[11px] tabular-nums text-zinc-300 text-center bg-transparent hover:border-zinc-400 focus:outline-none focus:border-live disabled:opacity-40 disabled:cursor-not-allowed"
     />
   )
 }
@@ -197,7 +202,7 @@ export function ControllerPanel() {
           <DeckSlider
             label="brightness"
             ariaLabel="Controller brightness"
-            value={brightness ?? 0}
+            value={brightness}
             min={0}
             max={1}
             step={0.01}
@@ -245,7 +250,9 @@ export function ControllerPanel() {
                   key={c.name}
                   label={c.label.toLowerCase()}
                   ariaLabel={c.name}
-                  value={c.value}
+                  // The device reports a control's drifted bound variable, not its
+                  // 0..1 position; an out-of-range value shows as unset (#speed-slider).
+                  value={controllerSliderValue(c.value)}
                   min={0}
                   max={1}
                   step={0.01}
