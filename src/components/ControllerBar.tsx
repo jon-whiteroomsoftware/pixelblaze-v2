@@ -41,6 +41,20 @@ function ChipGlyph() {
   )
 }
 
+/** A two-prong plug + cord — the familiar "plug it in" connect affordance. */
+function ConnectGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden className="shrink-0">
+      {/* Two prongs poking up out of the plug body. */}
+      <path d="M6.25 1.5v4M9.75 1.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      {/* Plug body: flat top with a rounded bowl underneath. */}
+      <path d="M4 5.5h8v0.5a4 4 0 0 1-8 0z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      {/* Cord dropping straight down from the body. */}
+      <path d="M8 10v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function ControllerPillButton({
   ip,
   nickname,
@@ -267,13 +281,22 @@ export function ControllerBar() {
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : openDropdown())}
         className={`inline-flex items-center justify-center h-6 rounded border border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 transition-colors focus:outline-none ${
-          hasPills ? 'w-6 text-base leading-none' : 'px-2.5 text-xs font-mono'
+          hasPills ? 'w-6 text-base leading-none' : 'gap-1.5 px-2 text-xs font-mono'
         }`}
       >
-        {/* "Connect to Controller" until a Controller is live, when it collapses
-            to a bare +. The dropdown — install pitch vs IP form — adapts to
-            extension presence; the entry label does not (#211). */}
-        {hasPills ? '+' : 'Connect to Controller'}
+        {/* Plug glyph + "Connect" until a Controller is live, when it collapses
+            to a bare +. This mirrors the connected pill's chip-glyph-plus-label
+            shape so the two states read as one family. The dropdown — install
+            pitch vs IP form — adapts to extension presence; the entry label does
+            not (#211). */}
+        {hasPills ? (
+          '+'
+        ) : (
+          <>
+            <ConnectGlyph />
+            Connect
+          </>
+        )}
       </button>
 
       {open && (
