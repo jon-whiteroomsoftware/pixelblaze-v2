@@ -28,6 +28,7 @@ import {
 } from '@/engine/storage'
 import { withProgramLabel } from '@/engine/controllerBinding'
 import { bundle } from '@/engine/bundle'
+import { buildPreviewJpeg } from '@/engine/previewThumbnailJpeg'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { usePatternStore, activePushKey } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
@@ -533,7 +534,15 @@ export const useControllerStore = create<ControllerConnectionState>()(
             // Push the bundled artifact (library-inlined) — the same code Copy/Download
             // emit — never raw editor source. Use the last *clean* preview source so a
             // broken edit is never compiled and pushed.
-            const { code } = bundle(previewSource, LIBRARIES)
+            const bundled = bundle(previewSource, LIBRARIES)
+            const { code } = bundled
+            // Save mode only: render the device-matched 100x150 waterfall preview and
+            // embed it in the PBP blob (#259). A run-only push never persists a record,
+            // so it needs no preview. A null result (render/encode failure) falls back to
+            // the empty preview section rather than blocking the save.
+            const previewImage = persist
+              ? (await buildPreviewJpeg(bundled)) ?? undefined
+              : undefined
             const { created, programId } = await pushPattern({
               provider: getControllerProvider(),
               controllerId,
@@ -541,6 +550,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
               source: code,
               name: previewPatternName,
               persist,
+              previewImage,
               loadBindings: getControllerBindings,
               saveBindings: setControllerBindings,
             })

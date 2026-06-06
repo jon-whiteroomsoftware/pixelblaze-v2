@@ -121,6 +121,23 @@ describe('pushPattern — save mode (persist: true)', () => {
     expect(decoded!.sourceCode).toBe('export function render(index){ hsv(0,1,1) }')
   })
 
+  it('threads the previewImage into the PBP jpeg section (#259)', async () => {
+    const previewImage = new Uint8Array([0xff, 0xd8, 1, 2, 3, 0xff, 0xd9])
+    const { deps } = makeDeps({ persist: true, previewImage })
+    await pushPattern(deps)
+    const [blob] = (deps.provider.saveProgram as ReturnType<typeof vi.fn>).mock.calls[0]
+    const decoded = decodePbp(blob as Uint8Array)
+    expect(Array.from(decoded!.jpeg)).toEqual(Array.from(previewImage))
+  })
+
+  it('writes an empty jpeg section when no previewImage is supplied', async () => {
+    const { deps } = makeDeps({ persist: true })
+    await pushPattern(deps)
+    const [blob] = (deps.provider.saveProgram as ReturnType<typeof vi.fn>).mock.calls[0]
+    const decoded = decodePbp(blob as Uint8Array)
+    expect(decoded!.jpeg.length).toBe(0)
+  })
+
   it('reuses the bound id (overwrite in place) and does NOT re-save the binding when still on the device', async () => {
     const { deps, saved } = makeDeps({
       persist: true,

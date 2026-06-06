@@ -50,6 +50,10 @@ export interface PushPatternDeps {
   saveBindings: (bindings: BindingStore) => Promise<void>
   /** Injectable id minter (determinism in tests). Defaults to makeProgramId. */
   mintId?: () => string
+  /** Optional JPEG preview bytes for the saved PBP blob (#259). Save mode only —
+   *  run-only never persists a record. Omitting it writes an empty preview section
+   *  (the pre-#259 behaviour), which stalls the stock app's pattern list. */
+  previewImage?: Uint8Array
 }
 
 export interface PushPatternResult {
@@ -103,6 +107,7 @@ export async function pushPattern(deps: PushPatternDeps): Promise<PushPatternRes
     name: deps.name ?? '',
     sourceCode: deps.source,
     byteCode: bytecode,
+    previewImage: deps.previewImage,
   })
   await deps.provider.saveProgram(blob, { id: programId })
 
