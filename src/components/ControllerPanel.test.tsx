@@ -172,10 +172,13 @@ describe('ControllerPanel', () => {
     setControllerProvider(provider)
     render(<ControllerPanel />)
     const slider = screen.getByLabelText('Controller brightness')
+    // The brightness slider runs on a gamma curve (curve={2}), so the range input's
+    // position is in [0,1] and maps non-linearly to the value: 0.7^2 = 0.49. This
+    // gives finer travel at the dim end while the value written stays in real units.
     fireEvent.change(slider, { target: { value: '0.7' } })
     await waitFor(() =>
       expect(provider.brightnessWrites[provider.brightnessWrites.length - 1]).toEqual({
-        value: 0.7,
+        value: 0.49,
         save: false,
       }),
     )

@@ -12,6 +12,7 @@ export function DeckSlider({
   step,
   onChange,
   format = (v) => v.toFixed(2),
+  curve = 1,
   className = '',
 }: {
   label: string
@@ -28,9 +29,38 @@ export function DeckSlider({
   step: number
   onChange: (v: number) => void
   format?: (v: number) => string
+  /** Position-vs-value curve. `1` (default) is linear. Values > 1 devote more of the
+   *  track's travel to the low end of the range — e.g. `curve={2.5}` on a 0..1
+   *  brightness slider gives fine control at the dim end where the eye is most
+   *  sensitive, while the value passed to/from `onChange`/`value` stays in real units.
+   *  The mapping is a gamma curve on the normalized fraction, so it reaches both
+   *  endpoints exactly (unlike a true log scale, which can't hit 0). */
+  curve?: number
   className?: string
 }) {
   const indeterminate = value == null
+  // With a non-linear curve the range input runs in normalized *position* space
+  // [0,1]; we gamma-map position <-> value so callers still deal in real units.
+  const curved = curve !== 1
+  const span = max - min
+  const toPos = (v: number) => (span <= 0 ? 0 : ((v - min) / span) ** (1 / curve))
+  const fromPos = (p: number) => {
+    // Do NOT quantize to `step` here: `step` is the coarse *readout* granularity, and
+    // applying it to the curved value collapses the dense low end of the track to 0
+    // (every position under step/2 rounds to zero, so dragging left "pops" to off).
+    // The position step already discretizes travel; we only trim binary-float noise.
+    return Number((min + span * p ** curve).toFixed(10))
+  }
+  const sliderMin = curved ? 0 : min
+  const sliderMax = curved ? 1 : max
+  // A fine position step keeps the curved track smooth; value is re-quantized to `step`.
+  const sliderStep = curved ? 0.001 : step
+  const sliderValue = indeterminate
+    ? (sliderMin + sliderMax) / 2
+    : curved
+      ? toPos(value)
+      : value
+  const handleChange = (raw: number) => onChange(curved ? fromPos(raw) : raw)
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
       <span className="text-zinc-400">{label}</span>
@@ -38,14 +68,14 @@ export function DeckSlider({
         <input
           type="range"
           aria-label={ariaLabel ?? label}
-          min={min}
-          max={max}
-          step={step}
+          min={sliderMin}
+          max={sliderMax}
+          step={sliderStep}
           // Indeterminate: a hollow accent ring centered on an empty track (no fill
           // that would imply a value) — reads as an interactive, not-yet-set control,
           // not a disabled one. Stays enabled: dragging is how the user sets it.
-          value={indeterminate ? (min + max) / 2 : value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          value={sliderValue}
+          onChange={(e) => handleChange(Number(e.target.value))}
           className={`w-2/3 ${indeterminate ? 'deck-slider-unset' : 'accent-live'}`}
         />
         <span

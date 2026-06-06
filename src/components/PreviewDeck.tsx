@@ -234,6 +234,7 @@ function SecondaryBand() {
             min={0}
             max={1}
             step={0.01}
+            curve={2}
             onChange={(v) => {
               setBrightness(v)
               writeCascadedOverride('brightness', v)

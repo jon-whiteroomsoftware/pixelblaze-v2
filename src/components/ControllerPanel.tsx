@@ -206,6 +206,7 @@ export function ControllerPanel() {
             min={0}
             max={1}
             step={0.01}
+            curve={2}
             onChange={setBrightness}
           />
           {/* Row 2: map points + pixel count. */}
