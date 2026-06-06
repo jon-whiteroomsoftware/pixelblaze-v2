@@ -131,9 +131,12 @@ export function Editor() {
     const model = editor.getModel()
     if (!model) return
 
-    // Library files are not user-authored patterns — skip validation
+    // Read-only content (shipped demos, library files) is curated and valid — skip
+    // validation, but mark the status 'good' so a stale 'broken' from a previously
+    // open pattern doesn't linger and block Send-to-Controller for a demo (#208).
     if (isReadOnly) {
       monaco.editor.setModelMarkers(model, 'pixelblaze', [])
+      setCompileStatus('good')
       return
     }
 

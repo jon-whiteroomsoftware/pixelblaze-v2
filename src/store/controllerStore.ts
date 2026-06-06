@@ -29,7 +29,7 @@ import {
 import { withProgramLabel } from '@/engine/controllerBinding'
 import { bundle } from '@/engine/bundle'
 import { LIBRARIES } from '@/pixelblaze/libs'
-import { usePatternStore } from '@/store/patternStore'
+import { usePatternStore, activePushKey } from '@/store/patternStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useMapStore } from '@/store/mapStore'
 import { useControllerPanelStore } from '@/store/controllerPanelStore'
@@ -515,7 +515,9 @@ export const useControllerStore = create<ControllerConnectionState>()(
 
         pushActivePattern: async () => {
           const controllerId = get().activeIp
-          const patternId = usePatternStore.getState().activePatternId
+          // Any pushable pattern — a user pattern by id, a demo by its `demo:` key — so
+          // demos push without forking (#208 follow-up). null only for a library/nothing.
+          const patternId = activePushKey(usePatternStore.getState())
           const { previewSource, previewPatternName } = useEditorStore.getState()
           // The button's gate already guarantees a connected Controller + a matching
           // active pattern, but guard anyway so a stray call is an inert no-op.

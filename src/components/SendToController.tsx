@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
 import { useControllerStore } from '@/store/controllerStore'
 import { useEditorStore } from '@/store/editorStore'
-import { usePatternStore } from '@/store/patternStore'
+import { usePatternStore, activePushKey } from '@/store/patternStore'
 import { describeSendToController, isAlreadyPushed, describeSendAction } from '@/engine/sendToController'
 
 // The editor-header "Send to Controller" action (H9 #201 → H10 #202; save mode #236,
@@ -27,7 +27,9 @@ export function SendToController() {
   const patternDim = useEditorStore((s) => s.nativeDim)
   const compileStatus = useEditorStore((s) => s.compileStatus)
   const previewSource = useEditorStore((s) => s.previewSource)
-  const patternId = usePatternStore((s) => s.activePatternId)
+  // The open pattern's push identity — a user pattern by id, a demo by its `demo:`
+  // key — so the dirty gate (and the push itself) work for demos without forking.
+  const patternId = usePatternStore(activePushKey)
   // Target the active Controller (#210): the gate + label key off its entry.
   const activeIp = useControllerStore((s) => s.activeIp)
   const active = useControllerStore((s) => (s.activeIp ? s.controllers[s.activeIp] : undefined))

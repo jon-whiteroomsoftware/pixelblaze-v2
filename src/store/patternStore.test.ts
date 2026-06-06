@@ -1,8 +1,28 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { usePatternStore, patternInitialState } from './patternStore'
+import { usePatternStore, patternInitialState, activePushKey } from './patternStore'
 
 beforeEach(() => {
   usePatternStore.setState(patternInitialState)
+})
+
+describe('activePushKey', () => {
+  it('keys a user pattern by its record id', () => {
+    expect(activePushKey({ activePatternId: 'abc-123', activeDemoName: null })).toBe('abc-123')
+  })
+
+  it('keys a demo by a `demo:` namespaced name (so it pushes without forking)', () => {
+    expect(activePushKey({ activePatternId: null, activeDemoName: 'Test Pattern (2D)' })).toBe(
+      'demo:Test Pattern (2D)',
+    )
+  })
+
+  it('prefers the user pattern id when both are somehow set', () => {
+    expect(activePushKey({ activePatternId: 'abc-123', activeDemoName: 'X' })).toBe('abc-123')
+  })
+
+  it('is null when nothing pushable is open (e.g. a library)', () => {
+    expect(activePushKey({ activePatternId: null, activeDemoName: null })).toBeNull()
+  })
 })
 
 describe('patternStore', () => {

@@ -62,6 +62,21 @@ interface PatternState {
   resetDemoSettings: (name: string) => Promise<void>
 }
 
+// The stable identity of the open *pushable* pattern — the key Send-to-Controller
+// uses for its device binding (save mode) and its dirty-track records. A user
+// pattern is keyed by its record id; a demo, which carries no record, by a
+// `demo:`-namespaced key off its name, so demos can be pushed and dirty-tracked
+// without first forking into the user area. Libraries are not patterns, so they
+// have no key (null → the Send button doesn't render). The `demo:` namespace
+// keeps demo and user ids from ever colliding in the binding/dirty maps.
+export function activePushKey(
+  s: Pick<PatternState, 'activePatternId' | 'activeDemoName'>,
+): string | null {
+  if (s.activePatternId !== null) return s.activePatternId
+  if (s.activeDemoName !== null) return `demo:${s.activeDemoName}`
+  return null
+}
+
 export const patternInitialState = {
   activePatternId: null as string | null,
   activeLibraryName: null as string | null,

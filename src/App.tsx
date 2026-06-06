@@ -219,7 +219,9 @@ export default function App() {
                 {copied ? 'Copied!' : 'Copy Code'}
               </Button>
             )}
-            {activePatternId !== null && <SendToController />}
+            {/* Send to Controller works for any open pattern — user patterns and
+                read-only demos alike (a demo pushes without first forking). */}
+            {(activePatternId !== null || activeDemoName !== null) && <SendToController />}
               </>
             )}
           </PaneHeader>
