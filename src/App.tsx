@@ -142,7 +142,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="app-vignette flex flex-col h-screen bg-zinc-950 text-zinc-100">
+    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100">
       <header data-testid="top-bar" className="h-10 flex items-center px-4 border-b border-seam shrink-0 bg-panel">
         <span className="flex items-center gap-2 select-none">
           <svg width="26" height="20" viewBox="0 0 26 20" aria-hidden className="shrink-0">

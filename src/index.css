@@ -113,17 +113,6 @@
     }
 }
 
-/* App-wide vignette (#182): a non-interactive overlay so the flat zinc-950 shell
-   gains depth. Sits above panes but below any popovers/portals (z below modals). */
-.app-vignette::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 30;
-  background: radial-gradient(140% 100% at 50% 0%, transparent 55%, rgba(0, 0, 0, 0.55));
-}
-
 /* Wordmark "wave" (PXLBLZ): a deliberately dull homage to the one-pixel-at-a-time
    LED fade. A bright-amber crest glides letter to letter and ping-pongs — on reaching
    Z it turns and walks back to P, then bounces again. It is not one lit letter but a
