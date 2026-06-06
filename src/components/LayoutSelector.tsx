@@ -80,7 +80,11 @@ export function MapSelect() {
     <DeckSelect
       ariaLabel="Map"
       value={mapValue ?? maps[0].id}
-      options={maps.map((o) => ({ value: o.id, label: o.name }))}
+      options={maps.map((o) => ({
+        value: o.id,
+        label: o.name,
+        group: o.group === 'user' ? 'User' : 'Stock',
+      }))}
       onChange={(id) => route(id, maps)}
       menuWidthClass="w-44"
     />

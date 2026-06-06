@@ -204,16 +204,36 @@ function RailFilterBar({
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
+  // After a close-click the cursor is still on the icon, which would re-unfurl the box
+  // via `hovered`. Latch hover off until the mouse genuinely leaves the area.
+  const [hoverSuppressed, setHoverSuppressed] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const expanded = pinned || hovered || focused || query !== ''
+  // "Committed open" = the user deliberately opened it (clicked or focused), as opposed
+  // to a transient hover-preview. The icon acts as Close only when committed. Focus is
+  // what holds it open, so blurring (a click elsewhere in the IDE) closes it — query is
+  // deliberately NOT a keep-open input, or a closed-but-filtered list could linger.
+  const committedOpen = pinned || focused
+  const expanded = committedOpen || (hovered && !hoverSuppressed)
+
+  // A click anywhere outside the search area blurs the input: fully close (unpin and
+  // clear the query) so an out-of-IDE click dismisses the box and its filter together.
+  function handleBlur() {
+    setFocused(false)
+    setPinned(false)
+    onQueryChange('')
+  }
 
   function toggle() {
-    if (expanded) {
-      // Collapsing: clear the query and drop focus so it doesn't immediately reopen.
+    if (committedOpen) {
+      // The icon is acting as Close: collapse, clear the query, drop focus, and suppress
+      // the still-hovering icon from immediately re-opening the box.
       setPinned(false)
       onQueryChange('')
       inputRef.current?.blur()
+      setHoverSuppressed(true)
     } else {
+      // The icon is the magnifier (collapsed, or merely hover-previewing): clicking it
+      // should open AND focus the input so you can type right away.
       setPinned(true)
       setTimeout(() => inputRef.current?.focus(), 0)
     }
@@ -254,7 +274,7 @@ function RailFilterBar({
       <div
         className="flex flex-1 items-center justify-end gap-1"
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseLeave={() => { setHovered(false); setHoverSuppressed(false) }}
       >
         <div
           className={[
@@ -268,7 +288,7 @@ function RailFilterBar({
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onBlur={handleBlur}
             placeholder="Search by name"
             aria-label="Search patterns by name"
             tabIndex={expanded ? 0 : -1}
@@ -277,14 +297,19 @@ function RailFilterBar({
         </div>
         <button
           onClick={toggle}
-          title={expanded ? 'Close search' : 'Search by name'}
-          aria-label={expanded ? 'Close search' : 'Search by name'}
+          // Keep focus on the input through the click so closing it here goes through
+          // `toggle` (committed-open ⇒ Close) rather than racing the input's blur-close.
+          onMouseDown={(e) => e.preventDefault()}
+          // Only a committed-open box offers Close; a mere hover-preview still reads as
+          // "Search by name" and a click there opens+focuses rather than closes.
+          title={committedOpen ? 'Close search' : 'Search by name'}
+          aria-label={committedOpen ? 'Close search' : 'Search by name'}
           className={[
             'shrink-0 transition-colors',
             expanded ? 'text-zinc-300 hover:text-live' : 'text-zinc-500 hover:text-zinc-300',
           ].join(' ')}
         >
-          {expanded && query ? <X size={13} /> : <Search size={13} />}
+          {committedOpen ? <X size={13} /> : <Search size={13} />}
         </button>
       </div>
     </div>
@@ -651,7 +676,11 @@ export function PatternList() {
     openExistingMap(map)
   }
 
-  const isCollapsed = (label: string) => !!collapsedSections[label]
+  // An active name search force-expands every group: a hit inside a collapsed group
+  // must still surface (#252 follow-up). The stored collapse state is left untouched,
+  // so groups snap back to the user's chosen open/closed layout when the query clears.
+  const searching = query.trim() !== ''
+  const isCollapsed = (label: string) => !searching && !!collapsedSections[label]
   const toggleCollapsed = (label: string) =>
     setCollapsedSections((c) => ({ ...c, [label]: !c[label] }))
 

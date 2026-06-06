@@ -8,6 +8,11 @@ export interface DeckOption<T> {
   // Optional small muted suffix shown after the label (e.g. a "2D" dimension
   // tag). Decorative — marked aria-hidden so it never enters the accessible name.
   badge?: string
+  // Optional subgroup label. When options carry more than one distinct group, the
+  // menu renders a non-clickable header above each group's first option (options are
+  // assumed pre-sorted so a group's members are contiguous). A single group renders
+  // no header.
+  group?: string
 }
 
 // A lightweight bordered dropdown for the preview deck (#150): a thin-bordered
@@ -31,6 +36,9 @@ export function DeckSelect<T extends string | number>({
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const current = options.find((o) => o.value === value) ?? options[0]
+  // Only show subgroup headers when the options actually span more than one group;
+  // a lone group (the common no-user-maps case) reads cleaner with no header.
+  const showGroups = new Set(options.map((o) => o.group).filter(Boolean)).size > 1
 
   useEffect(() => {
     if (!isOpen) return
@@ -67,28 +75,45 @@ export function DeckSelect<T extends string | number>({
           aria-label={ariaLabel}
           className={`absolute top-full right-0 mt-1 ${menuWidthClass} bg-zinc-900 border border-zinc-800 rounded-md shadow-xl z-50 py-1`}
         >
-          {options.map((opt) => (
-            <button
-              key={String(opt.value)}
-              role="option"
-              aria-selected={opt.value === current?.value}
-              title={opt.title}
-              onClick={() => {
-                onChange(opt.value)
-                setIsOpen(false)
-              }}
-              className={`block w-full whitespace-nowrap text-left px-3 py-1 text-xs tabular-nums transition-colors hover:bg-zinc-800 ${
-                opt.value === current?.value ? 'text-amber-400' : 'text-zinc-300'
-              }`}
-            >
-              {opt.label}
-              {opt.badge && (
-                <span aria-hidden className="ml-1 text-zinc-500">
-                  {opt.badge}
-                </span>
-              )}
-            </button>
-          ))}
+          {options.map((opt, i) => {
+            const header =
+              showGroups && opt.group && opt.group !== options[i - 1]?.group ? (
+                <div
+                  key={`group-${opt.group}`}
+                  role="presentation"
+                  // Match the pattern-rail section headers: `text-structural` grey, and
+                  // extra top space before a later group so the subgroups read as
+                  // visually separated (the first group sits flush to the menu top).
+                  className={`px-3 ${i === 0 ? 'pt-0.5' : 'pt-3'} pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-structural select-none`}
+                >
+                  {opt.group}
+                </div>
+              ) : null
+            return (
+              <div key={String(opt.value)}>
+                {header}
+                <button
+                  role="option"
+                  aria-selected={opt.value === current?.value}
+                  title={opt.title}
+                  onClick={() => {
+                    onChange(opt.value)
+                    setIsOpen(false)
+                  }}
+                  className={`block w-full whitespace-nowrap text-left px-3 py-0.5 text-xs tabular-nums transition-colors hover:bg-zinc-800 ${
+                    opt.value === current?.value ? 'text-amber-400' : 'text-zinc-300'
+                  }`}
+                >
+                  {opt.label}
+                  {opt.badge && (
+                    <span aria-hidden className="ml-1 text-zinc-500">
+                      {opt.badge}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

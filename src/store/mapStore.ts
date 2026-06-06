@@ -140,6 +140,7 @@ export function layoutSource(state: Pick<MapState, 'userMaps'>): LayoutSource {
         dim: m.dim,
         displayDim: m.displayDim,
         wrappable: isMapWrappable({ id: m.id, dim: m.dim }),
+        stock: true,
       })),
       // A custom map can only resolve as a layout once it has baked points; a
       // freshly-created map has none until #143 bakes it, so keep it out of the
@@ -152,6 +153,7 @@ export function layoutSource(state: Pick<MapState, 'userMaps'>): LayoutSource {
           name: m.name,
           dim: m.dim,
           wrappable: isMapWrappable({ id: m.id, dim: m.dim, gridDims: m.gridDims }),
+          stock: false,
         })),
     ],
   }

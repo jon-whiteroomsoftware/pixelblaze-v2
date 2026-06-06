@@ -217,13 +217,27 @@ function SecondaryBand() {
     <div className="text-xs pr-3">
       <DeckSection label="Pixelblaze" hint={PIXELBLAZE_HINT}>
         <DeckGrid>
-          {/* Row 1: fit + pixel count (compact cells); both `fit` and the map are real
-              map state, so `fit` is absent for a mapless 1D layout (#253). Row 2: map
-              (stacked dropdown) + brightness (stacked slider). The map is stacked —
-              label above, control on its own full-width line — because its names can be
-              too long for a cramped label-left/control-right cell. For 1D the map cell
-              drops away and the empty placeholder after pixel count drops brightness onto
-              its own row. */}
+          {/* Additive layout: row 1 (pixel count + brightness) is present for every
+              dimension and never moves; row 2 (fit + map) only appears for a mapped
+              2D/3D layout, growing downward rather than reshuffling row 1. Row 1 is
+              stacked (label above control) so pixel count aligns to the brightness
+              slider; row 2's fit and map are inline label-left/value-right cells. */}
+          <DeckField label="pixel count">
+            <PixelCountInput />
+          </DeckField>
+          <DeckSlider
+            label="brightness"
+            ariaLabel="Brightness"
+            value={brightness}
+            min={0}
+            max={1}
+            step={0.01}
+            curve={2}
+            onChange={(v) => {
+              setBrightness(v)
+              writeCascadedOverride('brightness', v)
+            }}
+          />
           {hasMap && (
             <DeckCell label="fit">
               <DeckSelect
@@ -241,28 +255,11 @@ function SecondaryBand() {
               />
             </DeckCell>
           )}
-          <DeckCell label="pixel count">
-            <PixelCountInput />
-          </DeckCell>
           {hasMap && (
-            <DeckField label="map">
+            <DeckCell label="map">
               <MapSelect />
-            </DeckField>
+            </DeckCell>
           )}
-          {!hasMap && <div aria-hidden />}
-          <DeckSlider
-            label="brightness"
-            ariaLabel="Brightness"
-            value={brightness}
-            min={0}
-            max={1}
-            step={0.01}
-            curve={2}
-            onChange={(v) => {
-              setBrightness(v)
-              writeCascadedOverride('brightness', v)
-            }}
-          />
         </DeckGrid>
       </DeckSection>
       <DeckSection label="Preview" hint={PREVIEW_HINT}>

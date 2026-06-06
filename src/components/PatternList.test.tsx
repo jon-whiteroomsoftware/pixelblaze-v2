@@ -128,6 +128,75 @@ describe('PatternList', () => {
     expect(screen.getByText('My Tree')).toBeInTheDocument()
   })
 
+  it('surfaces a search hit inside a collapsed group, then restores collapse when cleared', async () => {
+    const user = userEvent.setup()
+    render(<PatternList />)
+
+    // Pick a demo and its OpenGL-style subsection isn't guaranteed, so collapse the
+    // top-level "Demos" group, which hides every demo.
+    const demoName = Object.keys(DEMOS).sort()[0]
+    expect(await screen.findByText(new RegExp(`^${demoName}`))).toBeInTheDocument()
+    await user.click(screen.getByText('Demos'))
+    expect(screen.queryByText(new RegExp(`^${demoName}`))).not.toBeInTheDocument()
+
+    // A search matching that demo must surface it despite the collapse.
+    const search = screen.getByRole('textbox', { name: /search patterns by name/i })
+    await user.type(search, demoName)
+    expect(screen.getByText(new RegExp(`^${demoName}`))).toBeInTheDocument()
+
+    // Clearing the query restores the user's collapsed layout.
+    await user.clear(search)
+    expect(screen.queryByText(new RegExp(`^${demoName}`))).not.toBeInTheDocument()
+  })
+
+  it('clicking the search icon focuses the input', async () => {
+    const user = userEvent.setup()
+    render(<PatternList />)
+
+    const search = screen.getByRole('textbox', { name: /search patterns by name/i })
+    expect(search).not.toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: /search by name/i }))
+    expect(search).toHaveFocus()
+  })
+
+  it('clicking the icon while open closes and unfocuses the search input', async () => {
+    const user = userEvent.setup()
+    render(<PatternList />)
+
+    const search = screen.getByRole('textbox', { name: /search patterns by name/i })
+
+    // Open + focus it; the icon now offers Close.
+    await user.click(screen.getByRole('button', { name: /search by name/i }))
+    expect(search).toHaveFocus()
+    const closeBtn = screen.getByRole('button', { name: /close search/i })
+
+    // Clicking Close drops focus and clears any query.
+    await user.type(search, 'abc')
+    await user.click(closeBtn)
+    expect(search).not.toHaveFocus()
+    expect(search).toHaveValue('')
+    // And the affordance reverts to "Search by name".
+    expect(screen.getByRole('button', { name: /search by name/i })).toBeInTheDocument()
+  })
+
+  it('clicking elsewhere in the IDE closes the search box and clears its query', async () => {
+    const user = userEvent.setup()
+    render(<PatternList />)
+
+    const search = screen.getByRole('textbox', { name: /search patterns by name/i })
+    await user.click(screen.getByRole('button', { name: /search by name/i }))
+    await user.type(search, 'abc')
+    expect(search).toHaveFocus()
+
+    // A click on an unrelated part of the rail blurs the input.
+    await user.click(screen.getByText('Demos'))
+
+    expect(search).not.toHaveFocus()
+    expect(search).toHaveValue('')
+    expect(screen.getByRole('button', { name: /search by name/i })).toBeInTheDocument()
+  })
+
   it('shows a 3D custom map under the 3D lens but not the 2D lens', async () => {
     vi.mocked(listMaps).mockResolvedValueOnce([CUSTOM_MAP])
     const user = userEvent.setup()

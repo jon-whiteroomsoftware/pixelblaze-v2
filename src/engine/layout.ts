@@ -47,6 +47,10 @@ export interface LayoutOption {
   // DISPLAY dimension of the option (a 1D pattern's ring reads as 2D display; a
   // 2D pattern's cylinder reads as 3D).
   displayDim: 1 | 2 | 3
+  // For map options only: which subgroup the option belongs to, so the map
+  // dropdown can list stock maps and user maps under separate headers. Absent for
+  // shapes/surfaces.
+  group?: 'stock' | 'user'
 }
 
 export interface ShapeMeta {
@@ -75,6 +79,9 @@ export interface MapMeta {
   // (ADR-0010). The stock Square/Wide and regular-lattice custom maps qualify;
   // an irregular cloud does not, so it is offered Flat only.
   wrappable?: boolean
+  // True for a built-in stock map, false/absent for a user-authored one — drives the
+  // stock/user subgrouping in the map dropdown.
+  stock?: boolean
 }
 
 export interface LayoutSource {
@@ -91,7 +98,13 @@ export function mapOptions(nativeDim: 1 | 2 | 3, source: LayoutSource): LayoutOp
   if (nativeDim === 1) return []
   return source.maps
     .filter((m) => m.dim === nativeDim)
-    .map((m) => ({ kind: 'map' as const, id: m.id, name: m.name, displayDim: m.displayDim ?? m.dim }))
+    .map((m) => ({
+      kind: 'map' as const,
+      id: m.id,
+      name: m.name,
+      displayDim: m.displayDim ?? m.dim,
+      group: m.stock ? ('stock' as const) : ('user' as const),
+    }))
 }
 
 // The embedding options for a pattern + its active map: shapes for a 1D pattern
