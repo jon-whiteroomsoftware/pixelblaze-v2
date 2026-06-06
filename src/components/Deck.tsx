@@ -99,6 +99,27 @@ export function DeckCell({
   )
 }
 
+// A stacked (two-line) field: label above, the control below on its own full-width
+// line. The interactive counterpart to DeckStat (and the stacked sibling of the inline
+// DeckCell) — use it for a control whose value can be too long for the cramped
+// label-left/control-right cell, e.g. the map dropdown's long names (#253).
+export function DeckField({
+  label,
+  className = '',
+  children,
+}: {
+  label: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div className={`flex flex-col gap-1 min-w-0 ${className}`}>
+      <span className="text-zinc-400 truncate">{label}</span>
+      {children}
+    </div>
+  )
+}
+
 // A read-only telemetry cell (fps/elapsed/layout/pattern): a DeckCell whose value is
 // the live amber readout.
 export function DeckTelemetry({ label, value }: { label: string; value: string }) {

@@ -18,12 +18,14 @@ describe('PreviewDeck (smoke)', () => {
     useEditorStore.setState({ nativeDim: 2, previewPatternName: 'Demo' })
     render(<PreviewDeck />)
 
-    // Primary band: play/pause + pixel count + layout (Map control).
+    // Primary band: play/pause + the viewport embedding control (Surface for 2D).
     expect(screen.getByRole('button', { name: /run|pause/i })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Pixel count' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Surface' })).toBeInTheDocument()
 
-    // Pixelblaze section: brightness is now a long slider alongside pixels + fit.
+    // Pixelblaze section: the Map control now lives here (#253), alongside pixel
+    // count + fit, with brightness as a long slider.
+    expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Pixel count' })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Brightness' })).toBeInTheDocument()
 
     // Preview section: light size, diffusion sliders + renderer, speed.
@@ -39,6 +41,18 @@ describe('PreviewDeck (smoke)', () => {
     // No gear settings dialog exists anymore.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /preview settings/i })).not.toBeInTheDocument()
+  })
+
+  it('omits the map and fit controls for a mapless 1D pattern', () => {
+    useEditorStore.setState({ nativeDim: 1 })
+    render(<PreviewDeck />)
+    expect(screen.queryByRole('button', { name: 'Map' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Map normalization (Fill / Contain)' }),
+    ).not.toBeInTheDocument()
+    // The rest of the Pixelblaze block is still present.
+    expect(screen.getByRole('textbox', { name: 'Pixel count' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Brightness' })).toBeInTheDocument()
   })
 
   it('offers an info hint on both the Pixelblaze and Preview sections', () => {

@@ -12,7 +12,7 @@ import {
 } from '@/store/settingsCascade'
 import { clampPixelCount } from '@/engine/camera'
 import { effectivePixelCount } from '@/engine/layout'
-import { LayoutSelector } from '@/components/LayoutSelector'
+import { MapSelect, EmbeddingSelect } from '@/components/LayoutSelector'
 import { SpeedSelector } from '@/components/SpeedSelector'
 import { DeckSelect } from '@/components/DeckSelect'
 import { DeckSlider } from '@/components/DeckSlider'
@@ -23,6 +23,7 @@ import {
   DeckSectionHint,
   DeckGrid,
   DeckCell,
+  DeckField,
   DeckTelemetry,
 } from '@/components/Deck'
 
@@ -32,8 +33,9 @@ import {
 const PIXELBLAZE_HINT = (
   <DeckSectionHint
     items={[
-      ['pixel count', 'how many LEDs the pattern drives'],
+      ['map', 'the pixel map the pattern samples — its layout in real space (2D/3D only)'],
       ['fit', 'how the pixel map is normalized into pattern space — Contain keeps the aspect ratio, Fill stretches each axis to fill it'],
+      ['pixel count', 'how many LEDs the pattern drives'],
       ['brightness', 'master output level applied to every pixel'],
     ]}
   />
@@ -89,8 +91,10 @@ function PrimaryBand() {
   usePatternStore((s) => s.demoOverrides)
   const showReset = hasActiveOverrides()
 
-  // The name truncates first; LayoutSelector and play/pause never do (both `shrink-0`),
-  // so the controls stay fully readable and only the title gives up space (#63).
+  // The name truncates first; the embedding control and play/pause never do (both
+  // `shrink-0`), so the controls stay fully readable and only the title gives up space
+  // (#63). The MAP control no longer lives here — it moved to the PIXELBLAZE block
+  // (#253); this row holds only viewport affordances + transport.
   return (
     <div className="flex items-center gap-3 py-2 pr-3 border-b border-zinc-800">
       <div className="flex-1 min-w-0 flex items-center gap-2">
@@ -109,7 +113,7 @@ function PrimaryBand() {
           </button>
         )}
       </div>
-      <LayoutSelector />
+      <EmbeddingSelect />
       <button
         aria-label={isRunning ? 'Pause' : 'Run'}
         onClick={toggle}
@@ -203,30 +207,49 @@ function SecondaryBand() {
   const solidEligible = useEditorStore((s) => s.solidEligible)
   const solidity = useMapStore((s) => s.activeSolidity)
   const setSolidity = useMapStore((s) => s.setActiveSolidity)
+  // The map+fit row is real Pixelblaze state that only exists for a mapped layout
+  // (#253). 1D is mapless, so both the map and its normalization mode (fit) are
+  // absent entirely — not shown disabled.
+  const nativeDim = useEditorStore((s) => s.nativeDim)
+  const hasMap = nativeDim !== 1
 
   return (
     <div className="text-xs pr-3">
       <DeckSection label="Pixelblaze" hint={PIXELBLAZE_HINT}>
-        <DeckGrid gapY="gap-y-1">
-          {/* pixel count + fit on top, brightness in the bottom-left column below it. */}
+        <DeckGrid>
+          {/* Row 1: fit + pixel count (compact cells); both `fit` and the map are real
+              map state, so `fit` is absent for a mapless 1D layout (#253). Row 2: map
+              (stacked dropdown) + brightness (stacked slider). The map is stacked —
+              label above, control on its own full-width line — because its names can be
+              too long for a cramped label-left/control-right cell. For 1D the map cell
+              drops away and the empty placeholder after pixel count drops brightness onto
+              its own row. */}
+          {hasMap && (
+            <DeckCell label="fit">
+              <DeckSelect
+                ariaLabel="Map normalization (Fill / Contain)"
+                value={normalizeMode}
+                options={[
+                  { value: 'contain', label: 'Contain', title: 'Contain — keep aspect ratio, fit the longest axis' },
+                  { value: 'fill', label: 'Fill', title: 'Fill — stretch each axis to fill the unit square' },
+                ]}
+                onChange={(mode) => {
+                  setNormalizeMode(mode)
+                  writeCascadedOverride('normalize', mode)
+                }}
+                menuWidthClass="w-28"
+              />
+            </DeckCell>
+          )}
           <DeckCell label="pixel count">
             <PixelCountInput />
           </DeckCell>
-          <DeckCell label="fit">
-            <DeckSelect
-              ariaLabel="Map normalization (Fill / Contain)"
-              value={normalizeMode}
-              options={[
-                { value: 'contain', label: 'Contain', title: 'Contain — keep aspect ratio, fit the longest axis' },
-                { value: 'fill', label: 'Fill', title: 'Fill — stretch each axis to fill the unit square' },
-              ]}
-              onChange={(mode) => {
-                setNormalizeMode(mode)
-                writeCascadedOverride('normalize', mode)
-              }}
-              menuWidthClass="w-28"
-            />
-          </DeckCell>
+          {hasMap && (
+            <DeckField label="map">
+              <MapSelect />
+            </DeckField>
+          )}
+          {!hasMap && <div aria-hidden />}
           <DeckSlider
             label="brightness"
             ariaLabel="Brightness"
