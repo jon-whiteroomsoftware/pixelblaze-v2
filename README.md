@@ -2,16 +2,13 @@
 
 A browser-based pattern editor for [Pixelblaze](https://electromage.com/) LED controllers — write, preview, and tune patterns entirely offline, then copy the result onto your device or push it live to a controller on your network.
 
-<table width="100%">
-  <tr>
-    <td width="50%"><img width="100%" src="docs/screenshots/promo-edit.jpg" alt="Edit patterns in a real code editor"></td>
-    <td width="50%"><img width="100%" src="docs/screenshots/promo-preview.jpg" alt="Hardware-faithful live preview"></td>
-  </tr>
-  <tr>
-    <td width="50%"><img width="100%" src="docs/screenshots/promo-editor.jpg" alt="Reusable libraries and demos"></td>
-    <td width="50%"><img width="100%" src="docs/screenshots/promo-connect.jpg" alt="Connect to a controller on your network"></td>
-  </tr>
-</table>
+![Edit patterns in a real code editor](docs/screenshots/promo-edit.jpg)
+
+![Hardware-faithful live preview](docs/screenshots/promo-preview.jpg)
+
+![Reusable libraries and demos](docs/screenshots/promo-editor.jpg)
+
+![Connect to a controller on your network](docs/screenshots/promo-connect.jpg)
 
 **[Open PXLBLZ →](https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/)**
 
