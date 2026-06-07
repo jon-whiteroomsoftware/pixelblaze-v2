@@ -18,6 +18,7 @@
     "harness": "tsx test/divergence-harness/harness.ts",
     "profile": "tsx test/perf-harness/profiler.ts",
     "bench": "tsx test/perf-harness/bench.ts",
+    "devbench": "tsx test/perf-harness/devbench.ts",
     "spike": "tsx test/capability-spike/spike.ts",
     "prepare": "husky"
   },

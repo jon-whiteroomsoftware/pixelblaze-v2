@@ -1,11 +1,16 @@
 # Perf harness
 
-Two complementary tools live here. Keep their questions apart:
+Three complementary tools live here. Keep their questions apart:
 
 | tool | question | source of truth |
 |---|---|---|
 | **emulator bench** (`bench.ts`, #247) | "how many ops did my pattern do?" | the in-repo emulator — no hardware |
 | **hardware profiler** (`profiler.ts`, #245) | "what does each op cost on the device?" | a physical Pixelblaze on your LAN |
+| **hardware FPS bench** (`devbench.ts`, #248) | "did my pattern get faster on the device?" | a physical Pixelblaze on your LAN |
+
+The emulator bench proves an edit was *output-preserving* (checksum) and counts
+ops; the FPS bench measures the *whole-frame* speedup the edit actually buys on
+hardware — the two halves of the optimization loop.
 
 ---
 
@@ -116,3 +121,59 @@ each iteration to stay in `[0,1)` (bounded — no 16.16 overflow shifting costs)
 
 The `fn` codes in `profiler.js` and the `OPS` table in `profiler.ts` must stay in
 sync.
+
+---
+
+## Hardware FPS bench (`npm run devbench`, #248)
+
+Closes the optimization loop on real hardware, fully automated — no hand-loading.
+Give it a demo (or any `.js` source file) and it bundles, compiles to device
+bytecode, pushes the pattern run-only over the LAN, **confirms the device is
+actually rendering it**, then samples the FPS the firmware reports. Pass two or
+more sources to get a before/after Δ.
+
+```bash
+PIXELBLAZE_IP=192.168.8.224 npm run devbench -- Kishimisu
+PIXELBLAZE_IP=192.168.8.224 npm run devbench -- /tmp/Kishimisu.baseline.js Kishimisu
+PIXELBLAZE_IP=192.168.8.224 npm run devbench -- a.js b.js --settle 4000 --sample 5000
+```
+
+A handy before/after recipe is to diff the committed version against your working
+tree: `git show HEAD:src/pixelblaze/demos/Kishimisu.js > /tmp/base.js`, then
+`npm run devbench -- /tmp/base.js Kishimisu`.
+
+### How it works (and why it needs no Chrome extension)
+
+The device runs **bytecode**, compiled by its *own* embedded compiler. In the app
+that compile is routed through the extension's sandboxed iframe only because MV3
+CSP forbids `eval` in a service worker. Node has no such restriction, so devbench
+fetches the device compiler over HTTP (`/index.html.gz`), extracts it with the
+tested `compilerExtraction.ts`, and evals it in a Node `vm` context with a
+`window` shim. Push + FPS readback reuse `PixelblazeConnection` wholesale — the
+same Node comms layer `profiler.ts` uses.
+
+- **Active-program guard.** A run-only push mints a throwaway id; after pushing,
+  devbench calls `getConfig()` and refuses to report FPS unless
+  `activeProgramId` matches the id it pushed. A meaningless number from a
+  pattern the device never switched to is thus impossible.
+- **FPS sampling.** The firmware streams `fps` in its periodic status frames;
+  `PixelblazeConnection` captures the latest passively. devbench discards a
+  `--settle` window (default 3 s) then averages distinct readings over a
+  `--sample` window (default 4 s).
+
+### Caveat — frees the socket pool
+
+The Pixelblaze has a small WebSocket pool; if a connect fails with `ECONNRESET`
+while HTTP still answers, another client (a browser tab on the device web UI, the
+IDE on `localhost`, the stock editor, the phone app) is holding a socket. Close
+it and retry.
+
+## Files (FPS bench)
+
+| file | role |
+|---|---|
+| `devbench.ts` | bundle → compile (headless) → push → confirm-active → sample FPS → Δ |
+
+It reuses `src/engine`: `bundle.ts`, `compilerExtraction.ts`, `bytecodePush.ts`,
+`PixelblazeConnection.ts`. The `buildBytecode` blob layout mirrors
+`extension/sandbox.js` (keep in sync if the bytecode format changes).
