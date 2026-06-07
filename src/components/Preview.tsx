@@ -26,6 +26,7 @@ import { resolvePole, type ShapeId } from '@/engine/shapes'
 import { OrbitControls } from '@/components/OrbitControls'
 import { LIBRARIES } from '@/pixelblaze/libs'
 import { withControlDescriptions } from '@/pixelblaze/controlDescriptions'
+import { captureEnabled, createPreviewCapture } from '@/dev/previewCapture'
 
 // Square 3D viewport size (CSS px): fill the available pane edge-to-edge (the
 // smaller of its two sides), so the 3D canvas is exactly as tall as a square 2D
@@ -41,7 +42,10 @@ export function Preview() {
   const containerRef = useRef<HTMLDivElement>(null)
   const loopRef = useRef<RenderLoop | null>(null)
   const rendererRef = useRef<ReturnType<typeof createRenderer> | null>(null)
+  // Dev-only (`?capture`): snapshots the frame from inside paint(); inert otherwise.
+  const captureRef = useRef(createPreviewCapture())
   const isRunning = usePreviewStore((s) => s.isRunning)
+  const brightness = usePreviewStore((s) => s.brightness)
   const lightSize = usePreviewStore((s) => s.lightSize)
   const diffusion = usePreviewStore((s) => s.diffusion)
   const fidelity = usePreviewStore((s) => s.fidelity)
@@ -272,6 +276,8 @@ export function Preview() {
     const paint = (pixels: [number, number, number][], brightness: number, dimmed: boolean) => {
       if (positions3D) renderer.setCamera(useCameraStore.getState().camera)
       renderer.paint(pixels, brightness, dimmed)
+      // Dev capture: fulfil any pending request with the frame just drawn.
+      captureRef.current.afterPaint(canvasRef.current)
     }
 
     const loop = createRenderLoop({
@@ -422,6 +428,16 @@ export function Preview() {
     return () => cancelAnimationFrame(raf)
   }, [displayDim])
 
+  // Brightness: read live by the render loop's paint() each frame, so while the
+  // pattern runs a brightness change shows on the next frame for free. But a paused
+  // preview isn't painting, so — like every other deck control below — force one
+  // repaint when paused so dragging brightness updates the image immediately
+  // instead of doing nothing until play is pressed.
+  useEffect(() => {
+    if (!rendererRef.current) return
+    if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
+  }, [brightness])
+
   // Diffusion (per-source glow): pushed into the WebGL renderer, which
   // grows a soft glow tail around each source's solid core to merge neighbours
   // like a physical diffuser — no whole-frame blur, so cores stay crisp, the array
@@ -444,6 +460,35 @@ export function Preview() {
     renderer.setSolidity(activeSolidity)
     if (!usePreviewStore.getState().isRunning) loopRef.current?.renderPreviewFrame()
   }, [activeSolidity])
+
+  // Dev-only (`?capture`) automation API on window. Lets browser automation drive
+  // the preview deterministically: `setPreview({ diffusion: 0.5 })` merges into the
+  // store — firing the control effects above, which repaint a paused preview — and
+  // `capture(name)` forces a fresh paint and resolves once the frame has been saved
+  // to /__capture. Bypasses synthetic slider events entirely.
+  useEffect(() => {
+    if (!captureEnabled()) return
+    const cap = captureRef.current
+    const w = window as unknown as { __pxlblz?: unknown }
+    w.__pxlblz = {
+      setPreview: (patch: Parameters<typeof usePreviewStore.setState>[0]) =>
+        usePreviewStore.setState(patch),
+      capture: (name = 'capture.png') => {
+        const done = cap.request(name)
+        // Defer the forced paint to a macrotask so any setState-driven control
+        // effects (diffusion/solidity push into the renderer) flush first —
+        // otherwise we'd snapshot the frame before the new value is applied.
+        // A control change while paused already repaints (fulfilling the pending
+        // request with the correct frame); this forced paint is the fallback for
+        // a capture with no preceding change.
+        setTimeout(() => loopRef.current?.renderPreviewFrame(), 0)
+        return done
+      },
+    }
+    return () => {
+      delete w.__pxlblz
+    }
+  }, [])
 
   return (
     <div className="h-full bg-zinc-950 flex flex-col overflow-hidden">
