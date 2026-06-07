@@ -46,7 +46,8 @@ test('main UI pathways still function', async ({ page }, testInfo) => {
   // --- Load a 2D demo ---
   await openFromRail(page, 'Kishimisu')
   await expect(editor(page)).toContainText('Kishimisu')
-  await expect(editor(page)).toContainText('read-only') // demos are read-only
+  // Demos are read-only — flagged by the Lock icon (aria-label, not text).
+  await expect(editor(page).getByRole('img', { name: 'read-only' })).toBeVisible()
   // A 2D pattern exposes the Surface (embedding) dropdown.
   const surface = page.getByRole('button', { name: 'Surface', exact: true })
   await expect(surface).toBeVisible()
@@ -80,7 +81,8 @@ test('main UI pathways still function', async ({ page }, testInfo) => {
   // --- Create a new user pattern: starts from the 2D starter, editable ---
   await page.getByRole('button', { name: 'New pattern', exact: true }).click()
   await expect(editor(page)).toContainText('Untitled Pattern')
-  await expect(editor(page)).not.toContainText('read-only')
+  // A user pattern is editable — no read-only Lock icon.
+  await expect(editor(page).getByRole('img', { name: 'read-only' })).toHaveCount(0)
 
   // Canvas still rendering after the whole sequence.
   await expect(preview(page).locator('canvas').first()).toBeVisible()
