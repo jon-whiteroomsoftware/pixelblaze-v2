@@ -31,53 +31,64 @@ export var iters = 200 // inner-loop count, auto-tuned by the runner
 export var ms = 0      // EMA of frame time (ms), read back by the runner
 export var acc = 0     // cross-frame accumulator / sink (keeps the loop live)
 
-// Dispatch is identical for EVERY op including the baseline, so loop + branch +
-// wrap overhead cancels in the ms(fn) - ms(baseline) subtraction. Two-arg ops
-// derive their second operand from x too, so nothing is constant-foldable.
-function op(f, x) {
-  if (f == 0)  return x                 // baseline — identity (loop overhead only)
-  if (f == 1)  return x * 1.0001        // multiply — the normalization unit
-  if (f == 2)  return x + 1.0001        // add
-  if (f == 3)  return x - 1.0001        // subtract
-  if (f == 4)  return x / 1.0001        // divide
-  if (f == 5)  return x % 0.37          // mod
-  if (f == 6)  return abs(x - 0.5)      // abs
-  if (f == 7)  return floor(x * 8)      // floor
-  if (f == 8)  return ceil(x * 8)       // ceil
-  if (f == 9)  return frac(x * 8)       // frac
-  if (f == 10) return sin(x * 6.283)    // sin
-  if (f == 11) return cos(x * 6.283)    // cos
-  if (f == 12) return tan(x * 1.5)      // tan
-  if (f == 13) return wave(x)           // wave — table lookup (should be cheap)
-  if (f == 14) return triangle(x)       // triangle
-  if (f == 15) return square(x, 0.5)    // square (duty 0.5)
-  if (f == 16) return sqrt(x + 0.001)   // sqrt
-  if (f == 17) return pow(x + 0.001, 2.3) // pow
-  if (f == 18) return exp(x)            // exp
-  if (f == 19) return log(x + 0.001)    // log
-  if (f == 20) return hypot(x, 0.5)     // hypot
-  if (f == 21) return atan2(x, 0.5)     // atan2
-  if (f == 22) return atan(x)           // atan
-  if (f == 23) return asin(x)           // asin
-  if (f == 24) return acos(x)           // acos
-  if (f == 25) return clamp(x, 0.1, 0.9) // clamp
-  if (f == 26) return min(x, 0.5)       // min
-  if (f == 27) return max(x, 0.5)       // max
-  if (f == 28) return perlin(x, 0.5, 0.25, 0) // perlin (3D + seed)
-  if (f == 29) return perlinTurbulence(x, 0.5, 0.25, 0, 2, 0.5) // perlinTurbulence
-  if (f == 30) return perlinRidge(x, 0.5, 0.25, 0, 2, 0.5, 1.0) // perlinRidge
-  return x
-}
-
+// Dispatch is HOISTED OUT of the inner loop: each op gets its own tight loop,
+// selected once per frame. Two earlier designs failed:
+//   1. an if-chain with early `return` inside the loop — dispatch cost grew with
+//      the op's POSITION (a higher fn ran more comparisons per iter), so cost
+//      climbed in list order and add/sub looked pricier than mul;
+//   2. a full no-early-return chain inside the loop — constant but EXPENSIVE, so
+//      the 30 comparisons/iter dominated the frame, the watchdog forced `iters`
+//      down to ~500, and the real op signal sank into timing noise (perlin-
+//      Turbulence measured cheaper than perlin — impossible).
+// Hoisting fixes both: the 30 comparisons run ONCE per frame (negligible), each
+// op's inner loop is just `op + frac` wrap, so `iters` can go high (good SNR)
+// and baseline subtraction cancels the identical loop+frac overhead exactly.
+//
+// Every loop body is `frac(<expr> + 0.123)`: bounded in [0,1) (no 16.16 overflow
+// drift), x feeds forward (no hoisting), acc carries across frames (not dead
+// code). Operand expressions match the op being measured; baseline is identity.
 export function beforeRender(delta) {
   // EMA of frame time. alpha=0.05 → ~20-frame memory; the runner settles long
   // enough for this to converge before reading.
   ms = ms + (delta - ms) * 0.05
 
   var x = acc
-  for (var i = 0; i < iters; i++) {
-    x = frac(op(fn, x) + 0.123)  // keep bounded in [0,1), feed forward
-  }
+  var f = fn
+  var n = iters
+  var i = 0
+
+  if (f == 0)  for (i = 0; i < n; i++) x = frac(x + 0.123)              // baseline — identity (loop overhead only)
+  if (f == 1)  for (i = 0; i < n; i++) x = frac(x * 1.0001 + 0.123)     // multiply — the normalization unit
+  if (f == 2)  for (i = 0; i < n; i++) x = frac(x + 1.0001 + 0.123)     // add
+  if (f == 3)  for (i = 0; i < n; i++) x = frac(x - 1.0001 + 0.123)     // subtract
+  if (f == 4)  for (i = 0; i < n; i++) x = frac(x / 1.0001 + 0.123)     // divide
+  if (f == 5)  for (i = 0; i < n; i++) x = frac(x % 0.37 + 0.123)       // mod
+  if (f == 6)  for (i = 0; i < n; i++) x = frac(abs(x - 0.5) + 0.123)   // abs
+  if (f == 7)  for (i = 0; i < n; i++) x = frac(floor(x * 8) + 0.123)   // floor
+  if (f == 8)  for (i = 0; i < n; i++) x = frac(ceil(x * 8) + 0.123)    // ceil
+  if (f == 9)  for (i = 0; i < n; i++) x = frac(frac(x * 8) + 0.123)    // frac
+  if (f == 10) for (i = 0; i < n; i++) x = frac(sin(x * 6.283) + 0.123) // sin
+  if (f == 11) for (i = 0; i < n; i++) x = frac(cos(x * 6.283) + 0.123) // cos
+  if (f == 12) for (i = 0; i < n; i++) x = frac(tan(x * 1.5) + 0.123)   // tan
+  if (f == 13) for (i = 0; i < n; i++) x = frac(wave(x) + 0.123)        // wave — table lookup (should be cheap)
+  if (f == 14) for (i = 0; i < n; i++) x = frac(triangle(x) + 0.123)    // triangle
+  if (f == 15) for (i = 0; i < n; i++) x = frac(square(x, 0.5) + 0.123) // square (duty 0.5)
+  if (f == 16) for (i = 0; i < n; i++) x = frac(sqrt(x + 0.001) + 0.123) // sqrt
+  if (f == 17) for (i = 0; i < n; i++) x = frac(pow(x + 0.001, 2.3) + 0.123) // pow
+  if (f == 18) for (i = 0; i < n; i++) x = frac(exp(x) + 0.123)         // exp
+  if (f == 19) for (i = 0; i < n; i++) x = frac(log(x + 0.001) + 0.123) // log
+  if (f == 20) for (i = 0; i < n; i++) x = frac(hypot(x, 0.5) + 0.123)  // hypot
+  if (f == 21) for (i = 0; i < n; i++) x = frac(atan2(x, 0.5) + 0.123)  // atan2
+  if (f == 22) for (i = 0; i < n; i++) x = frac(atan(x) + 0.123)        // atan
+  if (f == 23) for (i = 0; i < n; i++) x = frac(asin(x) + 0.123)        // asin
+  if (f == 24) for (i = 0; i < n; i++) x = frac(acos(x) + 0.123)        // acos
+  if (f == 25) for (i = 0; i < n; i++) x = frac(clamp(x, 0.1, 0.9) + 0.123) // clamp
+  if (f == 26) for (i = 0; i < n; i++) x = frac(min(x, 0.5) + 0.123)    // min
+  if (f == 27) for (i = 0; i < n; i++) x = frac(max(x, 0.5) + 0.123)    // max
+  if (f == 28) for (i = 0; i < n; i++) x = frac(perlin(x, 0.5, 0.25, 0) + 0.123) // perlin (3D + seed)
+  if (f == 29) for (i = 0; i < n; i++) x = frac(perlinTurbulence(x, 0.5, 0.25, 0, 2, 0.5) + 0.123) // perlinTurbulence
+  if (f == 30) for (i = 0; i < n; i++) x = frac(perlinRidge(x, 0.5, 0.25, 0, 2, 0.5, 1.0) + 0.123) // perlinRidge
+
   acc = x                        // carry across frames so nothing is dead code
 }
 

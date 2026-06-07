@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This project lives under a path containing spaces (Google Drive folder). Never warn about embedded spaces in paths when running commands within this project directory.
 
+### Preview screenshots / browser automation (`?capture`)
+
+The WebGL preview render loop keeps the page perpetually busy, so naive screenshot tools time out and the canvas drawing buffer is unreadable by default. When you need to screenshot the app — and especially the preview renderer — load the dev server with the `?capture` query param (e.g. `http://localhost:5174/?capture`). This is dev-only and inert without the param. It enables `preserveDrawingBuffer` and installs deterministic capture tooling (added in #263/#265):
+
+- **In-page automation API** on `window.__pxlblz` (only present under `?capture`):
+  - `setPreview(patch)` — merges a partial into the preview store, firing the deck control effects so a *paused* preview repaints (e.g. `setPreview({ brightness: 0.5, diffusion: 0.3 })`).
+  - `capture(name = 'capture.png')` — forces a fresh paint on the next macrotask (so any setState-driven control effects flush first), snapshots the frame from *inside* `paint()`, POSTs it, and resolves once saved.
+- **Capture sink**: `POST /__capture?name=foo.png` (Vite dev-server endpoint) writes the posted PNG bytes to `/tmp/pxlblz-captures/`. Never registered in a production build.
+
+Prefer this path over out-of-band canvas readback (`drawImage`/`toBlob` from outside), which catches the buffer at unpredictable moments and can return stale or cleared frames.
+
 ## Commands
 
 ```bash

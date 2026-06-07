@@ -166,9 +166,10 @@ function buildReport(
   lines.push('## Method & caveats')
   lines.push('')
   lines.push(
-    '- **Net cost** = `ms(op) − ms(baseline)`, divided by `iters`. The baseline ' +
-      'is the identical loop + dispatch + `frac` wrap with an identity op, so loop ' +
-      'and frame overhead cancel.',
+    '- **Net cost** = `ms(op) − ms(baseline)`, divided by `iters`. Dispatch is ' +
+      'hoisted out of the inner loop (one tight per-op loop, selected once per ' +
+      'frame), so the baseline is the identical loop + `frac` wrap with an ' +
+      'identity op and loop/frame overhead cancels exactly.',
   )
   lines.push(
     '- **Relative** numbers (×multiply) are robust to per-frame fixed cost and to ' +
@@ -182,6 +183,18 @@ function buildReport(
   lines.push(
     '- A near-zero or negative net (within noise) means the op is ' +
       'indistinguishable from a multiply on this firmware.',
+  )
+  lines.push(
+    '- `wave` measures ~`sin`, not a cheap table lookup: on this firmware ' +
+      '`wave()` *is* a sinusoid. The genuinely cheap periodics are ' +
+      '`triangle`/`square`.',
+  )
+  lines.push(
+    '- Each op is profiled with one fixed argument set (see `op` in ' +
+      'profiler.js); cost can vary with operands. Notably `perlinTurbulence` ' +
+      'here measures below `perlin` — likely an artifact of the octave/' +
+      'lacunarity args, not a true per-call ordering. Treat the noise family as ' +
+      'indicative, not exact.',
   )
   lines.push('')
   return lines.join('\n')
