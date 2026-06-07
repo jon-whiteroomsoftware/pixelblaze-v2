@@ -236,10 +236,10 @@ preview↔hardware.
 ### Iterate in Fast, ship in Precise
 
 The Precise renderer emulates fixed-point in JS and is measurably slower *in the
-dev loop* (the `_perf_probe` showed ~2.2× for Kishimisu at 64×32) — this is an
-*emulator* tax, not a device cost. Drop to the Fast renderer to iterate on a
-heavy pattern, but always do the final correctness and the on-device perf check
-in Precise / on hardware.
+dev loop* (the `_perf_probe` typically reports a few × for Kishimisu at 64×32,
+varying with machine load) — this is an *emulator* tax, not a device cost. Drop
+to the Fast renderer to iterate on a heavy pattern, but always do the final
+correctness and the on-device perf check in Precise / on hardware.
 
 ## 7. Case studies
 
