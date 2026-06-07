@@ -532,6 +532,14 @@ decisions:
   feedback, `dFdx`/`fwidth`, `discard`, MRT, and GLSL→3D porting. Automated GLSL
   rewrite is a non-goal.
 
+**Performance.** Making patterns (especially ports) fast on serial, fixed-point
+hardware is its own living guide: `docs/guides/Optimizing Pixelblaze patterns.md`.
+It carries the measured per-built-in cost table from the hardware microbenchmark
+(#245, `test/perf-harness/costs.md`, fw 3.67) and tags each optimization as
+emulator-bench-verifiable (op/call count) vs hardware-only wisdom (per-function
+cost the float64 shims can't see — e.g. `wave` measures the same as `sin`, not
+cheaper).
+
 ---
 
 ## 12. Storage & pattern management

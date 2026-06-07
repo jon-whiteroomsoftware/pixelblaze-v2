@@ -180,6 +180,8 @@ Patterns run **on the main thread**, and Fidelity's fixed-point arithmetic is **
 - **No dynamic allocation in the hot path.** Arrays are the only allocatable type and can't be freed, so allocating per-pixel leaks. Pre-allocate any array once at module scope.
 - A syntactically valid infinite loop **freezes the tab** (main-thread execution) — bound every loop with a constant or a slider-fed count, never a data-dependent `while` that might not terminate.
 
+> Once a port *runs*, making it *fast* is its own topic — hoisting frame-global math, spending the transcendental budget against a measured cost table, cutting loop iterations. See **[Optimizing Pixelblaze patterns](./Optimizing%20Pixelblaze%20patterns.md)**.
+
 ---
 
 ## 4. Worked examples
