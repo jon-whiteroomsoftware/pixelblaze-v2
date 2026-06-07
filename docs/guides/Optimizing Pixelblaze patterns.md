@@ -71,13 +71,24 @@ The original method, and still the fastest way to find a hot spot:
 This measures the *real device*, so it is always truthful — it just can't tell
 you *why* a built-in is expensive.
 
-### b. The emulator benchmark (`src/engine/_perf_probe.test.ts`)
+### b. The emulator benchmark (`npm run bench`, `test/perf-harness/`)
 
-A Vitest probe that bundles a demo and times N frames under both shims at a given
-grid size, printing e.g. `[PERF] fast=11.27ms fidelity=24.81ms ratio=2.2x`.
+A CLI (issue #247) that bundles a demo and times N frames under both shims at a
+given grid size, emitting a per-mode FNV-1a **pixel checksum** alongside the mean
+frame time:
+
+```bash
+npm run bench -- Kishimisu                      # both modes, time + checksum
+npm run bench -- Kishimisu --frames 120 --grid 64x32
+```
+
+The **checksum is the guard rail**: re-run after an edit and compare *per mode* —
+identical checksum ⇒ byte-for-byte identical output, so any frame-time delta is a
+pure speed change, and a drift tells you a change was *not* output-preserving.
 
 - **What it's good for:** comparing two *versions* of a pattern (did my rewrite
-  reduce work?), and seeing the Precise-renderer iteration tax in the dev loop.
+  reduce work?), proving an edit was output-preserving (checksum), and seeing the
+  Precise-renderer iteration tax in the dev loop.
 - **What it cannot tell you:** the relative cost of individual built-ins. In the
   emulator **every** math built-in is a native `Math.*` call in *both* shims (the
   Precise path only quantizes the result), so it measures **operation/call
@@ -97,6 +108,26 @@ PIXELBLAZE_IP=<ip> PIXELBLAZE_FW=<ver> npm run profile
 
 See `test/perf-harness/README.md`. It's human-in-the-loop (needs a physical
 device) and excluded from the pre-commit gate.
+
+### d. The hardware FPS bench (`npm run devbench`, `test/perf-harness/`, issue #248)
+
+The automated end of the loop, and the truest whole-frame number short of
+watching the editor yourself. It bundles a demo (or any `.js` file), compiles it
+with the device's own compiler **headless** (no Chrome extension — see the
+harness README), pushes it run-only over the LAN, confirms the device actually
+switched to it (`activeProgramId` guard), and samples the FPS the firmware
+reports. Pass two sources for a before/after Δ:
+
+```bash
+PIXELBLAZE_IP=<ip> npm run devbench -- Kishimisu
+PIXELBLAZE_IP=<ip> npm run devbench -- /tmp/Kishimisu.baseline.js Kishimisu
+```
+
+This is what turns a **[hardware-wisdom]** claim into a measured one: the cost
+table predicts a per-pixel-body saving, but only the FPS bench tells you what
+fraction of the *frame* that body was, and hence the real gain. Use it for the
+final sign-off on any optimization whose payoff the emulator can't see. Like the
+profiler, it needs a physical device and is out of the pre-commit gate.
 
 ## 3. The measured cost table
 
@@ -236,19 +267,84 @@ preview↔hardware.
 ### Iterate in Fast, ship in Precise
 
 The Precise renderer emulates fixed-point in JS and is measurably slower *in the
-dev loop* (the `_perf_probe` typically reports a few × for Kishimisu at 64×32,
-varying with machine load) — this is an *emulator* tax, not a device cost. Drop
+dev loop* (`npm run bench` typically reports ~7× for Kishimisu at 64×32, varying
+with machine load) — this is an *emulator* tax, not a device cost. Drop
 to the Fast renderer to iterate on a heavy pattern, but always do the final
 correctness and the on-device perf check in Precise / on hardware.
 
 ## 7. Case studies
 
-### Kishimisu (`src/pixelblaze/demos/Kishimisu.js`)
+### Kishimisu (`src/pixelblaze/demos/Kishimisu.js`) — a full measured pass (#248)
 
-The canonical "1.4 KB of beauty" kaleidoscope. A clean port: the optimization
-work was mostly keeping the per-pixel body tight and routing coordinates through
-`Shader.toUV`/`Shader.fract`. Use it with the `_perf_probe` as the reference
-pattern when measuring rendering-path changes.
+The canonical "1.4 KB of beauty" kaleidoscope: a 4-octave fold, an IQ cosine
+palette per octave, a sharpened sine ring. It's a *clean* port to begin with, so
+it makes a good worked example of the **bench-verifiable / hardware-wisdom split**
+— the optimizations are all real and correct, yet the emulator stays nearly flat.
+
+**Method.** Baseline, then one change at a time, re-benching after each (3 runs,
+64×32, 120 frames) and gating on the per-mode checksum.
+
+| step | change | tag | Fast checksum | Precise checksum |
+|---|---|---|---|---|
+| 0 | baseline | — | `42265145` | `5427e6fb` |
+| 1 | 5 slider→range remaps → `beforeRender` | bench-verifiable | held | held |
+| 2 | `t*0.4` hoisted; per-octave `÷ringDensityM` → `×(1/ringDensityM)` | mixed | held | **drifts → `a6b511ef`** |
+| 3 | per-octave palette phase `i*0.4` → running `+0.4` accumulator | bench-verifiable | held | held |
+
+Frame time stayed inside ±5% run-to-run noise at every step (Fast ~0.83 ms,
+Precise ~6.0 ms). **That flatness is the lesson, not a failure:** the emulator
+runs every built-in as a native `Math.*` call, so the ops these steps remove
+(`mul`/`add`/`div`/`floor`/`clamp`) are all near-free there, while the per-octave
+`cos`/`sin`/`pow` and the per-pixel `exp` — untouched — dominate. The bench's job
+in a pass like this is the **checksum guard**, not the stopwatch.
+
+**The hardware story the bench can't show.** Pricing the per-pixel body against
+the [cost table](#the-measured-cost-table) (units = ×mul, 4 octaves):
+
+- Steps 1–3 trim **~297 → ~266 ×mul/pixel (~10%)**, output-preserving and free on
+  the device — invisible in the emulator for the reason above.
+- **Two items own the per-octave cost:** the palette's **3× `cos` (~22 ×mul, ~37%)**
+  and the **`pow(glowM/d, sharpnessM)` (~10.5 ×mul, ~17%)**. Neither hoists
+  (`cos`'s phase carries the per-pixel `len0`; `sharpnessM` is a non-integer
+  slider, so no `pow(x,2)→x*x`). They are the ceiling for a faithful render.
+- **`exp(-len0)` is ~13.8 ×mul *per pixel* and time-invariant** (a pure function of
+  position). It's already hoisted out of the octave loop; the next move would be
+  to **memoize it per pixel index** into a module array filled once — the one
+  hardware-wisdom item here that memoization could turn bench-verifiable (it would
+  drop ~2048 `exp` calls/frame in steady state). Not yet done: it's a structural
+  change (a `pixelCount`-sized cache + a grid-change guard) weighed against the
+  demo's readability.
+- **`octavesM` is the biggest single dial** — it multiplies the whole per-octave
+  cost. Dropping 4→3 is ~23% off the frame, but it **changes the image**: a
+  quality knob, not a free win. Keep it on the checksum's *other* side of the line.
+
+**The reciprocal caveat (step 2).** Replacing the per-octave divide with a
+precomputed reciprocal is a genuine speedup on hardware (`div` 1.9× → `mul` 1.0×)
+but a deliberate 16.16 divergence: the **Fast (float64) checksum holds**, the
+**Precise (fixed-point) checksum shifts**. Accepted here — the shipped device code
+uses the same reciprocal, and the delta is a sub-perceptual one-level flip on a
+handful of pixels. This is the template for "consciously accept + document drift":
+prove Fast is untouched, confirm the Precise drift is *only* the known fixed-point
+identity, and write down why.
+
+**Closing the loop on real hardware.** Both versions were bundled to device
+dialect and hand-loaded into the ElectroMage editor on a physical Pixelblaze
+(fw 3.67, 16×16 panel), reading the editor's FPS counter:
+
+| | FPS | frame time |
+|---|---|---|
+| baseline | 8.7 | 114.9 ms |
+| optimized | 9.1 | 109.9 ms |
+
+**+4.6% — real and repeatable, but well short of the ~10% compute estimate, and
+the gap is the lesson.** The ×mul model prices only the per-pixel *arithmetic
+body*; the frame also pays fixed overhead the optimization never touches — walking
+the map, driving the LEDs, framework/WS housekeeping. Back-solving
+`0.10 × f = 0.044` puts the body we trimmed at **~44% of the frame**, the rest
+fixed. So: **to predict an FPS gain, model the whole frame, not just the hot
+loop** — a 10% cut to a body that's half the frame is a 5% cut to the frame. The
+big-ticket items (the per-octave `cos`/`pow`, the octave count) are where a
+*dramatic* win would have to come from, and none of those are free.
 
 ### PhantomStar (`src/pixelblaze/demos/PhantomStar.js`)
 
@@ -274,4 +370,5 @@ hoisting win:
   — getting a shader running before you tune it; the fixed-point gotchas.
 - `docs/PXLBLZ Technical Reference.md` §2/§5 (fidelity & the fixed-point engine),
   §11 (the porting toolkit), §16 (main-thread execution).
-- `src/engine/_perf_probe.test.ts` — the emulator benchmark probe.
+- `test/perf-harness/` — the emulator bench (`npm run bench`, #247) and the
+  hardware profiler (`npm run profile`, #245).

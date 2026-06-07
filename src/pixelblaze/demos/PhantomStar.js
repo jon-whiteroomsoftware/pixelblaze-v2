@@ -40,11 +40,20 @@ export var c03 = 1, s03 = 0   // rot(t*0.3) — the abs-fold xy twist
 export var c01 = 1, s01 = 0   // rot(t*0.1) — the abs-fold xz twist
 export var cf = 1,  sf = 0    // rot(t)     — final xz twist + camera roll sin
 
+// Per-frame scalars derived only from sliders / time — same for every pixel, so
+// computed once here rather than per pixel (iters/steps/g) or per step (ringT).
+var fIters = 2, fSteps = 40, fGain = 1, ringT = 0
+
 export function beforeRender(delta) {
   t = t + delta * 0.001 * (0.3 + speed * 1.8)
   c03 = cos(t * 0.3); s03 = sin(t * 0.3)
   c01 = cos(t * 0.1); s01 = sin(t * 0.1)
   cf = cos(t);        sf = sin(t)
+
+  fIters = floor(2 + depth * 3)      // 2..5 IFS folds
+  fSteps = floor(40 + quality * 55)  // 40..95 march steps
+  fGain = 0.4 + gain * 1.2           // gain 0.5 ≈ the original's unscaled brightness
+  ringT = 24 * t                     // ring-pulse phase: time-only, hoisted from the loop
 }
 
 // Folded box-IFS distance. Operates on px/py/pz module temporaries (set by the
@@ -92,8 +101,8 @@ function map(wx, wy, wz, iters) {
 }
 
 export function render2D(index, x, y) {
-  var iters = floor(2 + depth * 3)        // 2..5 IFS folds
-  var steps = floor(40 + quality * 55)    // 40..95 march steps
+  var iters = fIters
+  var steps = fSteps
 
   // Centred square uv (short axis = unit; #116).
   Shader.toUV(x, y, 1)
@@ -119,7 +128,7 @@ export function render2D(index, x, y) {
     var dist = max(abs(ifsD), 0.02)
     var a = exp(-dist * 3)
     // Outward-pulsing rings: bright shell where length(pos)+24t wraps near 0.
-    if (mod(hypot3(posX, posY, posZ) + 24 * t, 30) < 3) {
+    if (mod(hypot3(posX, posY, posZ) + ringT, 30) < 3) {
       a = a * 2
       acc2 = acc2 + a
     }
@@ -127,7 +136,7 @@ export function render2D(index, x, y) {
     tt = tt + dist * 0.5
   }
 
-  var g = 0.4 + gain * 1.2  // gain 0.5 ≈ the original's unscaled brightness
+  var g = fGain
   rgb(
     acc * 0.010 * g,
     (acc * 0.011 + acc2 * 0.002) * g,
