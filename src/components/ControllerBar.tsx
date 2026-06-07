@@ -5,6 +5,7 @@ import { describeControllerPill, type ControllerPhase } from '@/engine/controlle
 import type { ControllerStatusTone } from '@/engine/controllerStatusView'
 import { StatusDot, type StatusTone } from './StatusDot'
 import { ControllerPanel } from './ControllerPanel'
+import { ControllerPanelTitle } from './ControllerPanelTitle'
 
 // The consolidated top-right Controller surface (#210). Supersedes the always-on
 // header IP input (ControllerConnect) and the standalone status dot
@@ -106,12 +107,10 @@ function ControllerPillButton({
           className="absolute right-0 top-8 z-50 w-80 rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl font-mono text-xs text-zinc-300"
         >
           <div className="flex items-center justify-between gap-2 border-b border-seam px-3 py-2">
-            <span className="flex min-w-0 items-baseline gap-1.5">
-              {/* One identity only: the device name once known, else its IP. The IP
-                  also appears as a labeled box inside the panel, so showing it here
-                  too would be redundant. */}
-              <span className="truncate text-zinc-200">{nickname ?? ip}</span>
-            </span>
+            {/* Title mirrors the editor and preview panes: the running pattern
+                name + dimensionality, not the device name (which already labels the
+                pill this popover hangs from). */}
+            <ControllerPanelTitle />
             <button
               type="button"
               onClick={onRemove}

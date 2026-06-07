@@ -93,9 +93,11 @@ describe('ControllerBar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle Desk panel' }))
     const popover = screen.getByTestId('controller-panel-popover')
-    // The header shows one identity only: the device name, not the IP (the IP moved
-    // into a labeled box inside the panel, so duplicating it here was redundant).
-    expect(popover).toHaveTextContent('Desk')
+    // The header title now mirrors the editor/preview panes: the running pattern
+    // name (— until polled), not the device identity. The device name already
+    // labels the pill this popover hangs from, and its IP shows in a labeled box
+    // inside the panel, so neither is repeated in the header.
+    expect(popover).not.toHaveTextContent('Desk')
     expect(popover).not.toHaveTextContent('10.0.0.5')
     expect(screen.getByTestId('controller-pill-remove')).toHaveAccessibleName('Disconnect Desk')
   })

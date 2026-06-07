@@ -17,6 +17,8 @@ import { SpeedSelector } from '@/components/SpeedSelector'
 import { DeckSelect } from '@/components/DeckSelect'
 import { DeckSlider } from '@/components/DeckSlider'
 import { ControlsPanel } from '@/components/ControlsPanel'
+import { DimPills } from '@/components/DimPills'
+import { exportedDims } from '@/engine/exportedDims'
 import { Variables } from '@/components/Variables'
 import {
   DeckSection,
@@ -79,6 +81,7 @@ function PrimaryBand() {
   const isRunning = usePreviewStore((s) => s.isRunning)
   const toggle = usePreviewStore((s) => s.toggle)
   const previewPatternName = useEditorStore((s) => s.previewPatternName)
+  const previewSource = useEditorStore((s) => s.previewSource)
 
   // The layer-1 reset affordance (#63): a rewind icon sitting immediately to
   // the right of the pattern name in the primary nav — findable, and clearly scoped to
@@ -104,6 +107,7 @@ function PrimaryBand() {
         <span className="min-w-0 truncate text-sm text-zinc-200">
           {previewPatternName || '—'}
         </span>
+        <DimPills dims={exportedDims(previewSource)} />
         {showReset && (
           <button
             type="button"

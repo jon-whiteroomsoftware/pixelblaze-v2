@@ -6,8 +6,6 @@ import {
   controllerPanelInitialState,
 } from '@/store/controllerPanelStore'
 import { useEditorStore, editorInitialState } from '@/store/editorStore'
-import { useControllerStore } from '@/store/controllerStore'
-import { setProgramLabels } from '@/engine/storage'
 import { setControllerProvider, resetControllerProvider } from '@/engine/controllerProviderRegistry'
 import {
   NullControllerProvider,
@@ -80,31 +78,17 @@ describe('ControllerPanel', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows the active pattern, fps, and brightness when connected', async () => {
+  it('shows fps and brightness when connected', async () => {
     setControllerProvider(new ConnectedProvider())
     render(<ControllerPanel />)
     expect(screen.getByTestId('controller-panel')).toBeInTheDocument()
     // The first section is labeled "Pixelblaze" (matching the preview deck); the
-    // device's IP shows in its own box, not as the section header.
+    // device's IP shows in its own box, not as the section header. The running
+    // pattern name lives in the panel title (ControllerPanelTitle), not here.
     expect(screen.getByText('Pixelblaze')).toBeInTheDocument()
     expect(screen.getByText('10.0.0.9')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByText('Nebula')).toBeInTheDocument())
-    expect(screen.getByText('30.0')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('30.0')).toBeInTheDocument())
     expect(screen.getByLabelText('Controller brightness')).toBeInTheDocument()
-  })
-
-  it('resolves a run-only program to its label-cache name with an unsaved marker (#237)', async () => {
-    // A run-only program id the device list does not know about, but the local label
-    // cache (loaded for the active Controller) does.
-    await setProgramLabels({ '10.0.0.9': { 'run-xyz': 'My Sketch' } })
-    useControllerStore.setState({ activeIp: '10.0.0.9' })
-    const provider = new ConnectedProvider()
-    provider.config = { ...provider.config, activeProgramId: 'run-xyz' }
-    setControllerProvider(provider)
-    render(<ControllerPanel />)
-
-    await waitFor(() => expect(screen.getByText('My Sketch')).toBeInTheDocument())
-    expect(screen.getByTestId('controller-pattern-unsaved')).toBeInTheDocument()
   })
 
   it('renders the running pattern controls and watched vars when connected', async () => {

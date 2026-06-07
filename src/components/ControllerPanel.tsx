@@ -164,7 +164,7 @@ export function ControllerPanel() {
     if (c.description) controlDescriptions[c.exportName] = c.description
   }
 
-  const { patternName, patternUnsaved, fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch } =
+  const { fpsLabel, pixelsLabel, mapPointsLabel, mapCountMismatch } =
     describeControllerPanel({
       activeProgramId,
       programs,
@@ -180,56 +180,50 @@ export function ControllerPanel() {
   return (
     <div className="font-mono pl-3 text-xs" data-testid="controller-panel">
       <DeckSection label="Pixelblaze" hint={PANEL_HINT}>
-        <DeckGrid gapY="gap-y-2">
-          {/* Row 1: pattern + brightness, both stacked for the width they need. The
-              pattern carries an "unsaved" marker when its name came from the local label
-              cache (a run-only push) rather than the device's saved program list (#237). */}
-          <div className="flex flex-col gap-1 min-w-0">
-            <span className="text-zinc-400 truncate">pattern</span>
-            <span className="text-live truncate" title={patternName}>
-              {patternName}
-              {patternUnsaved && (
-                <span
-                  className="text-zinc-500 not-italic"
-                  title="Running but not saved on the device — a run-only push (#237)."
-                  data-testid="controller-pattern-unsaved"
-                >
-                  {' · unsaved'}
-                </span>
-              )}
-            </span>
+        {/* Two columns of unequal height (#consistency): the title moved up, so the
+            old row-paired grid no longer lined up. Right column emulates the preview
+            deck — the stacked brightness slider over the editable pixel count. Left
+            column collects the three read-only one-liners (fps, map points, IP). The
+            columns top-align; their differing heights are accepted. */}
+        <div className="flex gap-x-4 items-start">
+          <div className="flex-1 min-w-0 flex flex-col gap-y-2">
+            <DeckTelemetry label="fps" value={fpsLabel} />
+            <DeckCell label="map points">
+              <span
+                className={`tabular-nums truncate ${mapCountMismatch ? 'text-amber-400' : 'text-live'}`}
+                title={
+                  mapCountMismatch
+                    ? `Map has ${mapPointsLabel} points but the Controller has ${pixelsLabel} pixels — the firmware silently drops a mismatched map (#204).`
+                    : undefined
+                }
+                data-testid="controller-map-points"
+              >
+                {mapPointsLabel}
+              </span>
+            </DeckCell>
+            <DeckTelemetry label="IP" value={status.controller.address} />
           </div>
-          <DeckSlider
-            label="brightness"
-            ariaLabel="Controller brightness"
-            value={brightness}
-            min={0}
-            max={1}
-            step={0.01}
-            curve={2}
-            onChange={setBrightness}
-          />
-          {/* Row 2: map points + pixel count. */}
-          <DeckCell label="map points">
-            <span
-              className={`tabular-nums truncate ${mapCountMismatch ? 'text-amber-400' : 'text-live'}`}
-              title={
-                mapCountMismatch
-                  ? `Map has ${mapPointsLabel} points but the Controller has ${pixelsLabel} pixels — the firmware silently drops a mismatched map (#204).`
-                  : undefined
-              }
-              data-testid="controller-map-points"
-            >
-              {mapPointsLabel}
-            </span>
-          </DeckCell>
-          <DeckCell label="pixel count">
-            <ControllerPixelCountInput />
-          </DeckCell>
-          {/* Row 3: IP + fps. */}
-          <DeckTelemetry label="IP" value={status.controller.address} />
-          <DeckTelemetry label="fps" value={fpsLabel} />
-        </DeckGrid>
+          <div className="flex-1 min-w-0 flex flex-col gap-y-2">
+            {/* Stretch the stacked slider to exactly two single-line rows tall
+                (h-10 = 16px line + 8px gap + 16px line), label pinned top and track
+                pinned bottom, so brightness + pixel count == the left column's three
+                one-liners and the two columns bottom-align cleanly (#consistency). */}
+            <DeckSlider
+              label="brightness"
+              ariaLabel="Controller brightness"
+              value={brightness}
+              min={0}
+              max={1}
+              step={0.01}
+              curve={2}
+              onChange={setBrightness}
+              className="h-10 justify-between"
+            />
+            <DeckCell label="pixel count">
+              <ControllerPixelCountInput />
+            </DeckCell>
+          </div>
+        </div>
       </DeckSection>
 
       {controls.length > 0 && (

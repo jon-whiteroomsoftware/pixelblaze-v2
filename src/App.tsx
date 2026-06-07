@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Editor } from '@/components/Editor'
 import { CompileStatusBadge } from '@/components/CompileStatusBadge'
+import { DimPills } from '@/components/DimPills'
 import { PatternList } from '@/components/PatternList'
 import { Preview } from '@/components/Preview'
 import { PaneHeader } from '@/components/PaneHeader'
@@ -198,14 +199,7 @@ export default function App() {
                   aria-label="read-only"
                 />
               )}
-              {exportedDims(source).map((d) => (
-                <span
-                  key={d}
-                  className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-400 border border-zinc-700 leading-none"
-                >
-                  {d}D
-                </span>
-              ))}
+              <DimPills dims={exportedDims(source)} />
               {activePatternId !== null && <CompileStatusBadge />}
             </span>
             {activeDemoName !== null && (
