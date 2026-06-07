@@ -44,7 +44,7 @@ describe('SendToController', () => {
     expect(screen.getByTestId('send-to-controller')).toBeEnabled()
   })
 
-  it('is disabled on a dimensionality mismatch, explaining why', () => {
+  it('stays enabled on a dimensionality mismatch (no longer a hard block)', () => {
     setControllerProvider(new ConnectedProvider())
     useEditorStore.setState({ nativeDim: 2 })
     useControllerStore.setState({
@@ -52,9 +52,92 @@ describe('SendToController', () => {
       controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 1 } },
     })
     render(<SendToController />)
-    const button = screen.getByTestId('send-to-controller')
-    expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('title', expect.stringMatching(/2D.*1D/))
+    expect(screen.getByTestId('send-to-controller')).toBeEnabled()
+  })
+
+  it('opens the preflight popover (warn, do not block) on a dim mismatch, and Send anyway pushes', () => {
+    setControllerProvider(new ConnectedProvider())
+    useEditorStore.setState({ nativeDim: 2, previewSource: 'export function render() {}' })
+    usePatternStore.setState({ activePatternId: 'p1' })
+    useControllerStore.setState({
+      activeIp: '10.0.0.9',
+      controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 1 } },
+    })
+    render(<SendToController />)
+    // No dialog until the click.
+    expect(screen.queryByTestId('pattern-preflight-dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('send-to-controller'))
+    const dialog = screen.getByTestId('pattern-preflight-dialog')
+    expect(dialog).toHaveTextContent(/2D/)
+    expect(dialog).toHaveTextContent(/1D/)
+
+    // "Send anyway" closes the dialog and pushes.
+    const pushActivePattern = vi.fn()
+    useControllerStore.setState({ pushActivePattern })
+    fireEvent.click(screen.getByRole('button', { name: /send anyway/i }))
+    expect(pushActivePattern).toHaveBeenCalledOnce()
+    expect(useControllerStore.getState().preflight).toBeNull()
+  })
+
+  it('offers the recommended-map remedy for a demo with a matching-dim recommendation', () => {
+    setControllerProvider(new ConnectedProvider())
+    // NebulaSphere is a 3D demo recommending seed-sphere-3d (3D, 8192px); the device map
+    // is 2D, so the dim warning fires and the remedy checkbox is offered. The confirm
+    // action is mocked up front (it is wired through a prop closure, so a later swap
+    // wouldn't take) — requestPush stays real to open the dialog and arm the remedy.
+    const confirmPatternPushWithMap = vi.fn()
+    useEditorStore.setState({ nativeDim: 3, previewSource: 'export function render3D() {}' })
+    usePatternStore.setState({ activePatternId: null, activeDemoName: 'NebulaSphere' })
+    useControllerStore.setState({
+      activeIp: '10.0.0.9',
+      controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 2 } },
+      confirmPatternPushWithMap,
+    })
+    render(<SendToController />)
+    fireEvent.click(screen.getByTestId('send-to-controller'))
+
+    const dialog = screen.getByTestId('pattern-preflight-dialog')
+    expect(screen.getByRole('checkbox')).toBeChecked()
+    expect(dialog).toHaveTextContent(/Sphere shell/)
+
+    // With the box checked the action installs the map first.
+    fireEvent.click(screen.getByRole('button', { name: /install & send/i }))
+    expect(confirmPatternPushWithMap).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to a plain push when the remedy checkbox is unchecked', () => {
+    setControllerProvider(new ConnectedProvider())
+    const confirmPatternPush = vi.fn()
+    useEditorStore.setState({ nativeDim: 3, previewSource: 'export function render3D() {}' })
+    usePatternStore.setState({ activePatternId: null, activeDemoName: 'NebulaSphere' })
+    useControllerStore.setState({
+      activeIp: '10.0.0.9',
+      controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 2 } },
+      confirmPatternPush,
+    })
+    render(<SendToController />)
+    fireEvent.click(screen.getByTestId('send-to-controller'))
+
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: /send anyway/i }))
+    expect(confirmPatternPush).toHaveBeenCalledOnce()
+  })
+
+  it('pushes straight through (no popover) when the dimensions match', () => {
+    setControllerProvider(new ConnectedProvider())
+    useEditorStore.setState({ nativeDim: 2, previewSource: 'export function render() {}' })
+    usePatternStore.setState({ activePatternId: 'p1' })
+    const pushActivePattern = vi.fn()
+    useControllerStore.setState({
+      activeIp: '10.0.0.9',
+      controllers: { '10.0.0.9': { ip: '10.0.0.9', phase: 'live', mapDim: 2 } },
+      pushActivePattern,
+    })
+    render(<SendToController />)
+    fireEvent.click(screen.getByTestId('send-to-controller'))
+    expect(screen.queryByTestId('pattern-preflight-dialog')).not.toBeInTheDocument()
+    expect(pushActivePattern).toHaveBeenCalledOnce()
   })
 
   it('runs the preflight (requestPush) on click when enabled', () => {

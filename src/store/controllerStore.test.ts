@@ -491,6 +491,88 @@ describe('controllerStore (keyed)', () => {
     })
   })
 
+  describe('pattern dim-mismatch preflight + recommended-map remedy (Option A)', () => {
+    const SRC_3D = 'export function render3D(index, x, y, z) {\n  hsv(x, 1, 1)\n}\n'
+
+    async function armMismatch() {
+      await store().addController('10.0.0.5')
+      // The device has a 2D map and drives 256 LEDs; the open pattern is the 3D
+      // NebulaSphere demo.
+      created.get('10.0.0.5')!.pixelCount = 256
+      useControllerStore.setState((s) => ({
+        controllers: {
+          ...s.controllers,
+          '10.0.0.5': { ...s.controllers['10.0.0.5'], mapDim: 2 },
+        },
+      }))
+      usePatternStore.setState({ activePatternId: null, activeDemoName: 'NebulaSphere' })
+      useEditorStore.setState({
+        nativeDim: 3,
+        previewSource: SRC_3D,
+        previewPatternName: 'NebulaSphere',
+      })
+    }
+
+    it('opens the dialog (no push) on a dim mismatch and arms the recommended-map remedy', async () => {
+      await armMismatch()
+      await store().requestPush()
+
+      expect(store().preflight?.map((w) => w.kind)).toEqual(['pattern-dim-mismatch'])
+      expect(store().mapPushRemedyCount).toBeNull() // never blocking
+      expect(store().patternMapRemedy).toEqual({
+        mapId: 'seed-sphere-3d',
+        mapName: 'Sphere shell',
+        mapDim: 3,
+      })
+      // Nothing pushed until the author confirms.
+      expect(created.get('10.0.0.5')!.pushed).toHaveLength(0)
+    })
+
+    it('confirmPatternPushWithMap materializes the map to the device count (no count change), updates mapDim, then pushes', async () => {
+      await armMismatch()
+      await store().requestPush()
+      await store().confirmPatternPushWithMap()
+
+      const provider = created.get('10.0.0.5')!
+      // The hardware pixel count is left untouched; the sphere is baked to the device's
+      // own 256 LEDs (not the preview's recommended size).
+      expect(provider.setPixelCounts).toEqual([])
+      expect(provider.pushedMaps).toHaveLength(1)
+      expect(provider.pushedMaps[0].points).toHaveLength(256)
+      // The controller entry now reflects the installed map's dimension.
+      expect(store().controllers['10.0.0.5'].mapDim).toBe(3)
+      // Then the pattern itself is pushed, and the dialog state is cleared.
+      expect(provider.pushed).toHaveLength(1)
+      expect(store().preflight).toBeNull()
+      expect(store().patternMapRemedy).toBeNull()
+    })
+
+    it('confirmPatternPush sends the pattern without installing a map (Send anyway)', async () => {
+      await armMismatch()
+      await store().requestPush()
+      await store().confirmPatternPush()
+
+      const provider = created.get('10.0.0.5')!
+      expect(provider.setPixelCounts).toEqual([])
+      expect(provider.pushedMaps).toHaveLength(0)
+      // The map is untouched, so the device stays 2D.
+      expect(store().controllers['10.0.0.5'].mapDim).toBe(2)
+      expect(provider.pushed).toHaveLength(1)
+      expect(store().preflight).toBeNull()
+    })
+
+    it('aborts before the pattern push when the map install fails', async () => {
+      await armMismatch()
+      created.get('10.0.0.5')!.setPixelMapError = new Error('socket closed')
+      await store().requestPush()
+      await store().confirmPatternPushWithMap()
+
+      const provider = created.get('10.0.0.5')!
+      expect(provider.pushed).toHaveLength(0) // pattern never pushed
+      expect(store().pushResult).toEqual({ ok: false, message: 'socket closed' })
+    })
+  })
+
   describe('map push (#204)', () => {
     const MAP: MapRecord = {
       id: 'm1',

@@ -3,14 +3,13 @@
 // reason to surface. No React, no transport specifics; the button is a thin shell
 // over this.
 //
-// Send is gated on two conditions (the H9 lens): a Controller is connected, AND
-// the open pattern's dimensionality matches the Controller's installed map. The
-// map dimensionality comes from reading the installed pixel map back through the
-// provider seam (getPixelMap) — an unconfirmed firmware capability (H13) pulled
-// forward here. When it can't be read (mapDim === null) we deliberately do NOT
-// block: we can't prove a mismatch, and a permanently-disabled Send would be worse
-// than letting a confident user push. So the dimensionality check applies only
-// when the map dimension is actually known.
+// Send is gated on the conditions that make a push impossible or pointless: a
+// Controller must be connected, the pattern must compile, and there must be a change
+// to send. A pattern/map *dimensionality* mismatch is NOT gated here — it no longer
+// hard-disables Send. It is a soft, push-past warning surfaced in the preflight popover
+// (describePreflight, `pattern-dim-mismatch`), mirroring the map-push reconciliation:
+// a permanently-disabled Send reads as a bug, and the author may know better than the
+// dim heuristic, so we warn and let them through rather than block.
 
 import type { ControllerStatus } from './ControllerProvider'
 
@@ -30,10 +29,6 @@ export function mapDimension(map: number[][] | null | undefined): MapDimension {
 export interface SendGateInput {
   /** Current Controller connection status. */
   status: ControllerStatus
-  /** The open pattern's native (coordinate) dimensionality. */
-  patternDim: 1 | 2 | 3
-  /** The connected Controller's installed-map dimensionality, or null if unknown. */
-  mapDim: MapDimension
   /** Editor compile state — a broken pattern can't be compiled or pushed. Defaults
    *  to 'good' when omitted (the H9 gate predates this). */
   compileStatus?: 'good' | 'broken'
@@ -52,8 +47,6 @@ export interface SendGate {
 /** Decide whether Send-to-Controller is enabled, and why not when it isn't. */
 export function describeSendToController({
   status,
-  patternDim,
-  mapDim,
   compileStatus = 'good',
   alreadyPushed = false,
 }: SendGateInput): SendGate {
@@ -62,12 +55,6 @@ export function describeSendToController({
   }
   if (compileStatus !== 'good') {
     return { enabled: false, reason: "Fix the pattern's errors before sending" }
-  }
-  if (mapDim !== null && mapDim !== patternDim) {
-    return {
-      enabled: false,
-      reason: `Pattern is ${patternDim}D but the Controller's map is ${mapDim}D`,
-    }
   }
   if (alreadyPushed) {
     return { enabled: false, reason: 'No changes since the last send' }

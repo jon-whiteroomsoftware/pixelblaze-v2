@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import type { PreflightWarning } from '@/engine/preflight'
+import { HelpHint } from '@/components/HelpHint'
 
 // The push-reconciliation popover (#63 UI cleanup). Both Send actions (pattern,
 // #203; map, #204/#213) used a centered modal AlertDialog to surface preflight
@@ -23,6 +25,27 @@ export const pushPopoverButton = {
   muted: `${baseButton} border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200`,
   action: `${baseButton} border-live bg-live/10 text-live hover:bg-live/20 disabled:opacity-30 disabled:hover:bg-live/10`,
 } as const
+
+// The warning rows shared by both Send flows: each preflight warning's headline, with
+// its longer firmware/behaviour explanation tucked behind an info-hover so the popover
+// body stays short. The map flow appends checkboxes below this; the pattern flow appends
+// a plain Send-anyway footer.
+export function PreflightWarningList({ warnings }: { warnings: PreflightWarning[] }) {
+  return (
+    <div className="mt-2 space-y-1.5 text-zinc-400">
+      {warnings.map((w) => (
+        <p key={w.kind} className="flex items-start gap-1">
+          <span>{w.message}</span>
+          {w.detail && (
+            <HelpHint label="More about this warning" width={260}>
+              <p className="leading-relaxed text-zinc-300">{w.detail}</p>
+            </HelpHint>
+          )}
+        </p>
+      ))}
+    </div>
+  )
+}
 
 export function PushConfirmPopover({
   open,

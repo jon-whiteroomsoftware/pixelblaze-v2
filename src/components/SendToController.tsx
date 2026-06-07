@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { RotateCw, Check, Play, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getControllerProvider } from '@/engine/controllerProviderRegistry'
@@ -6,6 +6,69 @@ import { useControllerStore } from '@/store/controllerStore'
 import { useEditorStore } from '@/store/editorStore'
 import { usePatternStore, activePushKey } from '@/store/patternStore'
 import { describeSendToController, isAlreadyPushed, describeSendAction } from '@/engine/sendToController'
+import type { PreflightWarning } from '@/engine/preflight'
+import type { RecommendedMapRemedy } from '@/engine/patternMapRemedy'
+import {
+  PushConfirmPopover,
+  PreflightWarningList,
+  pushPopoverButton,
+} from '@/components/PushConfirmPopover'
+
+const checkbox = 'h-3.5 w-3.5 shrink-0 accent-amber-400'
+
+// The pattern-push popover body, mounted only while the popover is open (so its
+// default-checked checkbox re-arms on every open). The dim-mismatch warning is soft, so
+// the author can always push past it ("Send anyway"). When the open demo carries a
+// recommended map of the matching dimension (Option A), a checked-by-default checkbox
+// offers to install it first — the pattern analogue of the map-push count remedy. Without
+// a recommendation (user patterns, demos without one) there's no checkbox: a plain push.
+function PatternPushChoices({
+  warning,
+  remedy,
+  onCancel,
+  confirmWithMap,
+  confirmOnly,
+}: {
+  warning?: PreflightWarning
+  remedy: RecommendedMapRemedy | null
+  onCancel: () => void
+  confirmWithMap: () => Promise<void>
+  confirmOnly: () => Promise<void>
+}) {
+  const [installMap, setInstallMap] = useState(true)
+  const withMap = remedy !== null && installMap
+  const onSend = () => void (withMap ? confirmWithMap() : confirmOnly())
+
+  return (
+    <>
+      <PreflightWarningList warnings={warning ? [warning] : []} />
+
+      {remedy && (
+        <fieldset className="mt-3 space-y-1.5">
+          <legend className="text-zinc-500">Recommended</legend>
+          <label className="flex items-center gap-2 text-zinc-300">
+            <input
+              type="checkbox"
+              className={checkbox}
+              checked={installMap}
+              onChange={(e) => setInstallMap(e.target.checked)}
+            />
+            Also install its map ({remedy.mapName})
+          </label>
+        </fieldset>
+      )}
+
+      <div className="mt-3 flex justify-end gap-2">
+        <button type="button" className={pushPopoverButton.cancel} onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="button" className={pushPopoverButton.action} onClick={onSend}>
+          {withMap ? 'Install & send' : 'Send anyway'}
+        </button>
+      </div>
+    </>
+  )
+}
 
 // The editor-header "Send to Controller" action (H9 #201 → H10 #202; save mode #236,
 // run-vs-save toggle #238). One verb that plays *or* saves the open pattern on the
@@ -24,7 +87,6 @@ export function SendToController() {
     (onChange) => provider.subscribe(onChange),
     () => provider.getStatus(),
   )
-  const patternDim = useEditorStore((s) => s.nativeDim)
   const compileStatus = useEditorStore((s) => s.compileStatus)
   const previewSource = useEditorStore((s) => s.previewSource)
   // The open pattern's push identity — a user pattern by id, a demo by its `demo:`
@@ -33,7 +95,6 @@ export function SendToController() {
   // Target the active Controller (#210): the gate + label key off its entry.
   const activeIp = useControllerStore((s) => s.activeIp)
   const active = useControllerStore((s) => (s.activeIp ? s.controllers[s.activeIp] : undefined))
-  const mapDim = active?.mapDim ?? null
   const pushing = useControllerStore((s) => s.pushing)
   const pushResult = useControllerStore((s) => s.pushResult)
   const lastPushedSource = useControllerStore((s) => s.lastPushedSource)
@@ -41,6 +102,11 @@ export function SendToController() {
   const saveArmed = useControllerStore((s) => s.saveArmed)
   const setSaveArmed = useControllerStore((s) => s.setSaveArmed)
   const requestPush = useControllerStore((s) => s.requestPush)
+  const confirmPatternPush = useControllerStore((s) => s.confirmPatternPush)
+  const confirmPatternPushWithMap = useControllerStore((s) => s.confirmPatternPushWithMap)
+  const cancelPush = useControllerStore((s) => s.cancelPush)
+  const preflight = useControllerStore((s) => s.preflight)
+  const patternMapRemedy = useControllerStore((s) => s.patternMapRemedy)
   const clearPushResult = useControllerStore((s) => s.clearPushResult)
 
   // Hold the just-pushed check on screen (button inert) for a few seconds, then let
@@ -69,8 +135,6 @@ export function SendToController() {
 
   const { enabled, reason } = describeSendToController({
     status,
-    patternDim,
-    mapDim,
     compileStatus,
     alreadyPushed,
   })
@@ -138,22 +202,41 @@ export function SendToController() {
     </button>
   )
 
-  // A pattern push goes straight through (no preflight, #239), so the button is a plain
-  // action — the click pushes immediately.
+  // A clean pattern push goes straight through (the one-click path, #239). The only
+  // preflight is the soft dim-match warning: when the pattern's dimensionality differs
+  // from the Controller's installed map, requestPush opens this popover instead of
+  // pushing, and the author confirms with "Send anyway" (mirrors the map-push flow).
+  const dimMismatch = (preflight ?? []).find((w) => w.kind === 'pattern-dim-mismatch')
   return (
     <span className="flex items-center gap-1">
       {saveToggle}
-      <Button
-        size="sm"
-        variant="ghost"
-        className={`text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300 ${dimClass}`}
-        disabled={!enabled || working}
-        title={title}
-        onClick={() => void requestPush()}
-        data-testid="send-to-controller"
+      <PushConfirmPopover
+        open={dimMismatch !== undefined}
+        onCancel={cancelPush}
+        title="Send pattern"
+        testId="pattern-preflight-dialog"
+        anchor={
+          <Button
+            size="sm"
+            variant="ghost"
+            className={`text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300 ${dimClass}`}
+            disabled={!enabled || working}
+            title={title}
+            onClick={() => void requestPush()}
+            data-testid="send-to-controller"
+          >
+            {content}
+          </Button>
+        }
       >
-        {content}
-      </Button>
+        <PatternPushChoices
+          warning={dimMismatch}
+          remedy={patternMapRemedy}
+          onCancel={cancelPush}
+          confirmWithMap={confirmPatternPushWithMap}
+          confirmOnly={confirmPatternPush}
+        />
+      </PushConfirmPopover>
     </span>
   )
 }

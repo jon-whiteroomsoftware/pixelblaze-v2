@@ -14,7 +14,7 @@
 
 A development environment for [Pixelblaze](https://electromage.com/) LED controllers.
 
-## Why does it exist? There's already an ElectroMage IDE.
+## Why? There's already an ElectroMage IDE.
 
 Pixelblaze ecosystem + modern IDE creature comforts = ❤️
 

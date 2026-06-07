@@ -17,13 +17,23 @@
 //
 // Transport-agnostic and React-free: the caller supplies the two counts (device count
 // read via getConfig; local count from the re-baked map) and whether a map upload is
-// opted into. A map *dimensionality* mismatch needs map read-back (#205) and is out of
-// scope here — see issue #203.
+// opted into.
+//
+// A *pattern* push DOES carry one preflight concern (the dim match): a pattern whose
+// coordinate dimensionality differs from the Controller's installed map renders against
+// coordinates that don't line up, so it will likely look wrong. Unlike the map-count
+// mismatch this is NOT blocking — the device still runs it, and the author may know
+// better (e.g. a 1D pattern that ignores y/z) — so it is a soft warning the author can
+// push past, mirroring the existing "don't block when the map dim is unknown" stance.
 
-/** Each distinct preflight concern. `map-overwrite` is the shared-map guard;
- *  `map-count-mismatch` is the blocking map-push failure (firmware would silently drop
- *  the map). Both are map-push only — a pattern push has no preflight (#239). */
-export type PreflightWarningKind = 'map-overwrite' | 'map-count-mismatch'
+/** Each distinct preflight concern. `map-overwrite` is the shared-map guard and
+ *  `map-count-mismatch` the blocking map-push failure (firmware would silently drop the
+ *  map) — both map-push only. `pattern-dim-mismatch` is the pattern-push soft warning:
+ *  the pattern's dimensionality differs from the Controller's installed map. */
+export type PreflightWarningKind =
+  | 'map-overwrite'
+  | 'map-count-mismatch'
+  | 'pattern-dim-mismatch'
 
 export interface PreflightWarning {
   kind: PreflightWarningKind
@@ -36,15 +46,21 @@ export interface PreflightWarning {
 
 export interface PreflightInput {
   /** The re-baked map's point count — what will actually be sent. Map push only. */
-  localPixelCount: number
+  localPixelCount?: number
   /** The Controller's configured pixel count (from getConfig), or null when it can't be
    *  read — in which case the mismatch check is suppressed (nothing to compare, and we
    *  can't safely block). */
-  devicePixelCount: number | null
+  devicePixelCount?: number | null
   /** True when this Send uploads the IDE's map (overwriting the device's single shared
-   *  map) — the only mode this function reconciles. When false/omitted the result is
-   *  always an empty, non-blocking preflight (a pattern push has no preflight, #239). */
+   *  map). Selects the map-push reconciliation; when false/omitted this reconciles a
+   *  pattern push (the dim-match warning below) instead. */
   pushingMap?: boolean
+  /** Pattern push only: the open pattern's coordinate dimensionality. */
+  patternDim?: 1 | 2 | 3
+  /** Pattern push only: the Controller's installed-map dimensionality, or null when it
+   *  can't be read — in which case the dim warning is suppressed (can't prove a
+   *  mismatch, same stance as the map count when the device count is unknown). */
+  mapDim?: 1 | 2 | 3 | null
 }
 
 export interface Preflight {
@@ -62,9 +78,11 @@ export interface Preflight {
  *  ordered warnings to show in the preflight dialog; an empty, non-blocking list means
  *  a clean push (the caller may then skip the dialog entirely). */
 export function describePreflight({
-  localPixelCount,
-  devicePixelCount,
+  localPixelCount = 0,
+  devicePixelCount = null,
   pushingMap = false,
+  patternDim,
+  mapDim = null,
 }: PreflightInput): Preflight {
   const warnings: PreflightWarning[] = []
 
@@ -92,7 +110,19 @@ export function describePreflight({
     return { warnings, blocking, remedyPixelCount }
   }
 
-  // Pattern push: no preflight (#239). A pattern runs on the device's own pixels and
-  // map; the IDE's preview resolution is unrelated, so there is nothing to reconcile.
+  // Pattern push: no count preflight (#239) — a pattern runs on the device's own pixels
+  // and map, so the IDE's preview resolution is unrelated. The one concern is the dim
+  // match: a pattern whose dimensionality differs from the installed map renders against
+  // coordinates that don't line up. Soft (non-blocking) — the device still runs it and
+  // the author may know better — and suppressed when the map dim is unknown.
+  if (patternDim !== undefined && mapDim !== null && mapDim !== patternDim) {
+    warnings.push({
+      kind: 'pattern-dim-mismatch',
+      message: `This pattern is ${patternDim}D but the Controller's map is ${mapDim}D.`,
+      detail:
+        `The device runs the pattern on its own installed map, so the coordinates won't ` +
+        `line up — it will likely render incorrectly until a ${patternDim}D map is installed.`,
+    })
+  }
   return { warnings, blocking: false, remedyPixelCount: null }
 }

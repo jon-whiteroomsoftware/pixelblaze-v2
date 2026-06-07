@@ -48,7 +48,7 @@ const PREVIEW_HINT = (
     items={[
       ['light size', 'on-screen LED size'],
       ['diffusion', 'soften and blend lights'],
-      ['solidity', 'opacity for surface maps'],
+      ['interior opacity', 'opacity for surface maps'],
       ['renderer', 'Fast (native float math) or Precise (hardware-accurate fixed-point)'],
       ['speed', 'playback rate of the preview'],
       ['fps', 'live preview frame rate'],
@@ -296,8 +296,8 @@ function SecondaryBand() {
           />
           {solidEligible && (
             <DeckSlider
-              label="solidity"
-              ariaLabel="Solidity (Transparent ↔ Solid)"
+              label="interior opacity"
+              ariaLabel="Interior opacity (Transparent ↔ Solid)"
               value={solidity}
               min={0}
               max={1}

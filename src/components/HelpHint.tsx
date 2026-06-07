@@ -20,28 +20,44 @@ export function HelpHint({ label, children, width = 320 }: Props) {
   const [rect, setRect] = useState<DOMRect | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cardId = useId()
 
   useEffect(() => () => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
+    if (showTimer.current) clearTimeout(showTimer.current)
   }, [])
 
   const clearHide = () => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
   }
+  const clearShow = () => {
+    if (showTimer.current) clearTimeout(showTimer.current)
+  }
   const show = () => {
     clearHide()
+    clearShow()
     if (btnRef.current) setRect(btnRef.current.getBoundingClientRect())
     setOpen(true)
   }
+  // Hover-intent: only open if the cursor rests on the trigger briefly, so a
+  // mouse sweeping across the busy preview deck doesn't pop the card open.
+  // Focus/click call show() directly and stay instant.
+  const showAfterHoverIntent = () => {
+    clearHide()
+    clearShow()
+    showTimer.current = setTimeout(show, 400)
+  }
   const close = () => {
     clearHide()
+    clearShow()
     setOpen(false)
   }
   // Delayed close for pointer/blur, so the cursor can travel from the trigger
   // into the card (whose onMouseEnter cancels it) without it flickering shut.
   const scheduleHide = () => {
     clearHide()
+    clearShow()
     hideTimer.current = setTimeout(() => setOpen(false), 80)
   }
 
@@ -59,7 +75,7 @@ export function HelpHint({ label, children, width = 320 }: Props) {
         aria-label={label}
         aria-expanded={open}
         aria-describedby={open ? cardId : undefined}
-        onMouseEnter={show}
+        onMouseEnter={showAfterHoverIntent}
         onMouseLeave={scheduleHide}
         onFocus={show}
         onBlur={scheduleHide}

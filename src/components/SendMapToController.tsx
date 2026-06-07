@@ -6,8 +6,11 @@ import { useControllerStore } from '@/store/controllerStore'
 import { useMapStore } from '@/store/mapStore'
 import { describeSendMap } from '@/engine/sendToController'
 import type { PreflightWarning } from '@/engine/preflight'
-import { PushConfirmPopover, pushPopoverButton } from '@/components/PushConfirmPopover'
-import { HelpHint } from '@/components/HelpHint'
+import {
+  PushConfirmPopover,
+  PreflightWarningList,
+  pushPopoverButton,
+} from '@/components/PushConfirmPopover'
 
 const checkbox = 'h-3.5 w-3.5 shrink-0 accent-amber-400'
 
@@ -48,19 +51,7 @@ function MapPushChoices({
 
   return (
     <>
-      <div className="mt-2 space-y-1.5 text-zinc-400">
-        {mismatch && (
-          <p className="flex items-start gap-1">
-            <span>{mismatch.message}</span>
-            {mismatch.detail && (
-              <HelpHint label="Why the pixel count must match" width={260}>
-                <p className="leading-relaxed text-zinc-300">{mismatch.detail}</p>
-              </HelpHint>
-            )}
-          </p>
-        )}
-        {overwrite && <p>{overwrite.message}</p>}
-      </div>
+      <PreflightWarningList warnings={[mismatch, overwrite].filter(Boolean) as PreflightWarning[]} />
 
       {blocking && (
         <fieldset className="mt-3 space-y-1.5">

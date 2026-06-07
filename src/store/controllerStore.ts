@@ -16,7 +16,9 @@ import {
 } from '@/engine/ControllerProvider'
 import { mapDimension, type MapDimension } from '@/engine/sendToController'
 import { describePreflight, type PreflightWarning } from '@/engine/preflight'
+import { recommendedMapRemedy, type RecommendedMapRemedy } from '@/engine/patternMapRemedy'
 import { resolveMapPushPoints } from '@/engine/mapPush'
+import { stockMapSpec } from '@/engine/maps/stockCatalogue'
 import { applyControllerPixelCount } from '@/engine/applyControllerPixelCount'
 import type { ControllerPhase } from '@/engine/controllerPillView'
 import { pushPattern } from '@/engine/pushPattern'
@@ -111,6 +113,12 @@ interface ControllerConnectionState {
    *  current map preflight as **blocking**: the plain "Send anyway" path is withheld and
    *  the dialog offers only the coupled remedy (set pixel count to this, then push). */
   mapPushRemedyCount: number | null
+  /** The recommended-map remedy offered alongside a pattern-push dim-mismatch warning
+   *  (Option A): a demo whose recommended map (of the matching dimension) can be installed
+   *  on the Controller so the device map's dim matches the pattern's. Non-null only while a
+   *  pattern preflight is open AND the open demo carries such a recommendation; null for
+   *  user patterns and demos without one (the dialog then offers a plain "Send anyway"). */
+  patternMapRemedy: RecommendedMapRemedy | null
 
   /** Controllers surfaced by the last discovery sweep (H14, #206), awaiting connect.
    *  Cleared when discovery re-runs. */
@@ -144,7 +152,16 @@ interface ControllerConnectionState {
    *  (#239) — it sends bytecode only and the device runs it on its own pixels + map —
    *  so this pushes straight through (the one-click path). */
   requestPush: () => Promise<void>
-  /** Dismiss the (map-push) preflight dialog without pushing. */
+  /** Acknowledge the pattern preflight dialog and push the pattern WITHOUT the coupled
+   *  map install — the plain "Send anyway" path (the dim warning is soft). */
+  confirmPatternPush: () => Promise<void>
+  /** Acknowledge the pattern preflight and FIRST install the demo's recommended map (set
+   *  the Controller's pixel count to the recommended count, then write the stock map),
+   *  then push the pattern. The coupled remedy offered by the dim-mismatch checkbox
+   *  (Option A). Order matters — count before map, then pattern — mirroring confirmMapPush.
+   *  If the map install fails, the pattern is not pushed (surfaced as a Send-failed). */
+  confirmPatternPushWithMap: () => Promise<void>
+  /** Dismiss the (pattern- or map-push) preflight dialog without pushing. */
   cancelPush: () => void
   /** Run the map-send preflight (#204): reconcile the open map's baked point count
    *  against the Controller's configured pixel count and always surface the map-overwrite
@@ -196,6 +213,7 @@ export const controllerInitialState = {
   lastPushedMap: {} as Record<string, Record<string, string>>,
   preflight: null as PreflightWarning[] | null,
   mapPushRemedyCount: null as number | null,
+  patternMapRemedy: null as RecommendedMapRemedy | null,
   discovered: [] as DiscoveredController[],
   discovering: false,
 }
@@ -225,6 +243,24 @@ function phaseFromStatus(status: ControllerStatus): Partial<ControllerEntry> | n
       // extension-present / no-extension aren't entry states; ignore.
       return null
   }
+}
+
+// Install a stock map by id — the coupled remedy behind the pattern dim-mismatch checkbox
+// (Option A). Mirrors pushActiveMap: re-bake the stock source to the DEVICE's current pixel
+// count (the firmware stores exactly pixelCount entries, and the hardware count — not any
+// preview size — is what the map must match) and write it. The hardware count is left
+// untouched. Throws on an unknown id, an unreadable device count, or any transport failure
+// so the caller can surface it.
+async function installStockMap(remedy: RecommendedMapRemedy): Promise<void> {
+  const spec = stockMapSpec(remedy.mapId)
+  if (!spec) throw new Error(`Unknown map: ${remedy.mapId}`)
+  const provider = getControllerProvider()
+  const config = await provider.getConfig().catch(() => null)
+  const points = resolveMapPushPoints(spec.source, [], config?.pixelCount ?? null)
+  if (points.length === 0) {
+    throw new Error("Couldn't read the Controller's pixel count to size the map")
+  }
+  await provider.setPixelMap(points)
 }
 
 export const useControllerStore = create<ControllerConnectionState>()(
@@ -404,14 +440,74 @@ export const useControllerStore = create<ControllerConnectionState>()(
         clearPushResult: () => set({ pushResult: null }),
 
         requestPush: async () => {
-          // A pattern push has no preflight (#239): it sends bytecode only and the
-          // device runs it on its own pixels + map, so there is nothing preview-side to
-          // reconcile. Push straight through (the guard inside pushActivePattern makes a
-          // stray call an inert no-op).
+          // A pattern push has no *count* preflight (#239) — it sends bytecode only and
+          // the device runs it on its own pixels + map. The one concern is the dim match:
+          // a pattern whose dimensionality differs from the installed map renders against
+          // coordinates that don't line up. That's a soft warning, so reconcile and, only
+          // when it fires, open the popover; otherwise push straight through (the valued
+          // one-click path). The guard inside pushActivePattern makes a stray call inert.
+          const activeIp = get().activeIp
+          const active = activeIp ? get().controllers[activeIp] : undefined
+          const patternDim = useEditorStore.getState().nativeDim
+          const { warnings } = describePreflight({
+            pushingMap: false,
+            patternDim,
+            mapDim: active?.mapDim ?? null,
+          })
+          if (warnings.length > 0) {
+            // A dim mismatch is never blocking. It may carry a coupled remedy (Option A):
+            // a demo whose recommended map (of the matching dim) can be installed to fix
+            // the mismatch. Absent for user patterns and demos without a recommendation.
+            const demoName = usePatternStore.getState().activeDemoName
+            set({
+              preflight: warnings,
+              mapPushRemedyCount: null,
+              patternMapRemedy: recommendedMapRemedy(demoName, patternDim),
+            })
+            return
+          }
           await get().pushActivePattern()
         },
 
-        cancelPush: () => set({ preflight: null, mapPushRemedyCount: null }),
+        confirmPatternPush: async () => {
+          set({ preflight: null, mapPushRemedyCount: null, patternMapRemedy: null })
+          await get().pushActivePattern()
+        },
+
+        confirmPatternPushWithMap: async () => {
+          const remedy = get().patternMapRemedy
+          const controllerId = get().activeIp
+          set({ preflight: null, mapPushRemedyCount: null, patternMapRemedy: null })
+          // No remedy to apply (shouldn't happen via the checkbox) — plain push.
+          if (!remedy) {
+            await get().pushActivePattern()
+            return
+          }
+          // Install the recommended map first (count, then map). A failure aborts before
+          // the pattern push — surfaced through the same pushResult the button reads.
+          set({ pushing: true, pushResult: null })
+          try {
+            await installStockMap(remedy)
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            set({ pushing: false, pushResult: { ok: false, message } })
+            return
+          }
+          // Reflect the now-installed map's dimensionality so the warning doesn't recur on
+          // the next push of this (or another matching-dim) pattern.
+          if (controllerId) {
+            set((s) => {
+              const entry = s.controllers[controllerId]
+              return entry
+                ? { controllers: { ...s.controllers, [controllerId]: { ...entry, mapDim: remedy.mapDim } } }
+                : {}
+            })
+          }
+          await get().pushActivePattern()
+        },
+
+        cancelPush: () =>
+          set({ preflight: null, mapPushRemedyCount: null, patternMapRemedy: null }),
 
         requestMapPush: async () => {
           const controllerId = get().activeIp

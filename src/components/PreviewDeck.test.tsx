@@ -77,11 +77,11 @@ describe('PreviewDeck (smoke)', () => {
 
   it('shows the solidity slider only when the embedding is solid-eligible', () => {
     const { rerender } = render(<PreviewDeck />)
-    expect(screen.queryByRole('slider', { name: /Solidity/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('slider', { name: /Interior opacity/ })).not.toBeInTheDocument()
 
     useEditorStore.setState({ solidEligible: true })
     rerender(<PreviewDeck />)
-    expect(screen.getByRole('slider', { name: /Solidity/ })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: /Interior opacity/ })).toBeInTheDocument()
   })
 
   it('hides the reset-preview icon until the active item carries overrides', () => {

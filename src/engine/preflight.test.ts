@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { describePreflight } from './preflight'
 
 describe('describePreflight', () => {
-  it('a pattern push has no preflight, whatever the counts (#239)', () => {
+  it('a pattern push reconciles no count, whatever the counts (#239)', () => {
     // The IDE preview resolution is unrelated to what the hardware drives, so a
     // pattern push never reconciles a count — it always pushes straight through.
     for (const local of [256, 100, 4096]) {
@@ -11,6 +11,28 @@ describe('describePreflight', () => {
       expect(pf.blocking).toBe(false)
       expect(pf.remedyPixelCount).toBeNull()
     }
+  })
+
+  // ── pattern-push dim match is a soft, non-blocking warning ──────────────────
+  it('warns (non-blocking) when the pattern dim differs from the installed map dim', () => {
+    const pf = describePreflight({ patternDim: 3, mapDim: 2 })
+    expect(pf.blocking).toBe(false)
+    expect(pf.remedyPixelCount).toBeNull()
+    expect(pf.warnings.map((w) => w.kind)).toEqual(['pattern-dim-mismatch'])
+    const [w] = pf.warnings
+    expect(w.message).toContain('3D')
+    expect(w.message).toContain('2D')
+    expect(w.detail).toContain("won't line up")
+  })
+
+  it('does not warn when the pattern dim matches the map dim', () => {
+    const pf = describePreflight({ patternDim: 2, mapDim: 2 })
+    expect(pf.warnings).toEqual([])
+  })
+
+  it('suppresses the dim warning when the map dim is unknown (cannot prove a mismatch)', () => {
+    const pf = describePreflight({ patternDim: 3, mapDim: null })
+    expect(pf.warnings).toEqual([])
   })
 
   it('adds a map-overwrite warning only when a map push is opted into', () => {

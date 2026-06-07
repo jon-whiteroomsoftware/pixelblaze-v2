@@ -30,52 +30,30 @@ describe('mapDimension', () => {
 
 describe('describeSendToController', () => {
   it('disables when no Controller is connected, explaining why', () => {
-    const gate = describeSendToController({
-      status: { kind: 'no-extension' },
-      patternDim: 2,
-      mapDim: 2,
-    })
+    const gate = describeSendToController({ status: { kind: 'no-extension' } })
     expect(gate.enabled).toBe(false)
     expect(gate.reason).toMatch(/connect a controller/i)
   })
 
-  it('enables when connected and the dimensions match', () => {
-    expect(describeSendToController({ status: connected, patternDim: 2, mapDim: 2 })).toEqual({
-      enabled: true,
-    })
+  it('enables when connected, compiling, and dirty', () => {
+    expect(describeSendToController({ status: connected })).toEqual({ enabled: true })
   })
 
-  it('disables on a dimensionality mismatch, naming both dimensions', () => {
-    const gate = describeSendToController({ status: connected, patternDim: 2, mapDim: 1 })
-    expect(gate.enabled).toBe(false)
-    expect(gate.reason).toContain('2D')
-    expect(gate.reason).toContain('1D')
-  })
-
-  it('enables when the map dimension is unknown (cannot prove a mismatch)', () => {
-    expect(
-      describeSendToController({ status: connected, patternDim: 3, mapDim: null }).enabled,
-    ).toBe(true)
+  // A pattern/map dimensionality mismatch no longer hard-disables Send — it is a soft,
+  // push-past warning surfaced in the preflight popover (see preflight.test.ts). The gate
+  // here is intentionally dim-agnostic.
+  it('enables regardless of dimensionality (the dim concern moved to preflight)', () => {
+    expect(describeSendToController({ status: connected }).enabled).toBe(true)
   })
 
   it('disables when the pattern does not compile cleanly', () => {
-    const gate = describeSendToController({
-      status: connected,
-      patternDim: 2,
-      mapDim: 2,
-      compileStatus: 'broken',
-    })
+    const gate = describeSendToController({ status: connected, compileStatus: 'broken' })
     expect(gate.enabled).toBe(false)
     expect(gate.reason).toMatch(/errors/i)
   })
 
   it('disables when the source already matches the last push (nothing to send)', () => {
-    const gate = describeSendToController({
-      status: connected,
-      patternDim: 2,
-      mapDim: 2,
-      alreadyPushed: true,
-    })
+    const gate = describeSendToController({ status: connected, alreadyPushed: true })
     expect(gate.enabled).toBe(false)
     expect(gate.reason).toMatch(/no changes/i)
   })

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Editor } from '@/components/Editor'
 import { CompileStatusBadge } from '@/components/CompileStatusBadge'
@@ -189,6 +190,14 @@ export default function App() {
               <>
             <span className="flex-1 min-w-0 flex items-center gap-1.5">
               <span className="truncate text-zinc-200">{activeFileName}</span>
+              {(activeLibraryName !== null || activeDemoName !== null) && (
+                <Lock
+                  size={13}
+                  strokeWidth={2.25}
+                  className="shrink-0 text-zinc-400"
+                  aria-label="read-only"
+                />
+              )}
               {exportedDims(source).map((d) => (
                 <span
                   key={d}
@@ -198,11 +207,6 @@ export default function App() {
                 </span>
               ))}
               {activePatternId !== null && <CompileStatusBadge />}
-              {(activeLibraryName !== null || activeDemoName !== null) && (
-                <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide uppercase text-zinc-400 border border-zinc-700 leading-none">
-                  read-only
-                </span>
-              )}
             </span>
             {activeDemoName !== null && (
               <Button
@@ -211,7 +215,7 @@ export default function App() {
                 className="text-xs text-zinc-400 bg-zinc-800/70 hover:bg-zinc-700/70 hover:text-zinc-300"
                 onClick={handleForkDemo}
               >
-                Edit
+                Clone
               </Button>
             )}
             {activePatternId !== null && (
