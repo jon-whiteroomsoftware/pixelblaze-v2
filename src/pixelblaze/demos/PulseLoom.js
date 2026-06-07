@@ -31,6 +31,7 @@ var bumpWidth  = 0.07  // half-width of each strike's glow, as a fraction of str
 var paletteHue = 0.04  // base hue of the complementary set; slider spins it round
 var accentOn   = 1     // downbeat full-strip flash
 var accentEnv  = 0     // this frame's accent brightness
+var bumpDenom  = 0.0098 // 2*bumpWidth^2 — frame-constant gaussian denominator
 
 export function sliderTempo(v)   { bps = 0.2 + v * 3.15 }
 export function sliderSwing(v)   { swing = v * 0.4 }
@@ -47,6 +48,7 @@ function applySwing(p, s) {
 
 export function beforeRender(delta) {
   barPhase = mod(barPhase + delta * 0.001 * bps, 1)
+  bumpDenom = 2 * bumpWidth * bumpWidth   // gaussian denominator, frame-constant
 
   var i = 0
   for (i = 0; i < 4; i++) {
@@ -68,7 +70,7 @@ export function render(index) {
   var i = 0
   for (i = 0; i < 4; i++) {
     var d = pos - homePos[i]
-    var bump = exp(-(d * d) / (2 * bumpWidth * bumpWidth))
+    var bump = exp(-(d * d) / bumpDenom)
     var c = env[i] * bump * voiceShade[i]   // darker-shade voices contribute less light
     total += c
     if (c > domWeight) { domWeight = c; domHue = mod(paletteHue + hueOffset[i], 1) }   // strongest voice owns the hue

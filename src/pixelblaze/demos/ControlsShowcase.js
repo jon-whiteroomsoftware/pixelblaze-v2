@@ -15,18 +15,27 @@ export function sliderOrbitDist(v) { orbitDist = v }
 export function toggleStarMode(v) { starMode = v }
 export function hsvPickerColor(h, s, v) { hue = h; saturation = s; brightness = v }
 
-export function render2D(index, x, y) {
+// The orbit geometry (centres, radii, edge falloff) is identical for every
+// pixel in a frame — only the SDF distance to it varies. Lift the 4 trig calls
+// and the orbit math into beforeRender; render2D just samples the field.
+var cx1, cy1, cx2, cy2, orbit, r, falloff
+
+export function beforeRender(delta) {
   var t = time(0.1 * (speed * 2 + 0.1))
   var angle = t * PI * 2
 
-  var orbit = orbitDist * 0.45
-  var r = orbit * 0.55
+  orbit = orbitDist * 0.45
+  r = orbit * 0.55
 
-  var cx1 = 0.5 + cos(angle) * orbit
-  var cy1 = 0.5 + sin(angle) * orbit
-  var cx2 = 0.5 + cos(angle + PI) * orbit
-  var cy2 = 0.5 + sin(angle + PI) * orbit
+  cx1 = 0.5 + cos(angle) * orbit
+  cy1 = 0.5 + sin(angle) * orbit
+  cx2 = 0.5 + cos(angle + PI) * orbit
+  cy2 = 0.5 + sin(angle + PI) * orbit
 
+  falloff = edgeBlur * edgeBlur * 0.3 + 0.005
+}
+
+export function render2D(index, x, y) {
   var d
   if (starMode) {
     var s1 = SDF.star(x, y, cx1, cy1, r, 5, 0.45)
@@ -38,7 +47,6 @@ export function render2D(index, x, y) {
     d = SDF.smoothUnion(c1, c2, orbit * 0.25)
   }
 
-  var falloff = edgeBlur * edgeBlur * 0.3 + 0.005
   var lit = SDF.fillGlow(d, falloff)
   hsv(hue + d * 0.3, saturation, lit * brightness)
 }

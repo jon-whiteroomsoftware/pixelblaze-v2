@@ -20,8 +20,16 @@ export function sliderColorSpread(v) { colorSpread = v }
 
 export var t
 var hueShift = 0
+// Lattice geometry and rainbow width are frame-constant (slider-derived) —
+// computed once per frame, not per pixel.
+var CELL, cellHalf, dotR, ringW, spread
 
 export function beforeRender(delta) {
+  CELL = 0.15 + zoom * 0.25
+  cellHalf = CELL * 0.5
+  dotR = CELL * 0.30
+  ringW = CELL * 0.07
+  spread = 0.5 + colorSpread * 3.5
   var period = 0.3 - speed * 0.22  // smaller period = faster
   t = time(period)
   // Palette cycles on its own steady clock, independent of the spin, so a
@@ -42,17 +50,15 @@ export function beforeRender(delta) {
 
 export function render2D(index, x, y) {
   // x, y arrive already spun and zoomed by the transform stack.
-  var CELL = 0.15 + zoom * 0.25
-
   // Lattice A — solid dots
-  var gx = mod(x, CELL) - CELL * 0.5
-  var gy = mod(y, CELL) - CELL * 0.5
-  var dot = SDF.circle(gx, gy, 0, 0, CELL * 0.30)
+  var gx = mod(x, CELL) - cellHalf
+  var gy = mod(y, CELL) - cellHalf
+  var dot = SDF.circle(gx, gy, 0, 0, dotR)
 
   // Lattice B — half-offset rings, interleaved with the dots
-  var hx = mod(x + CELL * 0.5, CELL) - CELL * 0.5
-  var hy = mod(y + CELL * 0.5, CELL) - CELL * 0.5
-  var rng = SDF.ring(hx, hy, 0, 0, CELL * 0.30, CELL * 0.07)
+  var hx = mod(x + cellHalf, CELL) - cellHalf
+  var hy = mod(y + cellHalf, CELL) - cellHalf
+  var rng = SDF.ring(hx, hy, 0, 0, dotR, ringW)
 
   var field = SDF.smoothUnion(dot, rng, 0.05)
   var lit = SDF.fillGlow(field, 0.045)
@@ -60,7 +66,6 @@ export function render2D(index, x, y) {
   // Rainbow radiates from the centre and rotates over time.
   var dx = x - 0.5, dy = y - 0.5
   var rad = sqrt(dx * dx + dy * dy)
-  var spread = 0.5 + colorSpread * 3.5
   var hue = frac(hueShift + rad * spread + (x + y) * 0.12)
   hsv(hue, 0.9, lit * lit)
 }

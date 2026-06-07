@@ -64,13 +64,15 @@ export var speed = 0.3
 export function sliderSpeed(v) { speed = v }
 
 export var t = 0
+var scroll = 0  // frame-constant palette-parameter offset (t * speed-scaled rate)
 export function beforeRender(delta) {
   t = t + delta * 0.001
+  scroll = t * (0.005 + speed * 0.1)
 }
 
 export function render2D(index, x, y) {
   // p.x scrolls; p.y selects the band. Raw [0,1] coords, no centring.
-  var px = x + t * (0.005 + speed * 0.1)
+  var px = x + scroll
   var py = y
 
   // Band index 0..6 (floor(py*7), clamped — py==1 would land on 7).

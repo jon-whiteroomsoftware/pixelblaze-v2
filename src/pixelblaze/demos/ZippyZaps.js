@@ -27,10 +27,35 @@
 export var iterations = 1
 export function sliderIterations(v) { iterations = v }
 
+// Per-iteration, frame-constant tables (loop-index/time-only — identical for
+// every pixel). Recomputed once per frame in beforeRender, then indexed in the
+// pixel loop, lifting 1 pow + 7 cos per iteration off the per-pixel path. Sized
+// to the iteration ceiling (max index 18); allocated once (arrays can't be
+// freed). Accumulation mirrors the render loop's exact tt/a stepping so the
+// Precise (16.16) checksum stays bit-identical — do NOT swap for a closed form.
+var P = array(19)               // pow(a, i)
+var C0 = array(19), C1 = array(19), C2 = array(19)  // cos-matrix (c3 == c0)
+var N0 = array(19), N1 = array(19), N2 = array(19), N3 = array(19) // 1+cos(k+tt)
+
 // iTime, in seconds (IDE speed control is pre-folded into delta).
 export var t = 0
 export function beforeRender(delta) {
   t = t + delta * 0.001
+
+  var iters = floor(4 + iterations * 15) // 4..19
+  var a = 0.5
+  var tt = t
+  for (var i = 1; i < iters; i = i + 1) {
+    tt = tt + 1   // ++t  (first thing the loop body does)
+    a = a + 0.03  // a += .03
+    P[i] = pow(a, i)
+    var b = i + 0.02 * tt
+    C0[i] = cos(b); C1[i] = cos(b - 11); C2[i] = cos(b - 33)
+    N0[i] = 1 + cos(1 + tt)
+    N1[i] = 1 + cos(2 + tt)
+    N2[i] = 1 + cos(3 + tt)
+    N3[i] = 1 + cos(0 + tt)
+  }
 }
 
 export function render2D(index, x, y) {
@@ -43,7 +68,7 @@ export function render2D(index, x, y) {
   // vec4 z = o = vec4(1,2,3,0); z stays constant, o accumulates.
   var ox = 1, oy = 2, oz = 3, ow = 0
 
-  var a = 0.5
+  var a = 0.5    // still needed for the cheap 0.2*a*px term below
   var tt = t
   var vx = 0, vy = 0 // v, (re)assigned each pass before use
 
@@ -51,16 +76,15 @@ export function render2D(index, x, y) {
     tt = tt + 1   // ++t  (first thing the loop body does)
     a = a + 0.03  // a += .03
 
-    // v = cos(tt - 7*u*pow(a,i)) - 5*u   (componentwise)
-    var p = pow(a, i)
+    // v = cos(tt - 7*u*pow(a,i)) - 5*u   (componentwise); pow(a,i) is P[i].
+    var p = P[i]
     vx = cos(tt - 7 * px * p) - 5 * px
     vy = cos(tt - 7 * py * p) - 5 * py
 
     // u *= mat2(cos(i + .02*tt - z.wxzw*11)).  Phases: (0,11,33,0) offsets, and
     // cos0 == cos3 since both offsets are 0. Row-vector × matrix:
     //   u.x' = u.x*cos0 + u.y*cos1 ;  u.y' = u.x*cos2 + u.y*cos3
-    var b = i + 0.02 * tt
-    var c0 = cos(b), c1 = cos(b - 11), c2 = cos(b - 33), c3 = c0
+    var c0 = C0[i], c1 = C1[i], c2 = C2[i], c3 = c0
     var nux = px * c0 + py * c1
     var nuy = px * c2 + py * c3
     px = nux; py = nuy
@@ -82,10 +106,10 @@ export function render2D(index, x, y) {
     var sx = sin(1.5 * px / denom - 9 * py + tt)
     var sy = sin(1.5 * py / denom - 9 * px + tt)
     var L = scale * hypot(sx, sy)
-    ox = ox + (1 + cos(1 + tt)) / L
-    oy = oy + (1 + cos(2 + tt)) / L
-    oz = oz + (1 + cos(3 + tt)) / L
-    ow = ow + (1 + cos(0 + tt)) / L
+    ox = ox + N0[i] / L
+    oy = oy + N1[i] / L
+    oz = oz + N2[i] / L
+    ow = ow + N3[i] / L
   }
 
   // o = 25.6 / (min(o,13) + 164/o) - dot(u,u)/250   (o ≥ (1,2,3,…) so no div-by-0)

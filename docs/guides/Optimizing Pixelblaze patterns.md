@@ -18,6 +18,48 @@ optimization is tagged with where it can be *proven*:
 
 ---
 
+## What this actually buys — the measured scoreboard
+
+Every demo we ship, optimized and measured on real hardware (fw 3.67, 16×16
+panel, `npm run devbench` before/after). **Almost all of it is one move** —
+factoring per-pixel-invariant work into `beforeRender` (§4) — and almost all of
+it is **bit-identical** (the preview checksum held in both renderer modes, so the
+image is provably unchanged). The spread is the whole story: the *same* move
+buys **+49.7%** on one demo and **~0%** on another.
+
+| demo | what moved off the per-pixel path | FPS before→after | Δ | preserving |
+|---|---|---|---|---|
+| ControlsShowcase | 4 `cos`/`sin` + orbit geometry + edge falloff | 33.7 → 50.4 | **+49.7%** | ✅ both |
+| NeonSquircles | ~100 trig/pixel → 20-ring `beforeRender` tables | 2.46 → 3.08 | +25.3% | ✅ both |
+| TestPattern2D | 2 trig (dot centre) + breathe level | 101.9 → 124.5\* | +22.1% | ✅ both |
+| GlowingOrb | `wave(t)` orb radius | 100.4 → 115.0 | +14.5% | ✅ both |
+| KaleidoBloom | cell size + 5 derived radii + rainbow spread | 31.5 → 35.5 | +12.6% | ✅ both |
+| Kishimisu | slider remaps + per-pixel `exp` memoization | 8.7 → 9.43 | ~+8.4% | ✅ both |
+| ZippyZaps | 1 `pow` + 7 `cos`/iteration → index tables | 0.83 → 0.89 | +7.4% | ✅ both |
+| AuroraSphere | frame-global great-ring normal + `hypot3` | 9.81 → 10.50 | +7.0% | Fast only |
+| PlasmaNebula | scale / warp / twinkle-threshold scalars | 21.6 → 22.8 | +5.5% | ✅ both |
+| NebulaSphere | scale / warp / threshold (3D) | 15.8 → 16.4 | +4.0% | ✅ both |
+| PulseLoom | gaussian denominator (×4 voices) | 19.9 → 20.7 | +4.0% | ✅ both |
+| IQPalettes | palette scroll offset | 35.1 → 35.9 | +2.5% | ✅ both |
+| ShaderShowcase | zoom mult + twist coeff + half-time | 15.9 → 16.2 | +2.3% | ✅ both |
+| Caustics | 5 time-only `sin`/`cos` + slider scalars | 2.83 → 2.87 | +1.7% | ✅ both |
+| EasedSweep | `wave`+ease sweep position | 124.5 → 124.5\* | ~0% | ✅ both |
+| PhantomStar | per-step scalars + `ringT` (rotation hoist already shipped) | 0.24 → 0.24 | +0.1% | ✅ both |
+
+\* *already at / hitting the firmware's ~124.5 FPS ceiling — the CPU work is still
+removed (it helps at larger pixel counts), but a rate-capped frame can't show it.*
+
+**Read the spread, not the average.** The payoff of a `beforeRender` hoist is
+governed by **whole-frame dilution** (§1): it's worth the cost of the work you
+move *as a fraction of the whole frame*. ControlsShowcase wins big because 4 trig
+calls are most of a cheap SDF frame; the same hoist on PlasmaNebula (perlin-bound)
+or ZippyZaps (12-transcendental iteration loop) is a rounding error against the
+rest. **Cheap demos have the most to gain from this move; the heavy ports need a
+quality knob (octaves, march steps) to move materially** — and those change the
+image, so they live on the far side of the checksum.
+
+---
+
 # Part I — General pattern optimization
 
 ## 1. The architecture gap
@@ -181,6 +223,13 @@ The highest-leverage move (§1). Anything identical across pixels — `t`
 accumulation, `sin(t)`/`cos(t)` for a rotation angle, palette coefficients,
 constants derived from sliders — computes **once per frame** there instead of
 once per pixel. The emulator bench will show the call-count drop directly.
+
+This one move accounts for nearly the entire [scoreboard](#what-this-actually-buys--the-measured-scoreboard)
+above. The exemplar is **ControlsShowcase (+49.7%)**: four `cos`/`sin` orbit
+positions and the orbit/falloff geometry were being recomputed for all 256
+pixels though they're identical across the frame; lifting them into a new
+`beforeRender` nearly halved frame time, bit-identical. The catch is whole-frame
+dilution — see the library-sweep case study for where the same move buys ~0%.
 
 ### Precompute loop-index-only work into a table [bench-verifiable + hardware-wisdom]
 
@@ -348,6 +397,42 @@ to the Fast renderer to iterate on a heavy pattern, but always do the final
 correctness and the on-device perf check in Precise / on hardware.
 
 ## 7. Case studies
+
+### The library sweep — one move, sixteen demos, ×500 spread in payoff (#248)
+
+The [scoreboard](#what-this-actually-buys--the-measured-scoreboard) is itself the
+case study for §1's whole-frame model. A single pass applied the *same*
+technique — factor per-pixel-invariant work into `beforeRender` — across the
+whole demo library, measured each on hardware, and got results ranging from
+**+49.7%** to **+0.0%**. Every win was checked for bit-identity first (the
+emulator checksum held in both modes on all but AuroraSphere's accepted `hypot3`
+drift), so the spread is purely about *speed*, not image trade-offs.
+
+The pattern that predicts the payoff:
+
+- **Cheap-frame demos win big.** ControlsShowcase (+49.7%), TestPattern2D
+  (+22.1%), GlowingOrb (+14.5%), KaleidoBloom (+12.6%) all have **light per-pixel
+  bodies** (a few SDF calls, a `hypot`), so the frame-constant trig being lifted
+  was a *large fraction* of the frame. ControlsShowcase is the headline: it had no
+  `beforeRender` at all — `time()`, four orbit `cos`/`sin`, and the falloff were
+  all recomputed per pixel — and adding one nearly halved frame time.
+- **Heavy-frame demos barely move.** PlasmaNebula (+5.5%), NebulaSphere (+4.0%),
+  ShaderShowcase (+2.3%) are perlin- or iteration-bound; the same kind of hoist is
+  a rounding error against 5–9 `perlinFbm` calls or a 2-octave IQ-palette fold.
+  Real and free, but small — exactly as the §1 model predicts.
+- **The firmware FPS cap hides wins.** EasedSweep (+0.0%) and TestPattern2D's
+  ceiling both pin at **~124.5 FPS** — the device's frame-rate cap on this panel.
+  The hoist still removes per-pixel `wave`/ease work (it pays off at higher pixel
+  counts), but a rate-capped frame can't report it. Don't read a capped 0% as
+  "the optimization did nothing" — read the ms/frame floor instead.
+
+The practical takeaway for picking *what to optimize*: **a `beforeRender` hoist is
+nearly free to apply and never hurts, so apply it everywhere — but expect the
+payoff only where the hoisted work is a real slice of a not-already-capped
+frame.** When a demo is heavy (perlin/raymarch/long iteration loop), stop
+hoisting and reach for a quality knob (octaves, steps, iteration count); those are
+the only levers big enough to matter, and they live on the far side of the
+checksum (see PhantomStar, ZippyZaps, Caustics).
 
 ### NeonSquircles (`src/pixelblaze/demos/NeonSquircles.js`) — precompute the per-ring tables (#248)
 

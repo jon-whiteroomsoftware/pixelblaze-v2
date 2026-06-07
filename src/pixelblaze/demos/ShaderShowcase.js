@@ -23,6 +23,9 @@ export function sliderZoom(v)  { zoom = v }
 export var t = 0
 export var breathe = 0   // 0..1, advances on its own steady clock
 export var swirl = 0.5   // eased breathing value, driven from breathe
+// Frame-constant derived values: half-time (swirl base phase), the twist
+// coefficient, and the kaleidoscope zoom — lifted out of the per-pixel path.
+var tHalf, twistC, zoomM
 
 export function beforeRender(delta) {
   t = t + delta * 0.001 * (0.3 + speed * 2)
@@ -31,6 +34,9 @@ export function beforeRender(delta) {
   // triangle() ping-pongs 0→1→0; easeInOut2 softens the turnarounds so the
   // vortex lingers at full twist and at the calm centre.
   swirl = Anim.easeInOut2(triangle(breathe))
+  tHalf = t * 0.5
+  twistC = swirl * 6 - 3   // twist coefficient sweeps -3..3 through 0 (untwisted)
+  zoomM = 1.5 + zoom * 3
 }
 
 export function render2D(index, x, y) {
@@ -40,12 +46,10 @@ export function render2D(index, x, y) {
   var rad = hypot(px, py)
 
   // Swirl: rotate more the further out you go, so space winds into a vortex.
-  // swirl breathes 0..1 → twist coefficient sweeps -3..3 through 0 (untwisted).
-  Shader.rot2(px, py, t * 0.5 + rad * (swirl * 6 - 3))
+  Shader.rot2(px, py, tHalf + rad * twistC)
   px = rx
   py = ry
 
-  var zoomM = 1.5 + zoom * 3
   var accR = 0, accG = 0, accB = 0
 
   // Two-octave kaleidoscope fold tinted by the IQ palette (à la Kishimisu).

@@ -27,15 +27,19 @@ var nebula = [
 ]
 
 export var t
+// Frame-constant scale / warp strength / twinkle threshold (slider-derived) —
+// hoisted out of the per-pixel path.
+var s, w, thresh
 
 export function beforeRender(delta) {
   setPalette(nebula)
   t = time(0.15) * (2 + speed * 8)  // drift the z-slice through noise cells
+  s = 1.5 + zoom * 3       // coordinate scale
+  w = 2 + warp * 4         // warp displacement strength
+  thresh = 0.995 - twinkle * 0.03
 }
 
 export function render2D(index, x, y) {
-  var s = 1.5 + zoom * 3   // coordinate scale
-  var w = 2 + warp * 4     // warp displacement strength
   var px = x * s, py = y * s
 
   // First warp layer
@@ -57,7 +61,6 @@ export function render2D(index, x, y) {
   // frac(sin(dot(..))*43758.5453) trick — those huge constants overflow 16.16
   // and the sin diverges, so that idiom looks fine here but breaks on hardware.
   var hsh = Shader.hash21(floor(x * 80), floor(y * 80))
-  var thresh = 0.995 - twinkle * 0.03
   if (hsh > thresh && density < 0.35) {
     var tw = wave(t * 5 + hsh * 9)
     paint(0.94, max(density, tw * tw))

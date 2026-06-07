@@ -43,6 +43,9 @@ var nebula = [
 // time-wrap discontinuities — and so the drift is a true 3D vector, not a
 // single shared axis.
 export var dx = 0, dy = 0, dz = 0
+// Frame-constant scale / warp strength / twinkle threshold (slider-derived) —
+// hoisted out of the per-pixel path.
+var s, w, thresh
 
 export function beforeRender(delta) {
   setPalette(nebula)
@@ -52,11 +55,12 @@ export function beforeRender(delta) {
   dx += dt * 0.62
   dy += dt * 0.31
   dz += dt * 0.48
+  s = 1.5 + zoom * 3       // coordinate scale
+  w = 2 + warp * 4         // warp displacement strength
+  thresh = 0.995 - twinkle * 0.03
 }
 
 export function render3D(index, x, y, z) {
-  var s = 1.5 + zoom * 3   // coordinate scale
-  var w = 2 + warp * 4     // warp displacement strength
   var px = x * s + dx, py = y * s + dy, pz = z * s + dz
 
   // First warp layer
@@ -80,7 +84,6 @@ export function render3D(index, x, y, z) {
   // frac(sin(dot(..))*43758.5453) trick — those huge constants overflow 16.16
   // and the sin diverges, so that idiom looks fine here but breaks on hardware.
   var hsh = Shader.hash21(floor(x * 80) + floor(z * 53), floor(y * 80))
-  var thresh = 0.995 - twinkle * 0.03
   if (hsh > thresh && density < 0.35) {
     var tw = wave(dx * 5 + hsh * 9)
     paint(0.94, max(density, tw * tw))
