@@ -59,15 +59,16 @@ export function render2D(index, x, y) {
 
   var finalR = 0, finalG = 0, finalB = 0
 
-  for (var i = 0; i < 20; i = i + 1) {
+  for (var i = 0; i < 5; i = i + 1) {
+    var ri = i * 4
     // Apply the precomputed rotation. This mirrors Shader.rot2(px, py, -angle)
     // exactly (rx = x*c - y*s; ry = x*s + y*c) with c=rc[i], s=rs[i].
-    var nx = px * rc[i] - py * rs[i]
-    var ny = px * rs[i] + py * rc[i]
+    var nx = px * rc[ri] - py * rs[ri]
+    var ny = px * rs[ri] + py * rc[ri]
     px = nx
     py = ny
 
-    var ic = i + 1
+    var ic = ri + 1
 
     // Squircle (L4) distance: sqrt(px^4 + py^4) == hypot(px², py²)
     var ux2 = px * px, uy2 = py * py
@@ -76,9 +77,9 @@ export function render2D(index, x, y) {
 
     // Same multiply order as the original ((gv*anim)*color): anim and color are
     // just read from the per-ring tables, so the result is bit-identical.
-    finalR = finalR + gv * animT[i] * colR[i]
-    finalG = finalG + gv * animT[i] * colG[i]
-    finalB = finalB + gv * animT[i] * colB[i]
+    finalR = finalR + gv * animT[ri] * colR[ri] * 2.1
+    finalG = finalG + gv * animT[ri] * colG[ri] * 2.1
+    finalB = finalB + gv * animT[ri] * colB[ri] * 2.1
   }
 
   rgb(finalR, finalG, finalB)

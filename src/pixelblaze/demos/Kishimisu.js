@@ -45,7 +45,7 @@ export var zoom        = 0.333 // → 1.0 + zoom*1.5         (1.5)
 export var ringDensity = 0.333 // → 2 + ringDensity*18     (8)
 export var glow        = 0.167 // → 0.002 + glow*0.048     (≈0.01)
 export var sharpness   = 0.28  // → 0.5 + sharpness*2.5    (1.2)
-export var octaves     = 0.5   // → floor(octaves*6) + 1   (4)
+export var octaves     = 0.34  // → floor(octaves*6) + 1   (3)
 
 export function sliderZoom(v)        { zoom        = v }
 export function sliderRingDensity(v) { ringDensity = v }

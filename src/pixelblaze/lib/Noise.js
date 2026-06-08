@@ -147,6 +147,85 @@ function voronoiDist(x, y) {
   return sqrt(md);
 }
 
+// Cheaper nearest-cell distance using the centre cell plus four cardinal
+// neighbours. Useful for hardware-first patterns where the full 3x3 scan is too
+// expensive and occasional diagonal-cell misses read as organic texture.
+function voronoiDist5(x, y) {
+  var ix = floor(x), iy = floor(y);
+  var cx = ix, cy = iy;
+  var px = cx + _hash2(cx, cy);
+  var py = cy + _hash2(cx + 1237, cy + 4567);
+  var ex = x - px, ey = y - py;
+  var md = ex * ex + ey * ey;
+
+  cx = ix - 1; cy = iy;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  var d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  cx = ix + 1; cy = iy;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  cx = ix; cy = iy - 1;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  cx = ix; cy = iy + 1;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  return sqrt(md);
+}
+
+// Directional 4-cell Voronoi approximation: centre, nearest x-side, nearest
+// y-side, and that diagonal. Faster than voronoiDist5 when a pattern can accept
+// approximate cell boundaries.
+function voronoiDist4(x, y) {
+  var ix = floor(x), iy = floor(y);
+  var sx = (x - ix < 0.5) ? -1 : 1;
+  var sy = (y - iy < 0.5) ? -1 : 1;
+  var cx = ix, cy = iy;
+  var px = cx + _hash2(cx, cy);
+  var py = cy + _hash2(cx + 1237, cy + 4567);
+  var ex = x - px, ey = y - py;
+  var md = ex * ex + ey * ey;
+
+  cx = ix + sx; cy = iy;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  var d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  cx = ix; cy = iy + sy;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  cx = ix + sx; cy = iy + sy;
+  px = cx + _hash2(cx, cy);
+  py = cy + _hash2(cx + 1237, cy + 4567);
+  ex = x - px; ey = y - py;
+  d = ex * ex + ey * ey;
+  if (d < md) md = d;
+
+  return sqrt(md);
+}
+
 // Stable [0,1) float per voronoi cell (use for per-cell colour)
 function voronoiID(x, y) {
   var ix = floor(x), iy = floor(y);

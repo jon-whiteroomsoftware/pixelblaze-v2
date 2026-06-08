@@ -62,13 +62,19 @@ describe('Noise hash fidelity (#92)', () => {
     }
   })
 
-  it('voronoiDist is finite and non-negative under fidelity', () => {
-    const probe = makeProbe('Noise.voronoiDist(x * 6, y * 6)', 'fidelity')
-    for (let yi = 0; yi < 8; yi++) {
-      for (let xi = 0; xi < 8; xi++) {
-        const v = probe(xi / 7, yi / 7)
-        expect(Number.isFinite(v)).toBe(true)
-        expect(v).toBeGreaterThanOrEqual(0)
+  it('voronoi distance helpers are finite and non-negative under fidelity', () => {
+    for (const expr of [
+      'Noise.voronoiDist(x * 6, y * 6)',
+      'Noise.voronoiDist5(x * 6, y * 6)',
+      'Noise.voronoiDist4(x * 6, y * 6)',
+    ]) {
+      const probe = makeProbe(expr, 'fidelity')
+      for (let yi = 0; yi < 8; yi++) {
+        for (let xi = 0; xi < 8; xi++) {
+          const v = probe(xi / 7, yi / 7)
+          expect(Number.isFinite(v)).toBe(true)
+          expect(v).toBeGreaterThanOrEqual(0)
+        }
       }
     }
   })

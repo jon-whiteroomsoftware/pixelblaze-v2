@@ -36,7 +36,9 @@ much more.
 | ControlsShowcase | 4 `cos`/`sin` + orbit geometry + edge falloff | 33.7 → 50.4 | **+49.7%** | ✅ both |
 | PulseLoom | cached 4 per-pixel Gaussian bumps | 21.09 → 29.02 | **+37.6%** | ✅ both |
 | NeonSquircles | ~100 trig/pixel → 20-ring `beforeRender` tables | 2.46 → 3.08 | +25.3% | ✅ both |
+| NeonSquircles | hardware retune: 20 rings → 5 representative rings | 3.08 → 10.73 | **+248%** | drift + visual accepted |
 | ZippyZaps | hardware retune: 18-pass shader loop → 2-pass default, cheaper denominator | 1.10 → 10.35 | **+841%** | drift + visual accepted |
+| Kishimisu | default 4 octaves → 3 octaves | 9.76 → 12.63 | **+29.4%** | drift + visual accepted |
 | ZippyZaps | local fast `tanh` approximation in hot loop | 0.90 → 1.10 | +22.1% | drift-measured |
 | TestPattern2D | 2 trig (dot centre) + breathe level | 101.9 → 124.5\* | +22.1% | ✅ both |
 | GlowingOrb | `wave(t)` orb radius | 100.4 → 115.0 | +14.5% | ✅ both |
@@ -55,6 +57,7 @@ much more.
 | ShaderShowcase | local polynomial glow instead of `pow(..., 1.3)` | 16.21 → 16.72 | +3.2% | drift-measured |
 | IQPalettes | palette scroll offset | 35.1 → 35.9 | +2.5% | ✅ both |
 | ShaderShowcase | zoom mult + twist coeff + half-time | 15.9 → 16.2 | +2.3% | ✅ both |
+| Caustics | hardware retune: one 4-cell Voronoi layer + noise layer + cheaper curves | 2.87 → 8.04 | **+180%** | drift + visual accepted |
 | Caustics | 5 time-only `sin`/`cos` + slider scalars | 2.83 → 2.87 | +1.7% | ✅ both |
 | EasedSweep | `wave`+ease sweep position | 124.5 → 124.5\* | ~0% | ✅ both |
 | PhantomStar | per-step scalars + `ringT` (rotation hoist already shipped) | 0.24 → 0.24 | +0.1% | ✅ both |

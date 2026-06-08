@@ -293,6 +293,8 @@ export const CHEATSHEETS: Record<string, Cheatsheet> = {
         header: 'Voronoi',
         entries: [
           { sig: 'voronoiDist(x, y)', desc: 'distance to nearest cell centre; range ≈0..0.7' },
+          { sig: 'voronoiDist4(x, y)', desc: 'directional 4-cell approximation for hardware-first patterns' },
+          { sig: 'voronoiDist5(x, y)', desc: 'cheaper centre + cardinal-neighbour distance' },
           { sig: 'voronoiID(x, y)', desc: 'stable [0,1) float per cell; use for per-cell colour' },
         ],
       },

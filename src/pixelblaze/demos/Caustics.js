@@ -1,9 +1,9 @@
 // Caustics — shimmering light on a pool floor.
 //
-// Two animated Voronoi layers drift past each other; the interference of their
-// light pools produces the wandering filaments of focused light you see at the
-// bottom of a swimming pool. A slow depth-shimmer crossing the whole pool adds
-// the feeling of sun filtering through moving water.
+// A cheap animated Voronoi layer is crossed with an organic noise layer; the
+// interference of their light pools produces wandering filaments like focused
+// light on the bottom of a swimming pool. A slow depth-shimmer crossing the
+// whole pool adds the feeling of sun filtering through moving water.
 
 // ── Adjustable controls ────────────────────────────────────────────────────
 export var speed = 0.5      // how fast the water moves
@@ -39,35 +39,38 @@ export function beforeRender(delta) {
 }
 
 export function render2D(index, x, y) {
-  // Layer A — slow, large-scale drift
+  // Layer A — slow, large-scale drift. The four-cell helper keeps one real
+  // nearest-cell field while avoiding a full 3x3 Voronoi scan.
   var ax = x * SCALE + offAx
   var ay = y * SCALE + offAy
-  var dA = Noise.voronoiDist(ax, ay)
+  var dA = Noise.voronoiDist4(ax, ay)
 
-  // Layer B — faster, finer, counter-drifting
+  // Layer B — faster, finer, counter-drifting synthetic field. Use coherent
+  // noise instead of a single planar wave so large layouts do not reveal
+  // repetitive diagonal bands.
   var bx = x * SCALE * 1.3 + offBx
   var by = y * SCALE * 1.3 + offBy
-  var dB = Noise.voronoiDist(bx, by)
+  var dB = Noise.noise2D(bx + t * 1.7, by - t * 1.3) * 0.42
 
-  // Sharp focal pools near each layer's cell centres. (pow(v,3) → v*v*v is a
-  // valid strength reduction here, but measured ~0 frame gain on hardware — this
-  // demo is voronoi-bound, so the two pow calls are diluted to noise — and it
-  // costs a Precise drift, so it's not worth it. Left as pow to stay
-  // output-preserving. See the guide's Caustics note.)
-  var cA = pow(1 - clamp(dA * sharp, 0, 1), 3)
-  var cB = pow(1 - clamp(dB * sharp, 0, 1), 3)
+  // Sharp focal pools near each layer's cell centres. The cubic is written out
+  // explicitly so hardware avoids two per-pixel pow() calls.
+  var qA = 1 - clamp(dA * sharp, 0, 1)
+  var qB = 1 - clamp(dB * sharp, 0, 1)
+  var cA = qA * qA * qA
+  var cB = qB * qB * qB
 
   // Veins (where both layers are bright) plus soft overall pooling
   var light = clamp(cA * cB * 2.5 + (cA + cB) * 0.5, 0, 1)
-  light = pow(light, 1.3)
+  // A close, cheap curve for the original pow(light, 1.3).
+  light = light * (0.72 + 0.28 * light)
 
   // Slow depth shimmer sweeping across the pool (sun through water)
-  var depth = 0.6 + 0.4 * wave(x * 0.5 + y * 0.3 + t * 0.5)
+  var depth = 0.6 + 0.4 * triangle(x * 0.5 + y * 0.3 + t * 0.5)
   light = light * depth
 
   // Water: dim tinted base, brightening to near-white at the focal lines,
   // with a faint iridescent hue drift along the veins.
-  var hue = frac(tint - light * 0.08 + 0.04 * wave(t * 0.3 + x))
+  var hue = frac(tint - light * 0.08 + 0.04 * triangle(t * 0.3 + x))
   var sat = clamp(0.9 - light * 1.0, 0.1, 0.9)
   var val = clamp(0.05 + light * 1.15, 0, 1)
   hsv(hue, sat, val)
