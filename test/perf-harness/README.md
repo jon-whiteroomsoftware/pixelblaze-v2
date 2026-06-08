@@ -1,16 +1,17 @@
 # Perf harness
 
-Three complementary tools live here. Keep their questions apart:
+Four complementary tools live here. Keep their questions apart:
 
 | tool | question | source of truth |
 |---|---|---|
 | **emulator bench** (`bench.ts`, #247) | "how many ops did my pattern do?" | the in-repo emulator — no hardware |
+| **visual drift** (`drift.ts`) | "how much did the image change?" | the in-repo emulator — no hardware |
 | **hardware profiler** (`profiler.ts`, #245) | "what does each op cost on the device?" | a physical Pixelblaze on your LAN |
 | **hardware FPS bench** (`devbench.ts`, #248) | "did my pattern get faster on the device?" | a physical Pixelblaze on your LAN |
 
 The emulator bench proves an edit was *output-preserving* (checksum) and counts
-ops; the FPS bench measures the *whole-frame* speedup the edit actually buys on
-hardware — the two halves of the optimization loop.
+ops; the drift tool quantifies intentional visual changes; the FPS bench measures
+the *whole-frame* speedup the edit actually buys on hardware.
 
 ---
 
@@ -52,6 +53,37 @@ tested (`benchCore.test.ts`) and runs in the normal `npm test` gate.
 | `bench.ts` | CLI: parse args, load demo + libs off disk, print time + checksum |
 | `benchCore.ts` | pure bench engine: bundle → render N frames → mean time + checksum |
 | `benchCore.test.ts` | guards checksum determinism & sensitivity |
+
+---
+
+## Visual drift (`npm run drift`)
+
+Compares two pattern sources over the same deterministic emulator frame window
+and reports *how much* the pixels changed. This is the lossy-optimization
+prefilter: use it when an edit intentionally trades a little visual fidelity for
+speed, such as approximating `exp`/`pow`, cutting octaves, lowering raymarch
+steps, or replacing a smooth curve with a cheaper one.
+
+```bash
+npm run drift -- Kishimisu /tmp/Kishimisu.lossy.js
+npm run drift -- /tmp/base.js src/pixelblaze/demos/ZippyZaps.js --mode precise
+npm run drift -- PhantomStar /tmp/PhantomStar.fast.js --frames 8 --grid 16x16
+```
+
+Output includes the baseline/candidate emulator frame time and checksums, then
+8-bit RGB drift metrics:
+
+- `mean` — average absolute channel delta, 0..255.
+- `rmse` — root-mean-square channel delta; more sensitive to larger errors.
+- `p95` / `max` — tail size, useful for spotting localized artifacts.
+- `changed>=N` — fraction of RGB channels whose absolute delta meets the
+  threshold (`--threshold`, default 2).
+
+Treat these as a sorting aid, not a judge. A tiny numeric drift can hit a
+visually important feature, and a large drift can be perfectly acceptable in a
+turbulent or noisy pattern. The intended loop is: generate broad candidates,
+use drift to find the promising ones, eyeball them, then use `devbench` for the
+real hardware FPS number.
 
 ---
 

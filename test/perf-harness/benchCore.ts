@@ -62,6 +62,25 @@ export interface BenchResult {
   grid: GridSpec
 }
 
+export interface DriftMetrics {
+  mode: BenchMode
+  base: BenchResult
+  candidate: BenchResult
+  /** Total RGB channels compared: frames * pixels * 3. */
+  channels: number
+  /** Average absolute 8-bit channel delta, 0..255. */
+  meanAbs: number
+  /** Root-mean-square 8-bit channel delta, 0..255. */
+  rmse: number
+  /** 95th percentile absolute 8-bit channel delta, 0..255. */
+  p95: number
+  /** Largest absolute 8-bit channel delta, 0..255. */
+  max: number
+  /** Fraction of RGB channels whose absolute delta is >= threshold. */
+  changedPct: number
+  threshold: number
+}
+
 const DEFAULT_FRAMES = 30
 const DEFAULT_WARMUP = 3
 const DEFAULT_FRAME_DELTA_MS = 1000 / 60
@@ -130,6 +149,61 @@ export function benchOne(
   mode: BenchMode,
   options: BenchOptions = {},
 ): BenchResult {
+  return renderSample(src, libraries, mode, options).result
+}
+
+export function compareVisualDrift(
+  baseSrc: string,
+  candidateSrc: string,
+  libraries: Record<string, string>,
+  mode: BenchMode,
+  options: BenchOptions & { threshold?: number } = {},
+): DriftMetrics {
+  const base = renderSample(baseSrc, libraries, mode, options)
+  const candidate = renderSample(candidateSrc, libraries, mode, options)
+  if (base.bytes.length !== candidate.bytes.length) {
+    throw new Error(`drift sample size mismatch: ${base.bytes.length} vs ${candidate.bytes.length}`)
+  }
+
+  const threshold = options.threshold ?? 2
+  const diffs = new Uint8Array(base.bytes.length)
+  let sumAbs = 0
+  let sumSq = 0
+  let max = 0
+  let changed = 0
+  for (let i = 0; i < base.bytes.length; i++) {
+    const d = Math.abs(base.bytes[i] - candidate.bytes[i])
+    diffs[i] = d
+    sumAbs += d
+    sumSq += d * d
+    if (d > max) max = d
+    if (d >= threshold) changed++
+  }
+
+  const sorted = Array.from(diffs).sort((a, b) => a - b)
+  const p95 = sorted.length === 0 ? 0 : sorted[Math.ceil(sorted.length * 0.95) - 1]
+  const channels = base.bytes.length
+
+  return {
+    mode,
+    base: base.result,
+    candidate: candidate.result,
+    channels,
+    meanAbs: channels === 0 ? 0 : sumAbs / channels,
+    rmse: channels === 0 ? 0 : Math.sqrt(sumSq / channels),
+    p95,
+    max,
+    changedPct: channels === 0 ? 0 : changed / channels,
+    threshold,
+  }
+}
+
+function renderSample(
+  src: string,
+  libraries: Record<string, string>,
+  mode: BenchMode,
+  options: BenchOptions = {},
+): { result: BenchResult; bytes: Uint8Array } {
   const frames = options.frames ?? DEFAULT_FRAMES
   const warmup = options.warmup ?? DEFAULT_WARMUP
   const frameDelta = options.frameDeltaMs ?? DEFAULT_FRAME_DELTA_MS
@@ -151,6 +225,8 @@ export function benchOne(
   const handle = loadPattern(mode === 'fast' ? code : fxCode, metadata, shim.builtins)
 
   const hash = new Fnv1a()
+  const bytes = new Uint8Array(frames * pixelCount * 3)
+  let offset = 0
   let accumulate = false
   const loop = createRenderLoop({
     handle,
@@ -165,9 +241,13 @@ export function benchOne(
       if (!accumulate) return
       for (let i = 0; i < pixels.length; i++) {
         const [r, g, b] = pixels[i]
-        hash.update(quant(r))
-        hash.update(quant(g))
-        hash.update(quant(b))
+        const qr = quant(r), qg = quant(g), qb = quant(b)
+        hash.update(qr)
+        hash.update(qg)
+        hash.update(qb)
+        bytes[offset++] = qr
+        bytes[offset++] = qg
+        bytes[offset++] = qb
       }
     },
   })
@@ -184,13 +264,16 @@ export function benchOne(
   const elapsed = performance.now() - t0
 
   return {
-    mode,
-    meanFrameMs: elapsed / frames,
-    checksum: hash.digest(),
-    frames,
-    pixelCount,
-    dimension,
-    grid,
+    result: {
+      mode,
+      meanFrameMs: elapsed / frames,
+      checksum: hash.digest(),
+      frames,
+      pixelCount,
+      dimension,
+      grid,
+    },
+    bytes,
   }
 }
 

@@ -2,7 +2,7 @@
 // identical code and moves the moment the visual changes. (The timing numbers
 // are inherently machine-dependent, so they're not asserted — only that they're
 // finite and positive.)
-import { benchOne, benchDemo } from './benchCore'
+import { benchOne, benchDemo, compareVisualDrift } from './benchCore'
 import { LIBRARIES } from '../../src/pixelblaze/libs'
 
 // A tiny self-contained 2D demo — no library deps, animates over the clock.
@@ -25,6 +25,25 @@ describe('benchCore', () => {
     const base = benchOne(SRC, LIBRARIES, 'fast', { frames: 5, warmup: 1 })
     const edited = benchOne(SRC.replace('hsv(x', 'hsv(y'), LIBRARIES, 'fast', { frames: 5, warmup: 1 })
     expect(edited.checksum).not.toBe(base.checksum)
+  })
+
+  it('reports zero visual drift for identical code', () => {
+    const drift = compareVisualDrift(SRC, SRC, LIBRARIES, 'fast', { frames: 5, warmup: 1 })
+    expect(drift.meanAbs).toBe(0)
+    expect(drift.rmse).toBe(0)
+    expect(drift.p95).toBe(0)
+    expect(drift.max).toBe(0)
+    expect(drift.changedPct).toBe(0)
+  })
+
+  it('quantifies bounded visual drift for a small brightness change', () => {
+    const edited = SRC.replace('hsv(x + time(0.1), 1, y)', 'hsv(x + time(0.1), 1, y * 0.9)')
+    const drift = compareVisualDrift(SRC, edited, LIBRARIES, 'fast', { frames: 5, warmup: 1, threshold: 2 })
+    expect(drift.meanAbs).toBeGreaterThan(0)
+    expect(drift.rmse).toBeGreaterThan(drift.meanAbs)
+    expect(drift.max).toBeLessThanOrEqual(26)
+    expect(drift.changedPct).toBeGreaterThan(0)
+    expect(drift.base.checksum).not.toBe(drift.candidate.checksum)
   })
 
   it('reports finite, positive frame times in both modes', () => {
