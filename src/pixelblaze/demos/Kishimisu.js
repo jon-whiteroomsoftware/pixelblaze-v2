@@ -150,7 +150,8 @@ export function render2D(index, x, y) {
 
     d = sin(d * ringDensityM + t) * invRingDensityM
     d = abs(d)
-    d = pow(glowM / d, sharpnessM)
+    d = glowM / d
+    d = d * (0.7 + 0.3 * d)
 
     finalR = finalR + cr * d
     finalG = finalG + cg * d

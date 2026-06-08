@@ -50,6 +50,8 @@ much more.
 | PlasmaNebula | scale / warp / twinkle-threshold scalars | 21.6 → 22.8 | +5.5% | ✅ both |
 | NebulaSphere | scale / warp / threshold (3D) | 15.8 → 16.4 | +4.0% | ✅ both |
 | PulseLoom | gaussian denominator (×4 voices) | 19.9 → 20.7 | +4.0% | ✅ both |
+| Kishimisu | local polynomial glow instead of `pow(..., sharpness)` | 9.39 → 9.76 | +3.9% | drift-measured |
+| ShaderShowcase | local polynomial glow instead of `pow(..., 1.3)` | 16.21 → 16.72 | +3.2% | drift-measured |
 | IQPalettes | palette scroll offset | 35.1 → 35.9 | +2.5% | ✅ both |
 | ShaderShowcase | zoom mult + twist coeff + half-time | 15.9 → 16.2 | +2.3% | ✅ both |
 | Caustics | 5 time-only `sin`/`cos` + slider scalars | 2.83 → 2.87 | +1.7% | ✅ both |
@@ -697,6 +699,19 @@ removes a per-frame `hypot3`, `asin`, divides, and related scalar work while
 keeping both checksums identical. Hardware improved **10.57 → 11.29 FPS (+6.8%)**.
 The cache stays local because it depends on this demo's self-calibrated sphere
 model, not on a reusable library abstraction.
+
+**Approximate `pow` only after pricing the whole frame.** `Kishimisu` and
+`ShaderShowcase` both used `pow` for glow shaping. Replacing the hot call with a
+local polynomial curve (`x * (0.7 + 0.3*x)`) changes the vein/glow shape, so it
+was accepted only after drift, hardware, and human visual review:
+
+| demo | drift summary | hardware |
+|---|---|---|
+| Kishimisu | mean **4.63/255**, p95 **6** | 9.39 → 9.76 FPS, **+3.9%** |
+| ShaderShowcase | mean **8.89/255**, p95 **16** | 16.21 → 16.72 FPS, **+3.2%** |
+
+This stays local rather than becoming a library helper: the curve is an artistic
+substitute for each demo's glow, not a general replacement for `pow`.
 
 Two plausible candidates were rejected: `FireflyChoir` phase trig arrays drifted
 heavily and slowed hardware (**−9.5%**), while a `PhantomStar` 5-sector rotation

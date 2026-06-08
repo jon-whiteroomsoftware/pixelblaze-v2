@@ -66,7 +66,8 @@ export function render2D(index, x, y) {
                      0.0, 0.33, 0.67)
 
     d = abs(sin(d * 8 + t)) * 0.5 + 0.025
-    var glow = pow(0.05 / d, 1.3)
+    var gd = 0.05 / d
+    var glow = gd * (0.7 + 0.3 * gd)
     accR = accR + cr * glow
     accG = accG + cg * glow
     accB = accB + cb * glow
