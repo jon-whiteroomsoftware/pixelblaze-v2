@@ -37,6 +37,14 @@ var P = array(19)               // pow(a, i)
 var C0 = array(19), C1 = array(19), C2 = array(19)  // cos-matrix (c3 == c0)
 var N0 = array(19), N1 = array(19), N2 = array(19), N3 = array(19) // 1+cos(k+tt)
 
+// Local lossy tanh approximation for the hot loop. Keeps Shader.tanh faithful
+// for other ports while avoiding two exp() calls per iteration here.
+function fastTanh(x) {
+  x = clamp(x, -3, 3)
+  var x2 = x * x
+  return x * (27 + x2) / (27 + 9 * x2)
+}
+
 // iTime, in seconds (IDE speed control is pre-folded into delta).
 export var t = 0
 export function beforeRender(delta) {
@@ -92,8 +100,8 @@ export function render2D(index, x, y) {
     // u += tanh(40*dot(u,u)*cos(1e2*u.yx + tt))/2e2 + .2*a*u + cos(...)/3e2
     var du = px * px + py * py
     // u.yx swizzle: x-component reads u.y, y-component reads u.x.
-    var t1x = Shader.tanh(40 * du * cos(100 * py + tt)) / 200
-    var t1y = Shader.tanh(40 * du * cos(100 * px + tt)) / 200
+    var t1x = fastTanh(40 * du * cos(100 * py + tt)) / 200
+    var t1y = fastTanh(40 * du * cos(100 * px + tt)) / 200
     var doo = ox * ox + oy * oy + oz * oz + ow * ow
     var sc = cos(4 / exp(doo / 100) + tt) / 300 // scalar, added to both components
     px = px + t1x + 0.2 * a * px + sc

@@ -11,6 +11,8 @@ optimization is tagged with where it can be *proven*:
 
 - **[bench-verifiable]** — the emulator benchmark can confirm it, because it
   reduces operation or call *count*.
+- **[drift-measured]** — the edit intentionally changes the image, and the
+  emulator drift tool can quantify how much before we spend hardware time.
 - **[hardware-wisdom]** — only the device (or the [cost table](#the-measured-cost-table))
   can confirm it, because it trades one built-in for another of different
   hardware cost. The emulator runs every built-in as a native `Math.*` call, so
@@ -21,21 +23,29 @@ optimization is tagged with where it can be *proven*:
 ## What this actually buys — the measured scoreboard
 
 Every demo we ship, optimized and measured on real hardware (fw 3.67, 16×16
-panel, `npm run devbench` before/after). **Almost all of it is one move** —
-factoring per-pixel-invariant work into `beforeRender` (§4) — and almost all of
-it is **bit-identical** (the preview checksum held in both renderer modes, so the
-image is provably unchanged). The spread is the whole story: the *same* move
-buys **+49.7%** on one demo and **~0%** on another.
+panel, `npm run devbench` before/after). The first sweep was mostly one move —
+factoring per-pixel-invariant work into `beforeRender` (§4) — and mostly
+bit-identical. The lossy sweep then used the drift tool plus human eyeballs to
+accept quality tradeoffs that still read as the same animation. The spread is the
+whole story: the *same kind* of move can buy **+49.7%** on one demo and **~0%**
+on another, while a targeted `exp` or octave-count cut can move a heavy frame
+much more.
 
 | demo | what moved off the per-pixel path | FPS before→after | Δ | preserving |
 |---|---|---|---|---|
 | ControlsShowcase | 4 `cos`/`sin` + orbit geometry + edge falloff | 33.7 → 50.4 | **+49.7%** | ✅ both |
+| PulseLoom | cached 4 per-pixel Gaussian bumps | 21.09 → 29.02 | **+37.6%** | ✅ both |
 | NeonSquircles | ~100 trig/pixel → 20-ring `beforeRender` tables | 2.46 → 3.08 | +25.3% | ✅ both |
+| ZippyZaps | local fast `tanh` approximation in hot loop | 0.90 → 1.10 | +22.1% | drift-measured |
 | TestPattern2D | 2 trig (dot centre) + breathe level | 101.9 → 124.5\* | +22.1% | ✅ both |
 | GlowingOrb | `wave(t)` orb radius | 100.4 → 115.0 | +14.5% | ✅ both |
 | KaleidoBloom | cell size + 5 derived radii + rainbow spread | 31.5 → 35.5 | +12.6% | ✅ both |
+| NebulaSphere | 4→3 octaves in warp fBm samples | 16.52 → 18.35 | +11.1% | drift-measured |
+| PlasmaNebula | 4→3 octaves in warp fBm samples | 23.01 → 25.36 | +10.2% | drift-measured |
 | Kishimisu | slider remaps + per-pixel `exp` memoization | 8.7 → 9.43 | ~+8.4% | ✅ both |
+| SDF/Coord helpers | 2D hand-rolled lengths → `hypot` | 50.92 → 54.60\*\* | +7.2% | Fast + tiny Precise drift |
 | ZippyZaps | 1 `pow` + 7 `cos`/iteration → index tables | 0.83 → 0.89 | +7.4% | ✅ both |
+| AuroraSphere | cached position-only sphere geometry | 10.57 → 11.29 | +6.8% | ✅ both |
 | AuroraSphere | frame-global great-ring normal + `hypot3` | 9.81 → 10.50 | +7.0% | Fast only |
 | PlasmaNebula | scale / warp / twinkle-threshold scalars | 21.6 → 22.8 | +5.5% | ✅ both |
 | NebulaSphere | scale / warp / threshold (3D) | 15.8 → 16.4 | +4.0% | ✅ both |
@@ -49,14 +59,18 @@ buys **+49.7%** on one demo and **~0%** on another.
 \* *already at / hitting the firmware's ~124.5 FPS ceiling — the CPU work is still
 removed (it helps at larger pixel counts), but a rate-capped frame can't show it.*
 
+\*\* *Measured on a flat bundled `ControlsShowcase` artifact to isolate the
+library helper change (`SDF`/`Coord`) from other demo edits.*
+
 **Read the spread, not the average.** The payoff of a `beforeRender` hoist is
 governed by **whole-frame dilution** (§1): it's worth the cost of the work you
 move *as a fraction of the whole frame*. ControlsShowcase wins big because 4 trig
 calls are most of a cheap SDF frame; the same hoist on PlasmaNebula (perlin-bound)
 or ZippyZaps (12-transcendental iteration loop) is a rounding error against the
-rest. **Cheap demos have the most to gain from this move; the heavy ports need a
-quality knob (octaves, march steps) to move materially** — and those change the
-image, so they live on the far side of the checksum.
+rest. **Cheap demos have the most to gain from hoists; heavy ports need a quality
+knob (octaves, approximations, march steps) to move materially** — and those
+change the image, so they live on the far side of the checksum and need drift +
+human visual approval.
 
 ---
 
@@ -98,8 +112,8 @@ fixed-point** arithmetic. Two consequences dominate everything below:
 
 ## 2. How to profile
 
-Three tools, in increasing order of fidelity. Use the cheapest one that can
-answer your question.
+Four tools, each answering a different question. Use the cheapest one that can
+answer the question in front of you.
 
 ### a. Caveman profiling (on the device, no tools)
 
@@ -134,11 +148,30 @@ pure speed change, and a drift tells you a change was *not* output-preserving.
 - **What it cannot tell you:** the relative cost of individual built-ins. In the
   emulator **every** math built-in is a native `Math.*` call in *both* shims (the
   Precise path only quantizes the result), so it measures **operation/call
-  count, not hardware per-function cost** — and even gets the ordering wrong
+count, not hardware per-function cost** — and even gets the ordering wrong
   (`wave()` is *slower* than `sin()` there; on hardware they are equal). This is
   the **[bench-verifiable]** / **[hardware-wisdom]** boundary.
 
-### c. The hardware profiler (`test/perf-harness/`, issue #245)
+### c. The visual drift tool (`npm run drift`, `test/perf-harness/`)
+
+The checksum is deliberately binary: identical or changed. For lossy
+optimizations — the JPEG-shaped trade where a pattern looks almost the same but
+runs much faster — use the drift tool to compare two sources over the same
+deterministic frame window:
+
+```bash
+npm run drift -- /tmp/base.js src/pixelblaze/demos/ZippyZaps.js
+npm run drift -- PhantomStar /tmp/PhantomStar.fast.js --frames 8 --grid 16x16
+```
+
+It reports mean absolute RGB channel error, RMSE, p95, max, and the percentage
+of channels changed above a small threshold. Use those numbers to sort a broad
+pile of candidates, not to veto them: the human eyeball still decides whether
+the result kept the soul of the pattern. The winning lossy optimizations are the
+ones with a big `devbench` gain, an acceptable drift profile, and a visual check
+that still reads as the same cool animation.
+
+### d. The hardware profiler (`test/perf-harness/`, issue #245)
 
 A hand-loaded probe pattern driven over LAN that measures the **real per-built-in
 cost on the device** and writes the [cost table](#the-measured-cost-table). This
@@ -151,7 +184,7 @@ PIXELBLAZE_IP=<ip> PIXELBLAZE_FW=<ver> npm run profile
 See `test/perf-harness/README.md`. It's human-in-the-loop (needs a physical
 device) and excluded from the pre-commit gate.
 
-### d. The hardware FPS bench (`npm run devbench`, `test/perf-harness/`, issue #248)
+### e. The hardware FPS bench (`npm run devbench`, `test/perf-harness/`, issue #248)
 
 The automated end of the loop, and the truest whole-frame number short of
 watching the editor yourself. It bundles a demo (or any `.js` file), compiles it
@@ -616,6 +649,60 @@ fixed. So: **to predict an FPS gain, model the whole frame, not just the hot
 loop** — a 10% cut to a body that's half the frame is a 5% cut to the frame. The
 big-ticket items (the per-octave `cos`/`pow`, the octave count) are where a
 *dramatic* win would have to come from, and none of those are free.
+
+### Lossy sweep (`#266`) — drift plus hardware plus eyeballs
+
+The next pass deliberately crossed the checksum line. The loop was: make a small
+candidate, compare it to a `HEAD` baseline with `npm run drift`, then run
+`devbench` only for visually plausible candidates. Human review accepted all
+kept image changes as still visually faithful to the original animation.
+
+**Biggest clean win: cache position-only `exp`.** `PulseLoom` computed four
+Gaussian bumps per pixel with `exp(-(d*d)/bumpDenom)`. The bump profile is a
+pure function of index and width, so it is cached in four `pixelCount` arrays,
+refreshed lazily when width changes. The image is byte-identical in both modes,
+and hardware jumped **21.09 → 29.02 FPS (+37.6%)**. This is the same principle as
+Kishimisu's `exp(-len0)` memoization, but multiplied by four voices.
+
+**Approximate only where the call site proves it.** `ZippyZaps` was the only demo
+using `Shader.tanh`, and it used it twice per iteration in the hot loop. A local
+rational `fastTanh` avoided two `exp` calls per iteration without changing the
+faithful shared `Shader.tanh` helper. Drift was small (Fast mean **0.29/255**,
+p95 **1**; Precise mean **0.31/255**, p95 **1**) and hardware improved
+**0.90 → 1.10 FPS (+22.1%)**. Keep this local until a second port wants the same
+trade; then add an explicitly lossy `Shader.fastTanh`.
+
+**Noise-bound demos need fewer octaves, not more hoists.** `PlasmaNebula` and
+`NebulaSphere` were dominated by many `perlinFbm` samples. Reducing the first and
+second warp layers from 4 to 3 octaves kept the final density sample unchanged,
+preserving the nebula structure while trimming the expensive setup field. Drift
+was moderate but visually acceptable in turbulent/noisy motion:
+
+| demo | drift summary | hardware |
+|---|---|---|
+| PlasmaNebula | mean **5.44/255**, p95 **20** | 23.01 → 25.36 FPS, **+10.2%** |
+| NebulaSphere | mean **4.11/255**, p95 **14** | 16.52 → 18.35 FPS, **+11.1%** |
+
+**Hardware-wisdom can belong in libraries.** `SDF` and `Coord` used several
+hand-rolled `sqrt(dx*dx + dy*dy)` 2D lengths. The cost table says `hypot(x,y)` is
+roughly half the device cost, and a flat bundled `ControlsShowcase` artifact
+confirmed the library-level win: Fast checksum identical, Precise tiny drift
+(mean **0.01/255**, max **2**), hardware **50.92 → 54.60 FPS (+7.2%)**. This one
+belongs in the library because it improves every SDF/Coord caller without
+changing the public helper contract.
+
+**Position geometry caches are pattern-owned.** `AuroraSphere` now lazily caches
+`latN` and normalized sphere coordinates per index after map calibration. That
+removes a per-frame `hypot3`, `asin`, divides, and related scalar work while
+keeping both checksums identical. Hardware improved **10.57 → 11.29 FPS (+6.8%)**.
+The cache stays local because it depends on this demo's self-calibrated sphere
+model, not on a reusable library abstraction.
+
+Two plausible candidates were rejected: `FireflyChoir` phase trig arrays drifted
+heavily and slowed hardware (**−9.5%**), while a `PhantomStar` 5-sector rotation
+table was checksum-identical but measured **+0.0%** on the long hardware window.
+The lesson is useful: table reads and extra arrays are not automatically wins on
+Pixelblaze; measure them on hardware before keeping them.
 
 ### PhantomStar (`src/pixelblaze/demos/PhantomStar.js`) — when hoisting runs out of road (#248)
 

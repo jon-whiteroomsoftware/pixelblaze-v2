@@ -43,12 +43,12 @@ export function render2D(index, x, y) {
   var px = x * s, py = y * s
 
   // First warp layer
-  var q1 = perlinFbm(px,       py,       t, 2, 0.5, 4)
-  var q2 = perlinFbm(px + 5.2, py + 1.3, t, 2, 0.5, 4)
+  var q1 = perlinFbm(px,       py,       t, 2, 0.5, 3)
+  var q2 = perlinFbm(px + 5.2, py + 1.3, t, 2, 0.5, 3)
 
   // Second warp, displaced by the first
-  var r1 = perlinFbm(px + w * q1,       py + w * q2,       t, 2, 0.5, 4)
-  var r2 = perlinFbm(px + w * q1 + 1.7, py + w * q2 + 9.2, t, 2, 0.5, 4)
+  var r1 = perlinFbm(px + w * q1,       py + w * q2,       t, 2, 0.5, 3)
+  var r2 = perlinFbm(px + w * q1 + 1.7, py + w * q2 + 9.2, t, 2, 0.5, 3)
 
   // Final density field, displaced by the second
   var f = perlinFbm(px + w * r1, py + w * r2, t + 10, 2, 0.5, 3)

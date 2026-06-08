@@ -64,14 +64,14 @@ export function render3D(index, x, y, z) {
   var px = x * s + dx, py = y * s + dy, pz = z * s + dz
 
   // First warp layer
-  var q1 = perlinFbm(px,       py,       pz,       2, 0.5, 4)
-  var q2 = perlinFbm(px + 5.2, py + 1.3, pz + 2.8, 2, 0.5, 4)
-  var q3 = perlinFbm(px + 3.1, py + 8.7, pz + 4.4, 2, 0.5, 4)
+  var q1 = perlinFbm(px,       py,       pz,       2, 0.5, 3)
+  var q2 = perlinFbm(px + 5.2, py + 1.3, pz + 2.8, 2, 0.5, 3)
+  var q3 = perlinFbm(px + 3.1, py + 8.7, pz + 4.4, 2, 0.5, 3)
 
   // Second warp, displaced by the first
-  var r1 = perlinFbm(px + w * q1,       py + w * q2,       pz + w * q3,       2, 0.5, 4)
-  var r2 = perlinFbm(px + w * q1 + 1.7, py + w * q2 + 9.2, pz + w * q3 + 6.5, 2, 0.5, 4)
-  var r3 = perlinFbm(px + w * q1 + 4.3, py + w * q2 + 2.1, pz + w * q3 + 7.9, 2, 0.5, 4)
+  var r1 = perlinFbm(px + w * q1,       py + w * q2,       pz + w * q3,       2, 0.5, 3)
+  var r2 = perlinFbm(px + w * q1 + 1.7, py + w * q2 + 9.2, pz + w * q3 + 6.5, 2, 0.5, 3)
+  var r3 = perlinFbm(px + w * q1 + 4.3, py + w * q2 + 2.1, pz + w * q3 + 7.9, 2, 0.5, 3)
 
   // Final density field, displaced by the second
   var f = perlinFbm(px + w * r1, py + w * r2, pz + w * r3, 2, 0.5, 3)

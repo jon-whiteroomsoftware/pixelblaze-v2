@@ -1,7 +1,7 @@
 // Coord — coordinate systems, transforms, and spatial utilities
 //
 // All functions are pure scalar — no arrays, no objects.
-// Assumes: sin, cos, atan2, sqrt, abs, floor, round, PI, clamp
+// Assumes: sin, cos, atan2, hypot, abs, floor, round, PI, clamp
 
 // ─── Polar ───────────────────────────────────────────────────────────────────
 
@@ -18,13 +18,13 @@ function angleFrom(x, y, cx, cy) {
 // Radius from grid centre, normalised so the unit-circle edge ≈ 1
 function polarRadius(x, y) {
   var dx = x - 0.5, dy = y - 0.5;
-  return sqrt(dx * dx + dy * dy) * 2;
+  return hypot(dx, dy) * 2;
 }
 
 // Radius from arbitrary centre, unnormalised
 function radiusFrom(x, y, cx, cy) {
   var dx = x - cx, dy = y - cy;
-  return sqrt(dx * dx + dy * dy);
+  return hypot(dx, dy);
 }
 
 // ─── Rotation ────────────────────────────────────────────────────────────────

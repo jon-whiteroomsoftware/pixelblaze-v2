@@ -3,14 +3,14 @@
 // Convention: negative = inside shape, positive = outside, 0 = on edge.
 // Coordinates are typically in the 0..1 grid used by render2D.
 //
-// Assumes: sin, cos, atan2, sqrt, abs, floor, round, min, max, clamp, PI
+// Assumes: sin, cos, atan2, sqrt, hypot, abs, floor, round, min, max, clamp, PI
 
 // ─── Primitive shapes ────────────────────────────────────────────────────────
 
 // Circle at (cx, cy) with radius r
 function circle(px, py, cx, cy, r) {
   var dx = px - cx, dy = py - cy;
-  return sqrt(dx * dx + dy * dy) - r;
+  return hypot(dx, dy) - r;
 }
 
 // Axis-aligned rectangle (hw = half-width, hh = half-height)
@@ -18,7 +18,7 @@ function rect(px, py, cx, cy, hw, hh) {
   var dx = abs(px - cx) - hw;
   var dy = abs(py - cy) - hh;
   var ox = max(dx, 0), oy = max(dy, 0);
-  return sqrt(ox * ox + oy * oy) + min(max(dx, dy), 0);
+  return hypot(ox, oy) + min(max(dx, dy), 0);
 }
 
 // Square; half is half-side length
@@ -30,7 +30,7 @@ function square(px, py, cx, cy, half) {
 function polygon(px, py, cx, cy, r, n) {
   var dx = px - cx, dy = py - cy;
   var angle   = atan2(dy, dx);
-  var dist    = sqrt(dx * dx + dy * dy);
+  var dist    = hypot(dx, dy);
   var a       = (PI * 2) / n;
   var nearest = round(angle / a) * a;
   return dist * cos(angle - nearest) - r * cos(PI / n);
@@ -46,27 +46,27 @@ function segment(px, py, ax, ay, bx, by) {
   var dx = bx - ax, dy = by - ay;
   var t  = clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy), 0, 1);
   var ex = px - (ax + t * dx), ey = py - (ay + t * dy);
-  return sqrt(ex * ex + ey * ey);
+  return hypot(ex, ey);
 }
 
 // Signed distance to infinite line through (ax,ay)→(bx,by); left side is negative
 function line(px, py, ax, ay, bx, by) {
   var dx = bx - ax, dy = by - ay;
-  var len = sqrt(dx * dx + dy * dy);
+  var len = hypot(dx, dy);
   return ((px - ax) * dy - (py - ay) * dx) / len;
 }
 
 // Hollow circle with given thickness
 function ring(px, py, cx, cy, r, thickness) {
   var dx = px - cx, dy = py - cy;
-  return abs(sqrt(dx * dx + dy * dy) - r) - thickness * 0.5;
+  return abs(hypot(dx, dy) - r) - thickness * 0.5;
 }
 
 // n-pointed star; ratio = inner/outer radius (try 0.4)
 function star(px, py, cx, cy, r, n, ratio) {
   var dx    = px - cx, dy = py - cy;
   var angle = atan2(dy, dx);
-  var dist  = sqrt(dx * dx + dy * dy);
+  var dist  = hypot(dx, dy);
   var step  = PI / n;
   var a = ((angle % (step * 2)) + step * 2) % (step * 2);
   if (a > step) a = step * 2 - a;
@@ -78,7 +78,7 @@ function star(px, py, cx, cy, r, n, ratio) {
 // Pie / sector — wedge with half-angle ha (radians)
 function pie(px, py, cx, cy, r, ha) {
   var dx = px - cx, dy = py - cy;
-  var dist  = sqrt(dx * dx + dy * dy);
+  var dist  = hypot(dx, dy);
   var angle = abs(atan2(dy, dx));
   var c = cos(ha), s = sin(ha);
   var wx = dx * c + dy * s;
@@ -104,8 +104,8 @@ function cross(px, py, cx, cy, size, thickness) {
   var o1x = max(d1x, 0), o1y = max(d1y, 0);
   var o2x = max(d2x, 0), o2y = max(d2y, 0);
   return min(
-    sqrt(o1x * o1x + o1y * o1y) - h1,
-    sqrt(o2x * o2x + o2y * o2y) - h2
+    hypot(o1x, o1y) - h1,
+    hypot(o2x, o2y) - h2
   );
 }
 

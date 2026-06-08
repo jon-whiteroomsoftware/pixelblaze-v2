@@ -67,6 +67,11 @@ var radius           // mean distance from center
 // Accumulators for the two mapPixels passes (centroid, then mean radius).
 var _sx, _sy, _sz, _sr, _n
 
+// Position-only geometry cache. Arrays are permanent on Pixelblaze, so this is
+// meant for bounded demo panels; a pixel-count change allocates a fresh set.
+var geomCount = 0
+var geomReady, latNCache, pxCache, pyCache, pzCache
+
 function _accumCenter(index, x, y, z) {
   _sx += x; _sy += y; _sz += z; _n += 1
 }
@@ -85,6 +90,18 @@ function calibrate() {
   radius = _sr / _n
   if (radius <= 0) radius = 1
   calibrated = 1
+}
+
+function ensureGeometryCache() {
+  if (pixelCount <= 0) return
+  if (geomCount != pixelCount) {
+    geomReady = array(pixelCount)
+    latNCache = array(pixelCount)
+    pxCache = array(pixelCount)
+    pyCache = array(pixelCount)
+    pzCache = array(pixelCount)
+    geomCount = pixelCount
+  }
 }
 
 // ── Animation phases (signed/zero-capable, so they accumulate, not time()) ───
@@ -144,25 +161,33 @@ export function beforeRender(delta) {
 
 export function render3D(index, x, y, z) {
   if (!calibrated) { rgb(0, 0, 0); return }
+  ensureGeometryCache()
+  var ix = floor(index)
 
   // Recover the surface coordinates from the bare position: project onto the
   // unit sphere about the calibrated center, then read latitude (pole = y) and
   // longitude. This is the surface equation, independent of how the map laid
   // its points out.
-  var px = (x - cx) / radius
-  var py = (y - cy) / radius
-  var pz = (z - cz) / radius
-  var len = hypot3(px, py, pz)
-  if (len > 0) { px /= len; py /= len; pz /= len }
+  if (!geomReady[ix]) {
+    var cpx = (x - cx) / radius
+    var cpy = (y - cy) / radius
+    var cpz = (z - cz) / radius
+    var len = hypot3(cpx, cpy, cpz)
+    if (len > 0) { cpx /= len; cpy /= len; cpz /= len }
 
-  // Bands stack along a pole axis tilted 45° from vertical (in the y-z plane),
-  // so the rings march on a diagonal rather than straight up the viewport — more
-  // interesting against the preview's slow default spin. `lat` is the signed
-  // angle from that tilted equator; everything downstream is unchanged.
-  var BAND_AY = 0.70710678, BAND_AZ = 0.70710678  // unit axis at 45°, x = 0
-  var proj = py * BAND_AY + pz * BAND_AZ
-  var lat = asin(clamp(proj, -1, 1))   // -PI/2..PI/2 about the tilted axis
-  var latN = lat / PI + 0.5            // 0..1, one tilted pole -> the other
+    // Bands stack along a pole axis tilted 45° from vertical (in the y-z plane),
+    // so the rings march on a diagonal rather than straight up the viewport — more
+    // interesting against the preview's slow default spin. `lat` is the signed
+    // angle from that tilted equator; everything downstream is unchanged.
+    var BAND_AY = 0.70710678, BAND_AZ = 0.70710678  // unit axis at 45°, x = 0
+    var proj = cpy * BAND_AY + cpz * BAND_AZ
+    var lat = asin(clamp(proj, -1, 1))   // -PI/2..PI/2 about the tilted axis
+    latNCache[ix] = lat / PI + 0.5       // 0..1, one tilted pole -> the other
+    pxCache[ix] = cpx; pyCache[ix] = cpy; pzCache[ix] = cpz
+    geomReady[ix] = 1
+  }
+  var px = pxCache[ix], py = pyCache[ix], pz = pzCache[ix]
+  var latN = latNCache[ix]
 
   // Pulsing latitude rings: sharpened sinusoidal bands marching along latitude,
   // breathing in intensity over time.

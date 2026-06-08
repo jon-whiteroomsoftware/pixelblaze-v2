@@ -33,6 +33,13 @@ var accentOn   = 1     // downbeat full-strip flash
 var accentEnv  = 0     // this frame's accent brightness
 var bumpDenom  = 0.0098 // 2*bumpWidth^2 — frame-constant gaussian denominator
 
+// Position-only gaussian profiles. Arrays cannot be freed on Pixelblaze, so we
+// allocate on pixel-count changes only and lazily refresh entries when width changes.
+var bumpCacheCount = 0
+var bumpVersion = 1
+var cachedBumpDenom = -1
+var bumpReady, bump0, bump1, bump2, bump3
+
 export function sliderTempo(v)   { bps = 0.2 + v * 3.15 }
 export function sliderSwing(v)   { swing = v * 0.4 }
 export function sliderWidth(v)   { bumpWidth = 0.005 + v * 0.11 }
@@ -46,9 +53,25 @@ function applySwing(p, s) {
   return 0.5 + (p - pivot) / (1 - pivot) * 0.5
 }
 
+function ensureBumpCache() {
+  if (pixelCount <= 0) return
+  if (bumpCacheCount != pixelCount) {
+    bumpReady = array(pixelCount)
+    bump0 = array(pixelCount)
+    bump1 = array(pixelCount)
+    bump2 = array(pixelCount)
+    bump3 = array(pixelCount)
+    bumpCacheCount = pixelCount
+  }
+}
+
 export function beforeRender(delta) {
   barPhase = mod(barPhase + delta * 0.001 * bps, 1)
   bumpDenom = 2 * bumpWidth * bumpWidth   // gaussian denominator, frame-constant
+  if (bumpDenom != cachedBumpDenom) {
+    bumpVersion += 1
+    cachedBumpDenom = bumpDenom
+  }
 
   var i = 0
   for (i = 0; i < 4; i++) {
@@ -62,15 +85,28 @@ export function beforeRender(delta) {
 }
 
 export function render(index) {
+  ensureBumpCache()
+  var ix = floor(index)
   var pos = index / (pixelCount - 1)
+
+  if (bumpReady[ix] != bumpVersion) {
+    var d0 = pos - homePos[0]
+    var d1 = pos - homePos[1]
+    var d2 = pos - homePos[2]
+    var d3 = pos - homePos[3]
+    bump0[ix] = exp(-(d0 * d0) / bumpDenom)
+    bump1[ix] = exp(-(d1 * d1) / bumpDenom)
+    bump2[ix] = exp(-(d2 * d2) / bumpDenom)
+    bump3[ix] = exp(-(d3 * d3) / bumpDenom)
+    bumpReady[ix] = bumpVersion
+  }
 
   var total = 0
   var domHue = 0
   var domWeight = 0
   var i = 0
   for (i = 0; i < 4; i++) {
-    var d = pos - homePos[i]
-    var bump = exp(-(d * d) / bumpDenom)
+    var bump = i == 0 ? bump0[ix] : (i == 1 ? bump1[ix] : (i == 2 ? bump2[ix] : bump3[ix]))
     var c = env[i] * bump * voiceShade[i]   // darker-shade voices contribute less light
     total += c
     if (c > domWeight) { domWeight = c; domHue = mod(paletteHue + hueOffset[i], 1) }   // strongest voice owns the hue
