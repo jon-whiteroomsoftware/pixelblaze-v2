@@ -27,10 +27,14 @@ export const DEMOS: Record<string, string> = Object.fromEntries(
 export const RECOMMENDED_SETTINGS: Record<string, Partial<Settings>> = {
   AuroraSphere: { mapId: 'seed-sphere-3d', pixelCount: 4096, solidity: 1 },
   NebulaSphere: { mapId: 'seed-sphere-3d', pixelCount: 8192, solidity: 1 },
+  CorePulse3D: { mapId: 'seed-sphere-3d', pixelCount: 4096, solidity: 1 },
+  CrystalLattice3D: { mapId: 'seed-cube-3d', pixelCount: 4096, solidity: 1 },
+  GyroidGlow3D: { mapId: 'seed-cube-3d', pixelCount: 4096, solidity: 1 },
   // 1D "Living" demos: a ring closes the polyrhythm into a clock face and the
   // firefly coupling loop into a circle; a denser strip gives both room to breathe.
   PulseLoom: { shapeId: 'ring', pixelCount: 160, diffusion: 0.6 },
   FireflyChoir: { shapeId: 'ring', pixelCount: 200, diffusion: 0.55 },
+  Trainyard: { shapeId: 'strip', pixelCount: 180, diffusion: 0.35 },
 }
 
 // The recommended settings for a demo (cascade layer 2), or an empty object for a

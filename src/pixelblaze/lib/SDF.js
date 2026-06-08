@@ -49,6 +49,17 @@ function segment(px, py, ax, ay, bx, by) {
   return hypot(ex, ey);
 }
 
+// Capsule / thick line segment with radius r
+function capsule(px, py, ax, ay, bx, by, r) {
+  return segment(px, py, ax, ay, bx, by) - r;
+}
+
+// Approximate ellipse SDF; rx/ry are radii
+function ellipse(px, py, cx, cy, rx, ry) {
+  var dx = (px - cx) / rx, dy = (py - cy) / ry;
+  return (hypot(dx, dy) - 1) * min(rx, ry);
+}
+
 // Signed distance to infinite line through (ax,ay)→(bx,by); left side is negative
 function line(px, py, ax, ay, bx, by) {
   var dx = bx - ax, dy = by - ay;

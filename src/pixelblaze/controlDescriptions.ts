@@ -33,6 +33,18 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     toggleStarMode: 'Switch the orbiting shapes between circles and stars.',
     hsvPickerColor: 'Base colour of the shapes.',
   },
+  CorePulse3D: {
+    sliderSpeed: 'How fast the energy shells expand from the core.',
+    sliderShellCount: 'How many concentric pulse shells fill the volume.',
+    sliderCoreSize: 'Size of the central glowing core.',
+    sliderHue: 'Base colour of the pulse.',
+  },
+  CrystalLattice3D: {
+    sliderSpeed: 'How quickly the crystal nodes pulse.',
+    sliderSpacing: 'Density of the repeated lattice cells.',
+    sliderNodeSize: 'Size of the glowing lattice nodes and rods.',
+    sliderHue: 'Base colour of the crystal.',
+  },
   FireflyChoir: {
     sliderCoupling:
       'How strongly the fireflies pull each other into sync — low stays in chaos, high snaps to a unified pulse.',
@@ -40,6 +52,12 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSpread: "Variety in each firefly's natural rhythm — keeps the sync alive instead of freezing.",
     sliderColor: 'Base colour of the fireflies.',
     sliderVariance: 'Per-firefly colour jitter — low makes them identical, high scatters their tints.',
+  },
+  GyroidGlow3D: {
+    sliderSpeed: 'How fast the gyroid field drifts through the volume.',
+    sliderScale: 'Density of the repeating gyroid cells.',
+    sliderThickness: 'Thickness of the glowing gyroid surface.',
+    sliderColor: 'Base colour of the gyroid.',
   },
   IQPalettes: {
     sliderSpeed: 'How fast the palette parameter scrolls across the bands.',
@@ -60,11 +78,29 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSharpness: 'How tight and crisp the rings are.',
     sliderOctaves: 'How many layers of folded detail are stacked.',
   },
+  MagneticFilaments: {
+    sliderSpeed: 'How quickly the invisible magnets drift.',
+    sliderSpacing: 'Density of the magnetic field-line contours.',
+    sliderGlow: 'Brightness of the glowing filaments.',
+    sliderContrast: 'Sharpness of the field lines.',
+  },
+  MoireCathedral: {
+    sliderSpeed: 'How fast the stained-glass stripe fields rotate.',
+    sliderDensity: 'Density of the crossing moire stripes.',
+    sliderBloom: 'Brightness of the glowing glass.',
+    sliderArch: 'Strength and softness of the arched window frame.',
+  },
   NebulaSphere: {
     sliderSpeed: 'How fast the gas drifts through the volume.',
     sliderZoom: 'Detail scale — higher is finer and busier.',
     sliderWarp: 'How violently the gas folds in on itself.',
     sliderTwinkle: 'Density of stars in the dark voids.',
+  },
+  RibbonLoom: {
+    sliderSpeed: 'How fast the ribbons weave.',
+    sliderWidth: 'Width of each glowing ribbon.',
+    sliderCount: 'How many ribbon families are active.',
+    sliderPalette: 'Base hue of the woven palette.',
   },
   PhantomStar: {
     sliderSpeed: 'Animation rate of the fractal.',
@@ -88,6 +124,12 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
   ShaderShowcase: {
     sliderSpeed: 'Animation rate.',
     sliderZoom: 'Density of the kaleidoscope.',
+  },
+  Trainyard: {
+    sliderSpeed: 'How fast pulses move around the virtual rail yard.',
+    sliderTraffic: 'Number of active trains.',
+    sliderTail: 'Length of each train trail.',
+    sliderPalette: 'Base hue of the rail-yard lights.',
   },
   ZippyZaps: {
     sliderIterations: 'How many fold passes build the arcs — more adds detail but costs more.',

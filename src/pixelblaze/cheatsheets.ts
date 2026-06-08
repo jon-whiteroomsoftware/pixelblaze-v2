@@ -312,6 +312,8 @@ export const CHEATSHEETS: Record<string, Cheatsheet> = {
           { sig: 'polygon(px, py, cx, cy, r, n)', desc: 'regular n-sided polygon; r is circumradius' },
           { sig: 'triangle(px, py, cx, cy, r)', desc: 'equilateral triangle; r is circumradius' },
           { sig: 'segment(px, py, ax, ay, bx, by)', desc: 'distance to line segment (ax,ay)→(bx,by)' },
+          { sig: 'capsule(px, py, ax, ay, bx, by, r)', desc: 'thick rounded line segment' },
+          { sig: 'ellipse(px, py, cx, cy, rx, ry)', desc: 'approximate ellipse; rx/ry are radii' },
           { sig: 'line(px, py, ax, ay, bx, by)', desc: 'signed distance to infinite line; left side negative' },
           { sig: 'ring(px, py, cx, cy, r, thickness)', desc: 'hollow circle; thickness sets ring width' },
           { sig: 'star(px, py, cx, cy, r, n, ratio)', desc: 'n-pointed star; ratio = inner/outer (try 0.4)' },

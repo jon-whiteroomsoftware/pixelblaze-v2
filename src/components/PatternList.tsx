@@ -33,13 +33,30 @@ const DEMO_NAMES = Object.keys(DEMOS).sort()
 
 const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
 const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom', 'AuroraSphere']
+// Pixelblaze-native sketches built around cheap fields, SDFs, and 3D math that
+// should scale better than direct shader ports.
+const NATIVE_SKETCHES = [
+  'CorePulse3D',
+  'CrystalLattice3D',
+  'GyroidGlow3D',
+  'MagneticFilaments',
+  'MoireCathedral',
+  'RibbonLoom',
+  'Trainyard',
+]
 // 1D effects that lean on rhythm and emergence rather than the usual chases and
 // crawls.
 const LIVING_1D_DEMOS = ['PulseLoom', 'FireflyChoir']
 // Minimal patterns — one per render dimensionality — for visually verifying
 // 1D / 2D / 3D preview behavior.
 const TEST_PATTERNS = ['TestPattern1D', 'TestPattern2D', 'TestPattern3D']
-const GROUPED_DEMOS = new Set([...OPENGL_DEMOS, ...BRAND_NEW_DEMOS, ...LIVING_1D_DEMOS, ...TEST_PATTERNS])
+const GROUPED_DEMOS = new Set([
+  ...OPENGL_DEMOS,
+  ...BRAND_NEW_DEMOS,
+  ...NATIVE_SKETCHES,
+  ...LIVING_1D_DEMOS,
+  ...TEST_PATTERNS,
+])
 
 // "Old Favorites" is the rest — anything not explicitly grouped, so new demos
 // land there by default until reassigned.
@@ -47,6 +64,7 @@ const DEMO_SECTIONS: { label: string; names: string[] }[] = [
   { label: 'OpenGL', names: OPENGL_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
   { label: 'Old Favorites', names: DEMO_NAMES.filter((n) => !GROUPED_DEMOS.has(n)) },
   { label: 'Brand New', names: BRAND_NEW_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
+  { label: 'Native Sketches', names: NATIVE_SKETCHES.filter((n) => DEMO_NAMES.includes(n)) },
   { label: 'Living 1D', names: LIVING_1D_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
   { label: 'Test Patterns', names: TEST_PATTERNS.filter((n) => DEMO_NAMES.includes(n)) },
 ]
