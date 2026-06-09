@@ -82,11 +82,13 @@ decoupled from its order in the chain. You choose what your pattern previews aga
   itself; the firmware derives the world's extent from your coordinates' limits and
   normalizes to `0..1`. (Hardware's Mapper also accepts a hand-written JSON array of
   coordinates for irregular layouts; the IDE's editor is the function flavor.)
-- **Templates** — every stock map is real, pasteable Mapper code with no hidden magic.
-  Use "Load template" in the New Map editor to start a custom map from any stock one.
+- **Clone stock maps** — every stock map is real, pasteable Mapper code with no hidden
+  magic. Open one read-only under **Stock Maps**, then click **Clone** to create an
+  editable custom map from the same source.
 
 Custom maps auto-bake as you edit (the same once-at-save evaluation hardware does),
-and **Deploy to preview** pushes a finished map onto the running pattern.
+but they do not automatically change the running preview. To try a map with a pattern,
+choose it deliberately from the preview's **Map** control.
 
 ### How the layout controls work
 
@@ -216,40 +218,51 @@ Monaco in a Pixelblaze language mode:
 - It quietly **auto-saves** your work to the browser's local storage, and pushes
   clean changes to the preview as you pause typing.
 
-The editor also doubles as the **map editor** (map mode) when you're writing a custom
-map — there it's a plain-JavaScript surface with its own parse-checking badge and the
-Load template / Deploy controls.
+The editor also doubles as the **map editor** (map mode) when you're writing or reading
+map source — there it's a plain-JavaScript surface with its own parse-checking badge.
+Custom maps are editable and deletable; stock maps open read-only with **Clone**.
 
 ---
 
 ## Patterns, libraries, and demos
 
-The left rail holds **your patterns**, **your maps**, and the **demos**; the
-**libraries** moved out of the rail into a dropdown in the header (see below). At the
-top of the rail is a **filter row** that combines two things:
+The left rail has a primary **Patterns / Maps** switch. **Patterns** shows **Your
+patterns** and **Demos**; **Maps** shows **Your maps** and **Stock maps**. The
+**libraries** live outside the rail in a dropdown in the header (see below). Below the
+mode switch is a **filter row** that combines two things:
 
 - A **dimension lens** — a single-select **All / 1D / 2D / 3D** filter. Pick a
-  dimensionality and the rail shows only patterns, maps, and demos of that native
-  dimension (a pattern's dimension is the highest render function it defines). Under the
-  1D lens the Your Maps section disappears entirely (1D has no maps); empty demo
-  subsections are hidden rather than left as bare headers. The lens is ephemeral — it
-  resets to All on reload, and the active pattern stays loaded even when filtered out of
-  view.
+  dimensionality and the rail shows only items of that native dimension in the active
+  mode (a pattern's dimension is the highest render function it defines). Maps have no
+  1D form — 1D uses viewport shapes, not maps — so the 1D pill is hidden in Maps mode;
+  if you enter Maps while the lens is on 1D, the IDE silently switches the lens to 2D.
+  Empty demo subsections are hidden rather than left as bare headers. The lens is
+  ephemeral — it resets to All on reload, and the active document stays loaded even
+  when filtered out of view.
 - A **type-down name search** — a magnifier on the right of the same row expands into a
   search box; type to filter by name. It AND-combines with the dimension lens (both must
   match). An active query force-expands any collapsed groups to surface hits, restoring
   their collapse state when you clear it. Clicking the magnifier opens and focuses the
   box; once open it becomes an X that clears and closes; clicking anywhere else in the
-  IDE also closes it.
+  IDE also closes it. The search text is separate between Patterns and Maps, while the
+  dimension lens is shared.
+
+The mode switch and filter row stay fixed at the top of the rail. Only the item lists
+scroll, with a slim overlay thumb that does not take horizontal space, so switching
+between a long Patterns list and a shorter Maps list does not shift row widths.
 
 What's in the rail:
 
 - **Your patterns** — created, renamed, and deleted by you; stored in the browser
   (IndexedDB), so they persist between sessions with no account or cloud. A new
-  pattern starts from a runnable animated starter.
+  pattern starts from a runnable animated starter. Delete is available from the editor
+  header as a visible, confirmation-guarded action, with the rail hover action as a
+  shortcut.
 - **Your maps** — your custom maps (see "The map is yours").
+- **Stock maps** — every shipped source-backed map, browseable read-only in map mode,
+  cloneable into Your Maps, and sendable directly to a Controller.
 - **Demos** — ready-to-run examples: shader ports, eased sweeps, noise fields, and
-  per-dimension test patterns. The *code* is read-only, but **Edit** forks any demo
+  per-dimension test patterns. The *code* is read-only, but **Clone** forks any demo
   into your own editable copy. Some demos open on a recommended map, pixel count, and
   solidity (e.g. the sphere demos open as dense, solid spheres) — defaults only;
   everything stays switchable, and your changes to a demo's preview settings are
@@ -344,9 +357,10 @@ attached.
   shows an **indeterminate** hollow-ring state with a `—` readout, still draggable so you
   can set it. Closing and reopening the *same* device's panel shows its last-known values
   immediately rather than flashing blank; switching to a different device clears first.
-- **Send to Controller** (a button in the editor header) compiles the open pattern with
-  the *device's own compiler* and pushes the result to the Controller. A **Save toggle**
-  beside the button picks the mode, and the button's glyph and tooltip follow it:
+- **Send to Controller** (in the editor header) compiles the open pattern with the
+  *device's own compiler* and pushes the result to the Controller. A small text
+  **Run / Save** pill beside the Send button picks the mode, and the primary Send
+  button's glyph and tooltip follow it:
   - **Run** (default) — load and run the pattern transiently. It plays immediately but is
     **not** added to the device's Saved Patterns; its name lives only in the IDE.
   - **Save** (toggle armed) — persist the pattern to the device's Saved Patterns *and*
@@ -362,7 +376,7 @@ attached.
   pixel-count differences: a pattern push sends bytecode only and keeps the device's
   existing map, so a count mismatch is just "this won't look right," not something to
   block on.)
-- **Send map to Controller** (in the map editor) writes the open custom map to the
+- **Send map to Controller** (in map mode) writes the open custom or stock map to the
   device's single shared map slot — a deliberate, confirm-first action, since one map is
   shared by every pattern on the device. The IDE re-bakes the map to the device's exact
   pixel count first, because the firmware drops any map whose point count doesn't match.

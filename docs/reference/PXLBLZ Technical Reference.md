@@ -83,9 +83,11 @@ A hard split, enforced by convention and load-bearing for the test strategy:
   unit-testable with no DOM (a fake relay emulates a device end-to-end).
 - **UI** (`src/components/`, `src/App.tsx`) — React components that call engine
   functions and read Zustand stores. Logic beyond rendering and event delegation
-  belongs in the engine. The rail filter (`RailFilterBar` — dimension pills + type-down
-  search) and the header `LibrariesMenu` are thin views over `dimLens.ts` predicates and
-  `patternStore`; the deck splits its layout dropdowns into `MapSelect` (PIXELBLAZE
+  belongs in the engine. The left rail (`PatternList` — Patterns / Maps mode switch,
+  dimension pills, type-down search, stock/custom object groups, and a list-only
+  overlay scroller) is a thin view over `dimLens.ts`, the pattern store, and the map
+  store; the header `LibrariesMenu` is a separate authoring-reference surface. The
+  deck splits its layout dropdowns into `MapSelect` (PIXELBLAZE
   block) and `EmbeddingSelect` (transport row) — see §8.
 
 ### Zustand stores (`src/store/`)
@@ -95,7 +97,7 @@ A hard split, enforced by convention and load-bearing for the test strategy:
 | `previewStore` | `isRunning`, `speed`, `brightness`, `lightSize`, `diffusion` (live working copies), `lightSizeSticky`/`diffusionSticky` (global-sticky baselines), `fidelity`, `watchPatternVars`, `watchValues`, `fps`, `elapsed`. Persists only `fidelity` + the two `*Sticky` baselines to `localStorage`; the cascaded `speed`/`brightness` and the live `lightSize`/`diffusion` are seeded per-pattern by the resolver, not persisted here. |
 | `patternStore` | tri-state selection: `activePatternId` / `activeLibraryName` / `activeDemoName`; `userPatterns`; `demoOverrides` (per-demo cascade layer-1 bag, keyed by demo name); CRUD. |
 | `editorStore` | `source`, `previewSource`, `compileStatus`, `isReadOnly`, `previewPatternName`, `patternVars`, `controls`, `nativeDim`, `displayDim`, `solidEligible`, `editorFlavor` (`'pattern' \| 'map'`). |
-| `mapStore` | `activeMapId`, `activeShapeId`, `activeSurfaceId`, `activePixelCount`, `activeNormalizeMode` (Fill/Contain), `activeSolidity`, `userMaps`, stock catalogue. |
+| `mapStore` | `activeMapId`, `activeShapeId`, `activeSurfaceId`, `activePixelCount`, `activeNormalizeMode` (Fill/Contain), `activeSolidity`, `userMaps`, stock catalogue, and the map-mode editing target (`editingMap`, either a custom record or a read-only stock map). |
 | `controlStore` | current pattern UI control values (transient). |
 | `cameraStore` | ephemeral orbit angle, persistent auto-orbit flag (spinning/stopped, set only by play/pause + reset), a transient `dragging` flag that just holds the spin still and releases on pointer-up, pole wrap density (`poleCols`). |
 | `controllerStore` | live-Controller connectivity (§13): keyed map of connected Controllers (IP → phase/nickname/installed-map dim), the active one, extension presence, last-connected IP (auto-reconnect), the Send/push slices, and the sticky `saveArmed` run-vs-save toggle with mode-split dirty tracking (`lastPushedSource` / `lastSavedSource`). Persists the last-connected IP (+ nickname) and `saveArmed`. |
@@ -228,23 +230,21 @@ a flash of un-highlighted text; read-only files (libraries, demos) skip validati
 clear markers.
 
 The editor has a second **map-authoring flavor** (`editorStore.editorFlavor === 'map'`,
-`mapAuthoring.ts` + `MapModeHeader.tsx`) for writing custom `function(pixelCount)` map
-sources — a JS surface with a **parse-only** badge (`parseMapSource` — Acorn parse of
-`(${source})`, no dialect walker, no shim, since a map is just a JS function
-expression). **New Map** opens on the `MAP_SKELETON` (a minimal valid 2D function, so
-the buffer renders something immediately). A **"Load template"** dropdown
-(`mapTemplates`) replaces the buffer with a stock map's *verbatim source text only*
-(never its name or `dim`) — the **only** way to view stock-map code; a **dirty-guard**
-(`isPristineToBaseline`) swaps silently while the buffer matches the last-loaded
-baseline and confirms before clobbering edits. The source **auto-bakes** on the sync
-tick when it parses (`bakeMapSource` — plain-JS `new Function`, float64, no shim;
-aspect-preserving normalize per §8). **Deploy to preview** (`canDeployMap`) selects the
-baked map as the active layout — enabled only when the bake is clean and its dim
-matches the previewed pattern. The source bakes at the active `pixelCount` or, with
-none set, `DEFAULT_MAP_BAKE_COUNT`; deploy never pins or overrides `pixelCount`
-. Eval failures surface in the header without crashing. `isMapOpenable` gates
-which persisted records reopen (only those carrying `source` — i.e. custom maps, never
-stock).
+`mapAuthoring.ts` + `MapModeHeader.tsx`) for writing or reading
+`function(pixelCount)` map sources — a JS surface with a **parse-only** badge
+(`parseMapSource` — Acorn parse of `(${source})`, no dialect walker, no shim, since a
+map is just a JS function expression). **New Map** opens on the `MAP_SKELETON` (a
+minimal valid 2D function, so the buffer renders something immediately). Stock maps
+open read-only in the same flavor via `openStockMap`, using their catalogue source.
+**Clone** (`cloneStockMap`) copies the stock source into a new custom `MapRecord`, bakes
+it immediately, and opens that custom map editable. Custom map source **auto-bakes** on
+the sync tick when it parses (`bakeMapSource` — plain-JS `new Function`, float64, no
+shim; aspect-preserving normalize per §8). Auto-baking only updates the stored map
+record; no map-mode action applies itself to the running preview. The old
+**Deploy to preview** action is retired; assigning a map to a pattern happens only via
+the preview **Map** control. Eval failures surface in the header without crashing.
+Custom maps show **Send map to Controller** and a confirmation-guarded **Delete**;
+stock maps show read-only state, **Clone**, and **Send map to Controller**.
 
 ---
 
@@ -313,7 +313,8 @@ Every stock map (`stockCatalogue.ts`) is a self-contained `function(pixelCount)`
 a real Mapper tab), read raw via `import.meta.glob(..., '?raw')` and run through a
 no-shim `new Function` primitive. The `.js` a user views *is* the `.js` the preview
 runs — single source of truth, no parallel TS generator to drift. Stock maps
-**regenerate live** for any count, so they never go stale.
+**regenerate live** for any count, so they never go stale. The same source is browseable
+read-only from the rail's Stock Maps group and pushable directly to a Controller.
 
 The shipped catalogue (`STOCK_MAP_SPECS`): `plane` (label "Square"), `wide`
 ("Wide 2:1"), `seed-ring-2d` ("Ring") — 2D; and the 3D set, named by the **shell /
@@ -336,7 +337,9 @@ It does **not** re-run on a `pixelCount` change — reproducing the hardware "ch
 pixelCount, forgot to re-save the Mapper" stale-map drift. A `MapRecord` carries
 `source` (the editable JS), `points` (the bake), and `gridDims` when the points form a
 regular lattice (for the layout readout). Baked replay applies to **custom maps only**
-(stock maps regenerate).
+(stock maps regenerate). Opening or editing a custom map does not change
+`activeMapId`; the user assigns a map to the pattern preview with the preview Map
+control.
 
 ### Aspect normalization: Fill / Contain (amended #174)
 
@@ -730,10 +733,11 @@ multi-Controller list/select model is deferred.
 #200, returned GO): the device's own compiler runs inside the helper's offscreen
 sandbox (the only MV3-legal place to eval the remote compiler), turning source into
 bytecode; `pushBytecode` sends it over the socket. `pushPattern` owns the *policy*, and
-runs in one of **two modes** (#236), chosen by a sticky **Save toggle** beside the Send
-button (`controllerStore.saveArmed`, persisted): the button's glyph (Play vs. Save) and
-tooltip follow the armed mode via `describeSendAction` (`sendToController.ts`). Run and
-save are tracked as **independent acts** — the dirty gate (`isAlreadyPushed`) keys off
+runs in one of **two modes** (#236), chosen by a sticky text **Run / Save** segmented
+pill beside the Send button (`controllerStore.saveArmed`, persisted): the primary
+button's glyph (Play vs. Save) and tooltip follow the armed mode via
+`describeSendAction` (`sendToController.ts`). Run and save are tracked as
+**independent acts** — the dirty gate (`isAlreadyPushed`) keys off
 `lastPushedSource` for run and `lastSavedSource` for save, so a clean run push doesn't
 satisfy a pending save (flipping the toggle re-arms Send). The modes:
 
@@ -796,7 +800,10 @@ below.
 
 A Pixelblaze stores **one shared map per device**, so a map push is a guarded
 device-configuration act (always routed through the preflight dialog — never a silent
-one-click), distinct from routine pattern deploy. `mapPush.ts` encodes the binary
+one-click), distinct from routine pattern deploy. The open map descriptor
+(`openMapForPushState`) handles both editable custom maps (last baked points + source)
+and read-only stock maps (source-backed, baked on demand), so either can be sent from
+map mode. `mapPush.ts` encodes the binary
 `mapData` blob (mirroring `createMapData`/`setMapData` in pixelblaze-client
 [`pixelblaze.py`](https://github.com/zranger1/pixelblaze-client/blob/9be84700248fa17f0123c702a2939213ba69800a/pixelblaze/pixelblaze.py#L1641)):
 a 12-byte header of three LE uint32 `[formatVersion, numDimensions, bodyBytes]` then
