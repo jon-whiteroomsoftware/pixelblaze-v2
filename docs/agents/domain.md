@@ -15,6 +15,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 /
 ├── CONTEXT.md                              ← domain glossary
 ├── docs/
+│   ├── plans/                              ← forward-looking plans and PRDs
 │   └── reference/
 │       └── PXLBLZ Technical Reference.md   ← authoritative design decisions
 └── src/

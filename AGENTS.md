@@ -92,6 +92,7 @@ Library files go under `src/pixelblaze/lib/` as plain `.js` (not `.ts`) — Acor
 - **As-built reference**: `docs/reference/PXLBLZ Technical Reference.md` — authoritative description of how the system is built (engine internals, maps, fidelity, connectivity)
 - **Feature guide**: `docs/reference/PXLBLZ Feature Guide.md` — the user-facing view of what the IDE does
 - **Domain glossary**: `CONTEXT.md`
+- **Forward-looking plans**: `docs/plans/`
 
 ## Agent skills
 
@@ -101,8 +102,13 @@ Issues live in GitHub Issues. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Uses the default five-label vocabulary. See `docs/agents/triage-labels.md`.
+Triage and coordination labels are mapped in `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
 Single-context repo: `CONTEXT.md` at root. The Technical Reference (`docs/reference/PXLBLZ Technical Reference.md`) is the authoritative record of design decisions and their rationale. See `docs/agents/domain.md`.
+
+### Documentation cadence
+
+Use the `doc-sweep` skill when a commit, issue, or feature completion needs
+`CONTEXT.md`, `docs/plans/`, and `docs/reference/` brought back into sync.
