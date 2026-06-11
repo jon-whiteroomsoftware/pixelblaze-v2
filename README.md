@@ -1,61 +1,110 @@
-# PXLBLZ
+# PXLBLZ-IDE
 
-![PXLBLZ](docs/screenshots/promo-marquee.jpg)
+PXLBLZ-IDE is a browser-based pattern editor for
+[Pixelblaze](https://electromage.com/) LED controllers. It lets you write,
+preview, tune, and export Pixelblaze patterns without needing a controller on
+your desk, then push the result to hardware when you are ready.
 
-![Edit patterns in a real code editor](docs/screenshots/promo-edit.jpg)
+**[Open PXLBLZ-IDE](https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/)**
 
-![Hardware-faithful live preview](docs/screenshots/promo-preview.jpg)
+## Why it exists
 
-![Reusable libraries and demos](docs/screenshots/promo-editor.jpg)
+The built-in Pixelblaze editor is still the right place for device setup and
+day-to-day controller management. PXLBLZ-IDE is for the parts of pattern work
+that benefit from a bigger browser workspace:
 
-![Connect to a controller on your network](docs/screenshots/promo-connect.jpg)
+- A Monaco editor with autocomplete, hover help, background compile errors, and
+  quiet auto-save.
+- A live 1D / 2D / 3D preview that can run with Pixelblaze-style 16.16
+  fixed-point math when fidelity matters.
+- Patterns and maps stored in your browser instead of on one controller.
+- First-class maps, including stock 2D and 3D maps and savable custom maps.
+- Bundled libraries for SDFs, animation, color, coordinates, noise, and
+  ShaderToy-style porting helpers.
+- Read-only demos that can be cloned into editable patterns.
+- Copy / download of a flat, tree-shaken `.js` artifact that is ready for the
+  hardware editor.
 
-## What is PXLBLZ?
+It is a hobby-engineering workbench, not a replacement for ElectroMage's own
+software.
 
-A development environment for [Pixelblaze](https://electromage.com/) LED controllers.
+## What works today
 
-## Why? There's already an ElectroMage IDE.
+- Edit user patterns in the browser and preview them live.
+- Import `.epe` files exported from Pixelblaze.
+- Clone shipped demos into editable local patterns.
+- Create, edit, clone, and preview map source.
+- Preview patterns on lines, rings, poles, flat 2D maps, cylinders, shells, and
+  volumes.
+- Tune preview-only display controls such as light size, diffusion, solidity,
+  playback speed, and Fast / Precise rendering.
+- Use pattern controls and watch exported variables in the preview.
+- Connect to a Pixelblaze over the local network through the companion Chrome
+  extension.
+- Run or save the open pattern on a connected controller.
+- Push stock or custom maps to a connected controller.
 
-Pixelblaze ecosystem + modern IDE creature comforts = ❤️
+## What it deliberately does not do
 
-- A home for patterns and maps beyond the controller
-- Reusable library code without a large runtime cost
-- Maps that are first-class objects: named and portable between controllers
-- Driving aids like autocomplete, error detection, and inline API docs
-- Libraries, examples, and guidelines for porting OpenGL shaders
-- An interactive and accurate pattern/map preview mode
-
-Don't worry, it also does these things:
-
-- Connect to a controller (via Chrome extension) to run and save patterns, change controller settings, or watch variables
-- View and adjust pattern controls for the preview or the controller
-- Preview in Precise mode uses 16.16 fixed-point math (not floats) to reproduce controller patterns more accurately
-
-<a href="https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/"><img src="docs/screenshots/launch-ide-button.png" alt="Launch PXLBLZ IDE now" width="360"></a>
-
----
+- It does not manage saved patterns, playlists, WiFi, LED hardware settings, or
+  other device administration. Use the Pixelblaze web UI for that.
+- It does not read patterns back from a controller. Import `.epe` files instead.
 
 ## Bundled libraries
 
-Open the **Libraries** menu in the header for a summary on hover; click any to open its source.
+Open the **Code** menu in the app header for source and hover summaries.
 
-| Library  | What it provides                                                                       |
-| -------- | -------------------------------------------------------------------------------------- |
-| `SDF`    | 2D signed distance fields — circles, rects, rings, stars, polygons, smooth boolean ops |
-| `Anim`   | Easing curves, oscillators, phase timing, looping animation primitives                 |
-| `Color`  | HSV/RGB blends, palette interpolation, colour math                                     |
-| `Coord`  | Polar coordinates, rectangular↔polar conversion, spatial transforms                    |
-| `Noise`  | Value noise, Voronoi distance, organic variation                                       |
-| `Shader` | GLSL gap-fillers (`fract`, `step`, `dot`, `reflect`, palettes) for shader ports        |
+| Library | What it provides |
+|---|---|
+| `SDF` | 2D signed distance fields: circles, rects, rings, stars, polygons, smooth boolean ops |
+| `Anim` | Easing curves, oscillators, phase timing, looping primitives |
+| `Color` | HSV/RGB blends, palette interpolation, color math |
+| `Coord` | Polar coordinates, rect-to-polar conversion, transforms |
+| `Noise` | Value noise, Voronoi distance, organic variation |
+| `Shader` | GLSL gap-fillers such as `fract`, `step`, `dot`, palettes, and hardware-safe hashes |
 
 ## Good to know
 
-- **Patterns and maps are stored in your browser's IndexedDB**. You can't access them from a different computer or browser, and if you clear your IndexedDB, you will lose them.
-- **`perlin` and the random functions diverge slightly** from firmware even in Precise mode; they're different algorithms, not reverse-engineered.
-- **Sound- and sensor-reactive patterns** load and run, but the sensor inputs are inert stubs, so they won't animate from audio here.
+- Patterns, maps, and demo setting overrides are stored in this browser's
+  IndexedDB. Clearing site data clears that local workspace.
+- Preview brightness is for the screen. Controller brightness is controlled from
+  the connected Controller panel and is not copied from the preview.
+- Precise rendering emulates Pixelblaze's fixed-point arithmetic, but `perlin`
+  and random functions still diverge slightly because the browser shim does not
+  reverse-engineer those firmware algorithms.
+- Everything preview-only stays preview-only: light size, diffusion, solidity,
+  Fast / Precise, playback speed, and viewport choices are never sent to
+  hardware.
 
-## What to read next
+## Local development
 
-- **[PXLBLZ Feature Guide](docs/reference/PXLBLZ%20Feature%20Guide.md)** — _for someone who uses Pixelblaze._ What every control on the screen does: the preview, maps, the control deck, live controls, and getting code onto hardware. Start here if you just want to use the IDE.
-- **[PXLBLZ Technical Reference](docs/reference/PXLBLZ%20Technical%20Reference.md)** — _for someone building the IDE._ The authoritative as-built description of how it works: transpiler, validator, fixed-point engine, maps and embeddings, camera, render loop, storage. Start here to contribute.
-- **[Pixelblaze Ecosystem Primer](docs/reference/Pixelblaze%20Ecosystem%20Primer.md)** — _for someone new to Pixelblaze itself._ The mental model the other two assume: device vs. browser, 16.16 fixed-point, the pattern and mapper dialects, the WebSocket API. Start here if "fixed-point" or "pixel map" needs unpacking.
+```bash
+npm install
+npm run dev
+```
+
+The normal development server runs at `http://localhost:5174/`.
+
+Useful checks:
+
+```bash
+npm test
+npx tsc --noEmit
+npm run build
+```
+
+## Documentation
+
+- **[PXLBLZ Feature Guide](docs/reference/PXLBLZ%20Feature%20Guide.md)** - start
+  here if you use Pixelblaze and want to know what the IDE does.
+- **[Pixelblaze Ecosystem Primer](docs/reference/Pixelblaze%20Ecosystem%20Primer.md)** -
+  background on the Pixelblaze model this project assumes.
+- **[PXLBLZ Technical Reference](docs/reference/PXLBLZ%20Technical%20Reference.md)** -
+  how the IDE is built: preview engine, maps, settings cascade, controller
+  connection, storage, and the transpiler.
+
+## Status
+
+PXLBLZ-IDE is small, local-first, and still evolving. Expect rough edges, keep
+copies of patterns you care about, and file issues with enough detail to
+reproduce the problem.
