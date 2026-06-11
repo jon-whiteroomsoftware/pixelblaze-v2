@@ -25,6 +25,15 @@ describe('ControllerBar', () => {
     expect(screen.getByTestId('controller-install-pitch')).toBeInTheDocument()
   })
 
+  it('links the install pitch to the Chrome Web Store helper listing (#270)', () => {
+    render(<ControllerBar />)
+    fireEvent.click(screen.getByTestId('controller-entry-button'))
+    expect(screen.getByRole('link', { name: 'Install extension' })).toHaveAttribute(
+      'href',
+      'https://chromewebstore.google.com/detail/pxlblz-ide-controller-hel/hjdkmngopeofakdbjfkaomcmgkcidoeg',
+    )
+  })
+
   it('offers the IP form when the extension is present and no Controller is connected', () => {
     useControllerStore.setState({ extensionPresent: true })
     render(<ControllerBar />)
@@ -64,6 +73,24 @@ describe('ControllerBar', () => {
     })
     render(<ControllerBar />)
     expect(screen.getByTestId('controller-pill')).toHaveTextContent('10.0.0.5')
+  })
+
+  it('shows the helper authorization hint for a pending per-IP grant (#235)', () => {
+    useControllerStore.setState({
+      activeIp: '10.0.0.5',
+      controllers: {
+        '10.0.0.5': {
+          ip: '10.0.0.5',
+          phase: 'pending',
+          mapDim: null,
+          authorizationNeededIp: '10.0.0.5',
+        },
+      },
+    })
+    render(<ControllerBar />)
+    expect(screen.getByTestId('controller-authorization-hint')).toHaveTextContent(
+      'Authorize this Controller in the PXLBLZ-IDE helper',
+    )
   })
 
   it('activates a Controller on pill click', () => {

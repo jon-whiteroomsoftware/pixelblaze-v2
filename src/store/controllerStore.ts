@@ -63,6 +63,8 @@ export interface ControllerEntry {
   phase: ControllerPhase
   /** Last error message when `phase === 'error'`. */
   error?: string
+  /** Non-null while Chrome is waiting for the helper popup's per-IP grant (#235). */
+  authorizationNeededIp?: string | null
   mapDim: MapDimension
 }
 
@@ -230,15 +232,20 @@ const unsubscribers = new Map<string, () => void>()
 function phaseFromStatus(status: ControllerStatus): Partial<ControllerEntry> | null {
   switch (status.kind) {
     case 'connecting':
-      return { phase: 'pending', error: undefined }
+      return {
+        phase: 'pending',
+        error: undefined,
+        authorizationNeededIp: status.authorizationNeededIp ?? null,
+      }
     case 'connected':
       return {
         phase: 'live',
         error: undefined,
+        authorizationNeededIp: null,
         ...(status.controller.name ? { nickname: status.controller.name } : {}),
       }
     case 'error':
-      return { phase: 'error', error: status.message }
+      return { phase: 'error', error: status.message, authorizationNeededIp: null }
     default:
       // extension-present / no-extension aren't entry states; ignore.
       return null
@@ -346,6 +353,7 @@ export const useControllerStore = create<ControllerConnectionState>()(
                 phase: 'pending',
                 mapDim: null,
                 nickname: seed || undefined,
+                authorizationNeededIp: null,
               },
             },
           }))

@@ -30,6 +30,9 @@ const PILL_TONE: Record<ControllerStatusTone, StatusTone> = {
   error: 'error',
 }
 
+const CONTROLLER_HELPER_STORE_URL =
+  'https://chromewebstore.google.com/detail/pxlblz-ide-controller-hel/hjdkmngopeofakdbjfkaomcmgkcidoeg'
+
 /** The small Controller/chip glyph carried on every pill. */
 function ChipGlyph() {
   return (
@@ -61,6 +64,7 @@ function ControllerPillButton({
   phase,
   active,
   panelOpen,
+  authorizationNeededIp,
   onActivate,
   onRemove,
 }: {
@@ -69,6 +73,7 @@ function ControllerPillButton({
   phase: ControllerPhase
   active: boolean
   panelOpen: boolean
+  authorizationNeededIp?: string | null
   onActivate: () => void
   onRemove: () => void
 }) {
@@ -99,6 +104,18 @@ function ControllerPillButton({
         <span className="max-w-[10rem] truncate">{label}</span>
         {showDot && tone && <StatusDot tone={PILL_TONE[tone]} testId="controller-pill-dot" />}
       </button>
+
+      {phase === 'pending' && authorizationNeededIp && (
+        <div
+          data-testid="controller-authorization-hint"
+          className="absolute right-0 top-8 z-40 w-72 rounded-lg border border-amber-400/40 bg-zinc-950 px-3 py-2 font-mono text-xs leading-relaxed text-zinc-300 shadow-2xl"
+        >
+          <p className="text-amber-300">Authorize this Controller in the PXLBLZ-IDE helper.</p>
+          <p className="mt-1 text-zinc-500">
+            If no prompt appeared, click the Chrome extensions icon and open the helper.
+          </p>
+        </div>
+      )}
 
       {panelOpen && (
         <div
@@ -267,6 +284,7 @@ export function ControllerBar() {
           phase={controllers[ip].phase}
           active={ip === activeIp}
           panelOpen={ip === panelOpenIp}
+          authorizationNeededIp={controllers[ip].authorizationNeededIp}
           onActivate={() => onPillClick(ip)}
           onRemove={() => onPillRemove(ip)}
         />
@@ -398,16 +416,26 @@ export function ControllerBar() {
             <div data-testid="controller-install-pitch" className="flex flex-col gap-2 leading-relaxed">
               <p className="text-zinc-200 font-semibold">Install the Pixelblaze extension</p>
               <p className="text-zinc-400">
-                Connecting to a Controller on your LAN needs the companion browser extension. Sideload it,
-                then follow the setup steps to grant it access to your Pixelblaze.
+                Connecting to a Controller on your LAN needs the companion browser extension. Install it
+                from the Chrome Web Store, then return here to connect.
               </p>
-              <button
-                type="button"
-                onClick={() => void detectExtension()}
-                className="self-start rounded border border-zinc-600 bg-zinc-800 px-3 py-1 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100"
-              >
-                I've installed it
-              </button>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <a
+                  href={CONTROLLER_HELPER_STORE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border border-zinc-500 bg-zinc-100 px-3 py-1 text-zinc-950 hover:border-zinc-300 hover:bg-white focus:outline-none"
+                >
+                  Install extension
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void detectExtension()}
+                  className="rounded border border-zinc-600 bg-zinc-800 px-3 py-1 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100 focus:outline-none"
+                >
+                  I've installed it
+                </button>
+              </div>
             </div>
           )}
         </div>

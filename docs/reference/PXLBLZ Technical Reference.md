@@ -649,10 +649,15 @@ discovered IPs into one request, so onboarding a fleet is a single dialog. The g
 gates **every** device-bound call (connect, compile fetch, map read-back), all of which
 hit `http://<ip>`. The reconnect path must distinguish "socket failed" from "permission
 missing for this (new) IP" — a DHCP reassignment re-triggers the popup rather than
-silently retry-failing. The provider surfaces a declined grant as a typed
-`ControllerPermissionDeniedError` so the store drops the half-created pill back to idle
-instead of dwelling on it. The build is **distribution-agnostic**: the identical manifest
-works from the Web Store or loaded unpacked.
+silently retry-failing. The helper emits an informational `permission-needed` as soon
+as it opens the popup; the provider carries that as `authorizationNeededIp` on the
+`connecting` status, and the Controller pill renders an immediate "authorize via the
+helper" hint so the page never sits silently through the 60s grant timeout. The provider
+surfaces a declined grant as a typed `ControllerPermissionDeniedError` so the store
+drops the half-created pill back to idle instead of dwelling on it. The build is
+**distribution-agnostic**: the identical manifest works from the Web Store or loaded
+unpacked. The IDE's first-run install pitch links to the canonical Chrome Web Store
+listing for the helper.
 
 ### Auto-discovery (cloud, via the helper)
 

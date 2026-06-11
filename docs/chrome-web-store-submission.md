@@ -20,6 +20,10 @@ extension collects/transmits no user data; controller traffic is relayed locally
 never sent anywhere; the one off-LAN request is the user-triggered cloud discovery
 call to Electromage.
 
+## Store listing URL
+
+> https://chromewebstore.google.com/detail/pxlblz-ide-controller-hel/hjdkmngopeofakdbjfkaomcmgkcidoeg
+
 ## Single purpose
 
 > The extension's single purpose is to relay local-network WebSocket and HTTP traffic

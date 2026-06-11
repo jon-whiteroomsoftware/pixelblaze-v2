@@ -29,6 +29,8 @@ function makeDeviceTransport(
      *  permission-needed, then permission-denied, then the connId error/close it
      *  always sends on a denied connect. */
     denyPermission?: boolean
+    /** Model a grant popup that is open/pending long enough for the page hint to render. */
+    pendingPermission?: boolean
     /** Bytecode the fake helper returns from a `compile` request. */
     compileBytecode?: Uint8Array
     /** When set, the fake helper fails compile with this error. */
@@ -82,6 +84,11 @@ function makeDeviceTransport(
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-denied', address })
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'error', connId: msg.connId, message: 'access not authorized' })
             emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'close', connId: msg.connId })
+            return
+          }
+          if (opts.pendingPermission) {
+            const address = new URL(msg.url).hostname
+            emit({ source: RELAY_SOURCE, dir: 'from-helper', type: 'permission-needed', address })
             return
           }
           if (opts.failConnect || silent) {
@@ -229,6 +236,21 @@ describe('ExtensionControllerProvider', () => {
     await expect(p.connect(TARGET)).rejects.toBeInstanceOf(ControllerPermissionDeniedError)
     // A decline resets to the pre-connect idle state, not an error.
     expect(p.getStatus()).toEqual({ kind: 'extension-present' })
+  })
+
+  it('surfaces a pending per-IP authorization hint while connecting (#235)', async () => {
+    const p = new ExtensionControllerProvider({ transport: makeDeviceTransport({ pendingPermission: true }).transport })
+    const seen: ControllerStatus[] = []
+    p.subscribe((s) => seen.push(s))
+
+    void p.connect(TARGET).catch(() => {})
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(seen).toContainEqual({
+      kind: 'connecting',
+      target: TARGET,
+      authorizationNeededIp: TARGET.address,
+    })
   })
 
   describe('push surface (H10)', () => {

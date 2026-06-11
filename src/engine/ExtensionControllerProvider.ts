@@ -144,7 +144,18 @@ export class ExtensionControllerProvider implements ControllerProvider {
     this.transport.subscribe((msg) => {
       if (msg.source !== RELAY_SOURCE || msg.dir !== 'from-helper') return
       // Only while we're (re)connecting to this address — a live connection means
-      // the IP is already granted, so a stray denial can't be for it.
+      // the IP is already granted, so a stray permission message can't be for it.
+      if (
+        msg.type === 'permission-needed' &&
+        this.target?.address === msg.address &&
+        this.status.kind !== 'connected'
+      ) {
+        this.setStatus({
+          kind: 'connecting',
+          target: this.target,
+          authorizationNeededIp: msg.address,
+        })
+      }
       if (
         msg.type === 'permission-denied' &&
         this.target?.address === msg.address &&

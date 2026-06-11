@@ -70,9 +70,18 @@ Connect simply re-prompts. A decline is a user choice, not an error pill to dwel
 anchors to the Extensions overflow menu). If it ever no-ops on a given Chrome, the
 connection sits in `connecting` until the grant window (60s) times out and then
 resets the same way a decline does. The SW also emits an informational
-`permission-needed` the moment it opens the popup; surfacing that as an immediate
-in-app "authorize via the helper" hint (rather than waiting on the timeout) is a
-follow-up — the wire message is in place, the page just doesn't render it yet.
+`permission-needed` the moment it opens the popup, and the page surfaces that as an
+immediate in-app "authorize via the helper" hint rather than waiting on the timeout.
+
+## Install
+
+Normal users should install the published helper from the Chrome Web Store:
+
+https://chromewebstore.google.com/detail/pxlblz-ide-controller-hel/hjdkmngopeofakdbjfkaomcmgkcidoeg
+
+After installing it, open the IDE and use the top-right Controller connect control.
+The first connection to a new Controller IP opens the helper popup to authorize that
+specific local device.
 
 ## Install (developer / unpacked)
 

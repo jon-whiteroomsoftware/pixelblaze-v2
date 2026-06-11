@@ -53,13 +53,14 @@ export interface DiscoveredController {
  *
  *  - `no-extension`     — no relay extension installed/reachable at all.
  *  - `extension-present`— extension is there, but no Controller is connected.
- *  - `connecting`       — a connect() is in flight.
+ *  - `connecting`       — a connect() is in flight. `authorizationNeededIp`
+ *                         means the helper is waiting on Chrome's per-IP grant.
  *  - `connected`        — a Controller is live.
  *  - `error`            — last connect/operation failed; carries a message. */
 export type ControllerStatus =
   | { kind: 'no-extension' }
   | { kind: 'extension-present' }
-  | { kind: 'connecting'; target: ControllerTarget }
+  | { kind: 'connecting'; target: ControllerTarget; authorizationNeededIp?: string }
   | { kind: 'connected'; controller: ConnectedController }
   | { kind: 'error'; message: string }
 

@@ -38,6 +38,7 @@ class FakeProvider extends NullControllerProvider {
   // Mirror the real provider's per-IP permission decline (#229): reset to idle and
   // reject with the typed error the store resets on.
   denyPermission = false
+  pendingAuthorization = false
   name: string | undefined = 'pixel-1'
   pixelCount: number | undefined = undefined
   pixelMap: number[][] | null = [
@@ -64,6 +65,10 @@ class FakeProvider extends NullControllerProvider {
   connect(target: ControllerTarget): Promise<void> {
     this.connects.push(target)
     this.emit({ kind: 'connecting', target })
+    if (this.pendingAuthorization) {
+      this.emit({ kind: 'connecting', target, authorizationNeededIp: target.address })
+      return new Promise<void>(() => {})
+    }
     if (this.denyPermission) {
       this.emit({ kind: 'extension-present' })
       return Promise.reject(new ControllerPermissionDeniedError(target.address))
@@ -239,6 +244,23 @@ describe('controllerStore (keyed)', () => {
     expect(store().controllers['10.0.0.9']).toBeUndefined()
     expect(store().activeIp).toBeNull()
     expect(store().lastConnectedIp).toBeNull()
+  })
+
+  it('marks a pending controller when Chrome is waiting on the helper authorization grant (#235)', async () => {
+    setControllerProviderFactory((ip) => {
+      const p = new FakeProvider()
+      p.pendingAuthorization = true
+      created.set(ip, p)
+      return p
+    })
+
+    void store().addController('10.0.0.9')
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(store().controllers['10.0.0.9']).toMatchObject({
+      phase: 'pending',
+      authorizationNeededIp: '10.0.0.9',
+    })
   })
 
   it('persists only the last-connected IP', async () => {
