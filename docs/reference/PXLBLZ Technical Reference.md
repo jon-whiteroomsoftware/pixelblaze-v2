@@ -657,7 +657,10 @@ surfaces a declined grant as a typed `ControllerPermissionDeniedError` so the st
 drops the half-created pill back to idle instead of dwelling on it. The build is
 **distribution-agnostic**: the identical manifest works from the Web Store or loaded
 unpacked. The IDE's first-run install pitch links to the canonical Chrome Web Store
-listing for the helper.
+listing for the helper. If the IDE tab was already open while the helper was
+installed, the **I've installed it** button re-runs detection and reloads the tab when
+the content script is still absent, because Chrome injects static content scripts on
+navigation rather than retroactively into already-loaded pages.
 
 ### Auto-discovery (cloud, via the helper)
 

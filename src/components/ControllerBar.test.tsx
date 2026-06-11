@@ -34,6 +34,17 @@ describe('ControllerBar', () => {
     )
   })
 
+  it("reloads the tab from the I've-installed-it button when Chrome has not injected the helper yet", async () => {
+    const reloadPage = vi.fn()
+    useControllerStore.setState({ detectExtension: async () => false })
+    render(<ControllerBar reloadPage={reloadPage} />)
+    fireEvent.click(screen.getByTestId('controller-entry-button'))
+
+    fireEvent.click(screen.getByRole('button', { name: "I've installed it" }))
+
+    await waitFor(() => expect(reloadPage).toHaveBeenCalledTimes(1))
+  })
+
   it('offers the IP form when the extension is present and no Controller is connected', () => {
     useControllerStore.setState({ extensionPresent: true })
     render(<ControllerBar />)

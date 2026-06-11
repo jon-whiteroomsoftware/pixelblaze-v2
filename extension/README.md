@@ -80,6 +80,9 @@ Normal users should install the published helper from the Chrome Web Store:
 https://chromewebstore.google.com/detail/pxlblz-ide-controller-hel/hjdkmngopeofakdbjfkaomcmgkcidoeg
 
 After installing it, open the IDE and use the top-right Controller connect control.
+If the IDE tab was already open while installing, click **I've installed it** in the
+connect dropdown; Chrome only injects newly installed content scripts on navigation,
+so the app reloads the tab if the helper is not visible yet.
 The first connection to a new Controller IP opens the helper popup to authorize that
 specific local device.
 

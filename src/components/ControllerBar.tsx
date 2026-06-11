@@ -168,7 +168,7 @@ const MIN_RESCAN_SPIN_MS = 600
 // no !important. One full rotation in MIN_RESCAN_SPIN_MS so it lands back at start.
 const RESCAN_SPIN_CLASS = '[animation:spin_0.6s_linear_infinite] text-amber-400'
 
-export function ControllerBar() {
+export function ControllerBar({ reloadPage = () => window.location.reload() }: { reloadPage?: () => void } = {}) {
   const extensionPresent = useControllerStore((s) => s.extensionPresent)
   const controllers = useControllerStore((s) => s.controllers)
   const activeIp = useControllerStore((s) => s.activeIp)
@@ -183,6 +183,7 @@ export function ControllerBar() {
   const [open, setOpen] = useState(false)
   const [panelOpenIp, setPanelOpenIp] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [checkingInstall, setCheckingInstall] = useState(false)
   // Forces the rescan spinner to stay visible for MIN_RESCAN_SPIN_MS after a
   // manual click, independent of how fast the actual sweep resolves.
   const [manualSpin, setManualSpin] = useState(false)
@@ -263,6 +264,13 @@ export function ControllerBar() {
     setDraft('')
     setOpen(false)
     void addController(ip)
+  }
+
+  const onInstalledClick = async () => {
+    setCheckingInstall(true)
+    const present = await detectExtension()
+    setCheckingInstall(false)
+    if (!present) reloadPage()
   }
 
   // Connect to a discovered candidate by its LAN address — same path as a manual
@@ -430,10 +438,12 @@ export function ControllerBar() {
                 </a>
                 <button
                   type="button"
-                  onClick={() => void detectExtension()}
+                  onClick={() => void onInstalledClick()}
+                  disabled={checkingInstall}
+                  aria-busy={checkingInstall}
                   className="rounded border border-zinc-600 bg-zinc-800 px-3 py-1 text-zinc-200 hover:border-zinc-400 hover:text-zinc-100 focus:outline-none"
                 >
-                  I've installed it
+                  {checkingInstall ? 'Checking...' : "I've installed it"}
                 </button>
               </div>
             </div>
