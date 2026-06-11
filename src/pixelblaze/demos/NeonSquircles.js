@@ -9,6 +9,11 @@
 // Per-ring glow:  .004 / (abs(L4 - i*.04) + .005) — bright ring at each L4 iso-contour.
 // Per-ring anim:  smoothstep stagger via i*.1 creates a wave sweeping across rings.
 
+// ── Adjustable controls ────────────────────────────────────────────────────
+export var speed = 0.69  // squircle spin and pulse rate
+
+export function sliderSpeed(v) { speed = v }
+
 export var t = 0
 
 // Per-ring scratch tables (20 source rings). Everything that depends only on the
@@ -34,7 +39,7 @@ for (var k = 0; k < 20; k = k + 1) {
 }
 
 export function beforeRender(delta) {
-  t = t + delta * 0.001
+  t = t + delta * 0.001 * (0.35 + speed * 2.4)
   var mt = t % 2
   for (var i = 0; i < 20; i = i + 1) {
     var ic = i + 1

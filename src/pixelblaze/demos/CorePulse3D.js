@@ -3,7 +3,7 @@
 // The whole effect is distance-from-centre plus a few dot-product waves, so it
 // is intentionally tractable on Pixelblaze while still reading as volumetric.
 
-export var speed = 0.45       // pulse rate
+export var speed = 0.04       // pulse rate
 export var shellCount = 0.42  // shell density
 export var coreSize = 0.62    // central glow radius
 export var hue = 0.58         // base colour

@@ -4,8 +4,8 @@
 // one atan2/hypot pair per pixel.
 
 export var speed = 0.35       // rotation speed
-export var points = 0.56      // number of rose points
-export var sweep = 0.50       // scanning beam strength
+export var points = 0.48      // number of rose points
+export var sweep = 0.72       // scanning beam strength
 export var hue = 0.58         // base colour
 
 export function sliderSpeed(v) { speed = v }
@@ -29,7 +29,7 @@ export function render2D(index, x, y) {
   var card = clamp(1 - abs(triangle(a * 4) - 0.5) * 7.0, 0, 1)
   var rings = clamp(1 - abs(triangle(r * 9 - t * 0.04) - 0.5) * 4.0, 0, 1)
   var beam = triangle(a + t * 0.10) * sweep
-  var mask = clamp(1 - abs(r - 0.34) * 2.3, 0, 1)
-  var val = clamp((spoke * 0.42 + card * 0.45 + rings * 0.38 + beam * 0.18) * mask, 0, 1)
-  hsv(frac(hue + a * 0.10 + r * 0.18), 0.78, val)
+  var mask = clamp(1 - abs(r - 0.34) * 1.85, 0, 1)
+  var val = clamp((spoke * 0.58 + card * 0.58 + rings * 0.52 + beam * 0.28) * mask + mask * 0.025, 0, 1)
+  hsv(frac(hue + a * 0.10 + r * 0.18), 0.70, val)
 }

@@ -4,10 +4,10 @@
 // first draft used per-pixel sine paths; triangle paths keep the weave language
 // while being much friendlier on Pixelblaze hardware.
 
-export var speed = 0.42       // weave motion
-export var width = 0.45       // ribbon width
-export var count = 0.5        // number of active ribbon families
-export var palette = 0.08     // base hue
+export var speed = 1          // weave motion
+export var width = 0          // ribbon width
+export var count = 0.79       // number of active ribbon families
+export var palette = 0.57     // base hue
 
 export function sliderSpeed(v) { speed = v }
 export function sliderWidth(v) { width = v }

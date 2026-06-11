@@ -3,9 +3,9 @@
 // This uses polar symmetry and triangle bands: lots of ornament from a handful
 // of cheap waveform operations.
 
-export var speed = 0.42       // scanning speed
-export var spokes = 0.55      // radial spoke count
-export var rings = 0.50       // ring density
+export var speed = 0.52       // scanning speed
+export var spokes = 0.48      // radial spoke count
+export var rings = 0.36       // ring density
 export var color = 0.64       // base hue
 
 export function sliderSpeed(v) { speed = v }
@@ -30,7 +30,7 @@ export function render2D(index, x, y) {
   var spoke = clamp(1 - abs(triangle(a * spokeCount + t * 0.08) - 0.5) * 4.2, 0, 1)
   var ring = clamp(1 - abs(triangle(r * ringCount - t * 0.07) - 0.5) * 3.7, 0, 1)
   var scan = triangle(a * 3 + r * 2.2 + t * 0.18)
-  var mask = clamp(1 - r * 1.95, 0, 1)
-  var val = clamp((spoke * 0.48 + ring * 0.55 + spoke * ring * 0.45) * mask + scan * mask * 0.12, 0, 1)
-  hsv(frac(color + a * 0.18 + r * 0.24 + t * 0.015), 0.86, val)
+  var mask = clamp(1 - r * 1.72, 0, 1)
+  var val = clamp((spoke * 0.62 + ring * 0.72 + spoke * ring * 0.58) * mask + scan * mask * 0.18 + mask * 0.035, 0, 1)
+  hsv(frac(color + a * 0.18 + r * 0.24 + t * 0.015), 0.78, val)
 }

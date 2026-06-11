@@ -26,4 +26,9 @@ describe('App smoke test', () => {
     render(<App />)
     expect(screen.getByTestId('preview-pane')).toBeInTheDocument()
   })
+
+  it('starts with a wider preview pane', () => {
+    render(<App />)
+    expect(screen.getByTestId('preview-pane')).toHaveStyle({ width: '460px' })
+  })
 })

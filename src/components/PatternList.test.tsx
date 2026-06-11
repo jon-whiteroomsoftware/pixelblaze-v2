@@ -65,6 +65,27 @@ describe('PatternList', () => {
     expect(useEditorStore.getState().previewPatternName).toBe(demoName)
   })
 
+  it('moves between focused demo rows with the arrow keys', async () => {
+    const user = userEvent.setup()
+    render(<PatternList />)
+
+    const firstRow = screen.getByText(/^Kishimisu$/).closest('li')
+    const nextRow = screen.getByText(/^NeonSquircles$/).closest('li')
+    expect(firstRow).toBeInTheDocument()
+    expect(nextRow).toBeInTheDocument()
+
+    await user.click(firstRow!)
+    firstRow!.focus()
+    await user.keyboard('{ArrowDown}')
+
+    expect(useEditorStore.getState().previewPatternName).toBe('NeonSquircles')
+    expect(nextRow).toHaveFocus()
+
+    await user.keyboard('{ArrowUp}')
+    expect(useEditorStore.getState().previewPatternName).toBe('Kishimisu')
+    expect(firstRow).toHaveFocus()
+  })
+
   it('shows the empty state when there are no custom maps', async () => {
     const user = userEvent.setup()
     render(<PatternList />)

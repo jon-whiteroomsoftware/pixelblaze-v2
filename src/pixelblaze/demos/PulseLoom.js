@@ -13,6 +13,11 @@
 // overflow 16.16 (the voices realign exactly when the bar wraps).
 
 export var barPhase = 0
+export var tempo = 0.02
+export var swing = 0
+export var width = 0.5
+export var palette = 0.5
+export var accent = 0
 
 // Voices: hits per bar and home position (0..1). Colour comes from a rotatable
 // complementary palette (see below): the left pair are the primary hue + a darker
@@ -25,11 +30,11 @@ var voiceShade = [1, 0.62, 1, 0.62]     // full, darker, full, darker
 var env        = [0, 0, 0, 0]           // per-voice strike envelope, filled each frame
 
 // Tunables (live, via the sliders below).
-var bps        = 1.6   // bars per second (the tempo)
-var swing      = 0.0   // 0 = straight, up to ~0.4 = heavy lilt
-var bumpWidth  = 0.095 // half-width of each strike's glow, as a fraction of strip
-var paletteHue = 0.04  // base hue of the complementary set; slider spins it round
-var accentOn   = 1     // downbeat full-strip flash
+var bps        = 0.2 + tempo * 3.15   // bars per second (the tempo)
+var swingAmt   = swing * 0.4          // 0 = straight, up to ~0.4 = heavy lilt
+var bumpWidth  = 0.005 + width * 0.11 // half-width of each strike's glow, as a fraction of strip
+var paletteHue = palette              // base hue of the complementary set; slider spins it round
+var accentOn   = accent               // downbeat full-strip flash
 var accentEnv  = 0     // this frame's accent brightness
 var bumpDenom  = 0.0098 // 2*bumpWidth^2 — frame-constant gaussian denominator
 
@@ -40,11 +45,11 @@ var bumpVersion = 1
 var cachedBumpDenom = -1
 var bumpReady, bump0, bump1, bump2, bump3
 
-export function sliderTempo(v)   { bps = 0.2 + v * 3.15 }
-export function sliderSwing(v)   { swing = v * 0.4 }
-export function sliderWidth(v)   { bumpWidth = 0.005 + v * 0.11 }
-export function sliderPalette(v) { paletteHue = v }
-export function toggleAccent(v)  { accentOn = v }
+export function sliderTempo(v)   { tempo = v; bps = 0.2 + v * 3.15 }
+export function sliderSwing(v)   { swing = v; swingAmt = v * 0.4 }
+export function sliderWidth(v)   { width = v; bumpWidth = 0.005 + v * 0.11 }
+export function sliderPalette(v) { palette = v; paletteHue = v }
+export function toggleAccent(v)  { accent = v; accentOn = v }
 
 // Warp a 0..1 cycle phase so its midpoint lands late — a swing/groove lilt.
 function applySwing(p, s) {
@@ -76,7 +81,7 @@ export function beforeRender(delta) {
   var i = 0
   for (i = 0; i < 4; i++) {
     var vp = mod(barPhase * hitsPerBar[i], 1)   // this voice's own strike phase
-    vp = applySwing(vp, swing)
+    vp = applySwing(vp, swingAmt)
     env[i] = exp(-vp * 4)                        // instant attack, quick decay
   }
 

@@ -3,10 +3,10 @@
 // SDF bands are an efficient way to get lots of apparent detail from one moving
 // signed-distance field.
 
-export var speed = 0.32       // bloom breathing speed
-export var layers = 0.55      // contour density
-export var spacing = 0.45     // band separation
-export var color = 0.78       // base hue
+export var speed = 0.56       // bloom breathing speed
+export var layers = 0.95      // contour density
+export var spacing = 0.42     // band separation
+export var color = 0.30       // base hue
 
 export function sliderSpeed(v) { speed = v }
 export function sliderLayers(v) { layers = v }

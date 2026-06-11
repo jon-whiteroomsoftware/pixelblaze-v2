@@ -4,9 +4,9 @@
 // phase wobble, which stays tractable on large 3D previews and hardware.
 
 export var speed = 0.34       // shell drift
-export var shellCount = 0.55  // shell density
-export var thickness = 0.48   // shell thickness
-export var color = 0.74       // base hue
+export var shellCount = 1     // shell density
+export var thickness = 1      // shell thickness
+export var color = 0.07       // base hue
 
 export function sliderSpeed(v) { speed = v }
 export function sliderShellCount(v) { shellCount = v }

@@ -15,7 +15,7 @@
 
 // ── Adjustable controls ────────────────────────────────────────────────────
 export var speed = 0.5  // animation rate
-export var zoom  = 0.4  // kaleidoscope density
+export var zoom  = 0    // kaleidoscope density
 
 export function sliderSpeed(v) { speed = v }
 export function sliderZoom(v)  { zoom = v }

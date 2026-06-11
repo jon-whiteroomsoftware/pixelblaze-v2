@@ -43,7 +43,6 @@ const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom', 'AuroraSphe
 // Pixelblaze-native sketches built around cheap fields, SDFs, and 3D math that
 // should scale better than direct shader ports.
 const NATIVE_SKETCHES = [
-  'BubbleGlass',
   'CometLoom',
   'CompassRose',
   'CorePulse3D',
@@ -59,7 +58,6 @@ const NATIVE_SKETCHES = [
   'MoireCathedral',
   'NebulaShells3D',
   'NeonCircuitBoard',
-  'OrigamiLanterns',
   'RibbonLoom',
   'SignalMandala',
   'StainedGlassWeather',
@@ -71,7 +69,7 @@ const NATIVE_SKETCHES = [
 const LIVING_1D_DEMOS = ['PulseLoom', 'FireflyChoir']
 // Minimal patterns — one per render dimensionality — for visually verifying
 // 1D / 2D / 3D preview behavior.
-const TEST_PATTERNS = ['TestPattern1D', 'TestPattern2D', 'TestPattern3D']
+const TEST_PATTERNS = ['EasedSweep', 'TestPattern1D', 'TestPattern2D', 'TestPattern3D']
 const GROUPED_DEMOS = new Set([
   ...OPENGL_DEMOS,
   ...BRAND_NEW_DEMOS,
@@ -194,7 +192,7 @@ const ROW_PAD_SUB = '26px'
 // can yield to them without any row-width reflow.
 const rowClass = (active: boolean) =>
   [
-    'group relative flex items-center gap-1.5 pr-3 min-h-[19px] py-px cursor-pointer select-none',
+    'group relative flex items-center gap-1.5 pr-3 min-h-[19px] py-px cursor-pointer select-none outline-none focus-visible:ring-1 focus-visible:ring-live/70 focus-visible:ring-inset',
     active ? 'text-live bg-live/5' : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800/60',
   ].join(' ')
 
@@ -422,8 +420,11 @@ function ListItem({
   active,
   dim,
   subItem,
+  navKey,
   onFork,
   onClick,
+  onRowRef,
+  onKeyDown,
   onMouseEnter,
   onMouseLeave,
 }: {
@@ -431,16 +432,23 @@ function ListItem({
   active: boolean
   dim?: string
   subItem?: boolean
+  navKey?: string
   onFork?: () => void
   onClick: () => void
+  onRowRef?: (key: string, el: HTMLLIElement | null) => void
+  onKeyDown?: (e: React.KeyboardEvent<HTMLLIElement>, key: string) => void
   onMouseEnter?: (e: React.MouseEvent<HTMLLIElement>) => void
   onMouseLeave?: () => void
 }) {
   return (
     <li
+      ref={(el) => { if (navKey) onRowRef?.(navKey, el) }}
       onClick={onClick}
+      onKeyDown={navKey ? (e) => onKeyDown?.(e, navKey) : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      tabIndex={navKey ? 0 : undefined}
+      data-pattern-nav-key={navKey}
       style={{ paddingLeft: subItem ? ROW_PAD_SUB : ROW_PAD_FIRST }}
       className={rowClass(active)}
     >
@@ -471,18 +479,24 @@ function EditableListItem({
   active,
   dim,
   takenNames,
+  navKey,
   onSelect,
   onRename,
   onDelete,
+  onRowRef,
+  onRowKeyDown,
 }: {
   name: string
   noun: 'pattern' | 'map'
   active: boolean
   dim?: string
   takenNames: string[]
+  navKey?: string
   onSelect: () => void
   onRename: (name: string) => void
   onDelete: () => void
+  onRowRef?: (key: string, el: HTMLLIElement | null) => void
+  onRowKeyDown?: (e: React.KeyboardEvent<HTMLLIElement>, key: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
@@ -523,7 +537,11 @@ function EditableListItem({
   return (
     <AlertDialogRoot>
       <li
+        ref={(el) => { if (navKey) onRowRef?.(navKey, el) }}
         onClick={onSelect}
+        onKeyDown={!editing && navKey ? (e) => onRowKeyDown?.(e, navKey) : undefined}
+        tabIndex={!editing && navKey ? 0 : undefined}
+        data-pattern-nav-key={navKey}
         style={{ paddingLeft: ROW_PAD_FIRST }}
         className={rowClass(active)}
       >
@@ -721,6 +739,7 @@ export function PatternList() {
 
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
   const scrollRef = useRef<HTMLDivElement>(null)
+  const patternRowRefs = useRef(new Map<string, HTMLLIElement>())
   const [scrollMetrics, setScrollMetrics] = useState<ScrollMetrics>({ top: 0, height: 0, visible: false })
   const query = queries[railMode]
   const setQuery = (next: string) => setQueries((q) => ({ ...q, [railMode]: next }))
@@ -875,6 +894,64 @@ export function PatternList() {
   const isCollapsed = (label: string) => !searching && !!collapsedSections[label]
   const toggleCollapsed = (label: string) =>
     setCollapsedSections((c) => ({ ...c, [label]: !c[label] }))
+  const visibleUserPatterns = userPatterns.filter(
+    (pattern) =>
+      matchesLens(nativeDim(pattern.src), dimLens) && matchesQuery(pattern.name, query),
+  )
+  const visibleDemoSections = DEMO_SECTIONS.map((section) => ({
+    ...section,
+    names: section.names.filter(
+      (name) =>
+        matchesLens(nativeDim(DEMOS[name] ?? ''), dimLens) && matchesQuery(name, query),
+    ),
+  })).filter((section) => section.names.length > 0)
+
+  const patternNavItems = [
+    ...(!isCollapsed('Your Patterns')
+      ? visibleUserPatterns.map((pattern) => ({
+        key: `pattern:${pattern.id}`,
+        activate: () => openUserPattern(pattern),
+      }))
+      : []),
+    ...(!isCollapsed('Demos')
+      ? visibleDemoSections.flatMap((section) =>
+        isCollapsed(section.label)
+          ? []
+          : section.names.map((name) => ({
+            key: `demo:${name}`,
+            activate: () => openDemo(name),
+          })),
+      )
+      : []),
+  ]
+
+  function handlePatternRowRef(key: string, el: HTMLLIElement | null) {
+    if (el) patternRowRefs.current.set(key, el)
+    else patternRowRefs.current.delete(key)
+  }
+
+  function focusPatternRow(key: string) {
+    window.setTimeout(() => {
+      const row = patternRowRefs.current.get(key)
+      row?.focus()
+      if (typeof row?.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' })
+    }, 0)
+  }
+
+  function handlePatternRowKeyDown(e: React.KeyboardEvent<HTMLLIElement>, key: string) {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const index = patternNavItems.findIndex((item) => item.key === key)
+    if (index === -1) return
+    const nextIndex = e.key === 'ArrowDown'
+      ? Math.min(patternNavItems.length - 1, index + 1)
+      : Math.max(0, index - 1)
+    if (nextIndex === index) return
+    e.preventDefault()
+    const next = patternNavItems[nextIndex]
+    if (!next) return
+    next.activate()
+    focusPatternRow(next.key)
+  }
 
   return (
     <div className="flex flex-col h-full text-xs font-mono">
@@ -923,12 +1000,7 @@ export function PatternList() {
           )}
           {!isCollapsed('Your Patterns') && (
             <ul>
-              {userPatterns
-                .filter(
-                  (pattern) =>
-                    matchesLens(nativeDim(pattern.src), dimLens) && matchesQuery(pattern.name, query),
-                )
-                .map((pattern) => (
+              {visibleUserPatterns.map((pattern) => (
                 <EditableListItem
                   key={pattern.id}
                   name={pattern.name}
@@ -936,9 +1008,12 @@ export function PatternList() {
                   active={activePatternId === pattern.id}
                   dim={dimLens === 'all' ? `${nativeDim(pattern.src)}D` : undefined}
                   takenNames={userPatterns.filter((p) => p.id !== pattern.id).map((p) => p.name)}
+                  navKey={`pattern:${pattern.id}`}
                   onSelect={() => openUserPattern(pattern)}
                   onRename={(name) => renamePattern(pattern.id, name)}
                   onDelete={() => removePattern(pattern.id)}
+                  onRowRef={handlePatternRowRef}
+                  onRowKeyDown={handlePatternRowKeyDown}
                 />
               ))}
             </ul>
@@ -950,14 +1025,7 @@ export function PatternList() {
             onToggle={() => toggleCollapsed('Demos')}
           />
           {!isCollapsed('Demos') &&
-            DEMO_SECTIONS.map((section) => {
-              // Under a dimension lens, drop non-matching demos and hide any subsection
-              // that ends up empty — no empty headers (#251).
-              const names = section.names.filter(
-                (name) =>
-                  matchesLens(nativeDim(DEMOS[name] ?? ''), dimLens) && matchesQuery(name, query),
-              )
-              if (names.length === 0) return null
+            visibleDemoSections.map((section) => {
               const collapsed = isCollapsed(section.label)
               return (
                 <div key={section.label}>
@@ -968,15 +1036,18 @@ export function PatternList() {
                   />
                   {!collapsed && (
                     <ul>
-                      {names.map((name) => (
+                      {section.names.map((name) => (
                         <ListItem
                           key={name}
                           label={name}
+                          navKey={`demo:${name}`}
                           subItem
                           dim={dimLens === 'all' ? `${nativeDim(DEMOS[name] ?? '')}D` : undefined}
                           active={activeDemoName === name}
                           onClick={() => openDemo(name)}
                           onFork={() => handleForkDemo(name)}
+                          onRowRef={handlePatternRowRef}
+                          onKeyDown={handlePatternRowKeyDown}
                         />
                       ))}
                     </ul>

@@ -6,15 +6,17 @@
 // field into the filaments and voids that read as interstellar gas.
 
 // ── Adjustable controls ────────────────────────────────────────────────────
-export var speed = 0.5    // drift speed of the gas
+export var speed = 0.35   // drift speed of the gas
 export var zoom = 0.37    // detail scale (higher = finer, busier)
 export var warp = 0.5     // how violently the field folds
 export var twinkle = 0.33 // star density in the voids
+export var hue = 0.09     // palette hue offset
 
 export function sliderSpeed(v) { speed = v }
 export function sliderZoom(v) { zoom = v }
 export function sliderWarp(v) { warp = v }
 export function sliderTwinkle(v) { twinkle = v }
+export function sliderHue(v) { hue = v }
 
 // pos, r, g, b — all 0..1 (Pixelblaze palette convention)
 var nebula = [
@@ -63,8 +65,8 @@ export function render2D(index, x, y) {
   var hsh = Shader.hash21(floor(x * 80), floor(y * 80))
   if (hsh > thresh && density < 0.35) {
     var tw = wave(t * 5 + hsh * 9)
-    paint(0.94, max(density, tw * tw))
+    paint(frac(0.94 + hue), max(density, tw * tw))
   } else {
-    paint(0.12 + r1 * 0.82, density)
+    paint(frac(0.12 + r1 * 0.82 + hue), density)
   }
 }

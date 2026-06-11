@@ -20,8 +20,8 @@
 // UI seed the slider straight from the var's initial value — so these defaults
 // ARE the opening slider positions.
 export var ringCount = 0.5    // 0.5 -> 6 latitude bands (see nBands below)
-export var spin = 0.7         // 0.5 = still; 0.7 leans into a gentle spin
-export var speed = 0.5        // ring-tick rate; 0.5 -> once/sec (see beforeRender)
+export var spin = 0.81        // 0.5 = still; higher spins faster
+export var speed = 0.4        // ring-tick rate; 0.5 -> once/sec (see beforeRender)
 
 export function sliderRingCount(v) { ringCount = v }
 export function sliderSpin(v) { spin = v }

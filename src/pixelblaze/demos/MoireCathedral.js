@@ -4,10 +4,10 @@
 // or raymarching. It should scale well because every layer is simple periodic
 // math with frame-constant angles.
 
-export var speed = 0.38       // motion rate
-export var density = 0.42     // stripe density
-export var bloom = 0.6        // glow brightness
-export var arch = 0.55        // arch/window strength
+export var speed = 0.55       // motion rate
+export var density = 0.30     // stripe density
+export var bloom = 0.46       // glow brightness
+export var arch = 0.61        // arch/window strength
 
 export function sliderSpeed(v) { speed = v }
 export function sliderDensity(v) { density = v }

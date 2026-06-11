@@ -26,12 +26,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSharpness: 'Focus of the light: soft glowing pools at low, crisp bright veins at high.',
     sliderTint: 'Base water colour, swept around the colour wheel.',
   },
-  BubbleGlass: {
-    sliderSpeed: 'How quickly the bubbles drift through the glass.',
-    sliderBubbles: 'Number of active bubble rings.',
-    sliderShine: 'Strength of the glossy highlights.',
-    sliderTint: 'Base colour of the glass.',
-  },
   CometLoom: {
     sliderSpeed: 'How fast comet heads move around the strip.',
     sliderComets: 'Number of active comet trails.',
@@ -143,17 +137,14 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderThickness: 'Thickness of each glowing shell.',
     sliderColor: 'Base colour of the nebula.',
   },
+  NeonSquircles: {
+    sliderSpeed: 'How fast the nested squircles spin and pulse.',
+  },
   NeonCircuitBoard: {
     sliderSpeed: 'How fast packets move along the traces.',
     sliderDensity: 'Density of the repeated circuit cells.',
     sliderPulse: 'Brightness of packet glints travelling through the board.',
     sliderHue: 'Base colour of the neon traces.',
-  },
-  OrigamiLanterns: {
-    sliderSpeed: 'How quickly the lanterns drift.',
-    sliderFold: 'Strength of the folded paper seam pattern.',
-    sliderGlow: 'Brightness of the warm inner lantern light.',
-    sliderHue: 'Base colour of the paper glow.',
   },
   NebulaSphere: {
     sliderSpeed: 'How fast the gas drifts through the volume.',
@@ -178,6 +169,7 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderZoom: 'Detail scale — higher is finer and busier.',
     sliderWarp: 'How violently the gas folds in on itself.',
     sliderTwinkle: 'Density of stars in the dark voids.',
+    sliderHue: 'Shifts the nebula palette around the colour wheel.',
   },
   PulseLoom: {
     sliderTempo: 'Speed of the groove, in bars per second.',

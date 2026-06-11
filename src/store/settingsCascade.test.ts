@@ -53,8 +53,8 @@ describe('resolveActiveSettings', () => {
     const eff = resolveActiveSettings()
     expect(eff.mapId).toBe('seed-sphere-3d')
     expect(eff.pixelCount).toBe(2048)
-    expect(eff.solidity).toBe(1)
-    expect(eff.brightness).toBe(0.9)
+    expect(eff.solidity).toBe(0.08)
+    expect(eff.brightness).toBe(1)
   })
 })
 
@@ -90,7 +90,7 @@ describe('fork snapshot', () => {
     const snap = forkSettingsSnapshot()
     expect(snap.mapId).toBe('seed-sphere-3d')
     expect(snap.pixelCount).toBe(2048)
-    expect(snap.solidity).toBe(1)
+    expect(snap.solidity).toBe(0.08)
     expect('fidelity' in snap).toBe(false)
   })
 
@@ -98,8 +98,8 @@ describe('fork snapshot', () => {
     // A different demo is "active"; the per-row fork still resolves by name.
     usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
     const snap = forkSettingsSnapshotForDemo('NebulaSphere')
-    expect(snap.mapId).toBe('sphere-volume')
-    expect(snap.pixelCount).toBe(2048)
+    expect(snap.mapId).toBe('seed-sphere-3d')
+    expect(snap.pixelCount).toBe(1024)
     expect('fidelity' in snap).toBe(false)
   })
 })
@@ -176,8 +176,9 @@ describe('resetActiveSettings', () => {
     expect(usePatternStore.getState().demoOverrides.AuroraSphere).toBeUndefined()
     // Back to the recommendation…
     expect(useMapStore.getState().activePixelCount).toBe(2048)
+    expect(usePreviewStore.getState().lightSize).toBe(0.85)
     // …but the personal light-size baseline (global-sticky) is untouched.
-    expect(usePreviewStore.getState().lightSize).toBe(0.7)
+    expect(usePreviewStore.getState().lightSizeSticky).toBe(0.7)
   })
 })
 

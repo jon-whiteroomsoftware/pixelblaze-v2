@@ -552,8 +552,8 @@ describe('controllerStore (keyed)', () => {
       expect(store().preflight?.map((w) => w.kind)).toEqual(['pattern-dim-mismatch'])
       expect(store().mapPushRemedyCount).toBeNull() // never blocking
       expect(store().patternMapRemedy).toEqual({
-        mapId: 'sphere-volume',
-        mapName: 'Sphere volume',
+        mapId: 'seed-sphere-3d',
+        mapName: 'Sphere shell',
         mapDim: 3,
       })
       // Nothing pushed until the author confirms.

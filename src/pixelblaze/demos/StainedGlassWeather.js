@@ -3,10 +3,10 @@
 // Repeated cells and cheap borders do most of the work. The "weather" is a few
 // triangle-wave streaks and a global flash, not noise or particle state.
 
-export var speed = 0.42       // weather motion speed
-export var paneSize = 0.48    // glass cell density
-export var storm = 0.55       // rain/lightning strength
-export var tint = 0.55        // base glass colour
+export var speed = 0.41       // weather motion speed
+export var paneSize = 0.47    // glass cell density
+export var storm = 0.72       // rain/lightning strength
+export var tint = 0.90        // base glass colour
 
 export function sliderSpeed(v) { speed = v }
 export function sliderPaneSize(v) { paneSize = v }

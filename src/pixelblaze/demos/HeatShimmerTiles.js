@@ -2,7 +2,7 @@
 //
 // The shimmer is just coordinate offsets from triangle waves. No perlin needed.
 
-export var speed = 0.40       // shimmer speed
+export var speed = 0.57       // shimmer speed
 export var tileSize = 0.50    // tile density
 export var shimmer = 0.62     // bend amount
 export var palette = 0.04     // base heat colour

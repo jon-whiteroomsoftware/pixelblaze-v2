@@ -21,7 +21,7 @@
 //     the Fast renderer to iterate and drop the grid size for the Precise check.
 
 // ── Controls ──────────────────────────────────────────────────────────────────
-export var speed   = 0.4  // animation rate
+export var speed   = 0.3  // animation rate
 export var quality = 0.5  // march steps (detail vs. main-thread cost)
 export var depth   = 0.6  // IFS fold iterations
 export var gain    = 0.5  // overall glow brightness

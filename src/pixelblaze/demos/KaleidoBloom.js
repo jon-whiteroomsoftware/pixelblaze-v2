@@ -8,8 +8,8 @@
 // it turns rather than sitting on one tone.
 
 // ── Adjustable controls ────────────────────────────────────────────────────
-export var speed = 0.5       // spin + breathe rate
-export var zoom = 0.4        // lattice cell size
+export var speed = 1         // spin + breathe rate
+export var zoom = 0.85       // lattice cell size
 export var breatheAmt = 0.5  // how much the zoom pulses
 export var colorSpread = 0.5 // width of the radial rainbow
 

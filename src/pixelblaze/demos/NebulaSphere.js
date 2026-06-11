@@ -20,10 +20,10 @@
 // a "what the preview can render" showcase, consistent with PlasmaNebula.
 
 // ── Adjustable controls ────────────────────────────────────────────────────
-export var speed = 0.24   // drift speed of the gas through the volume
+export var speed = 0.52   // drift speed of the gas through the volume
 export var zoom = 0.72     // detail scale (higher = finer, busier)
-export var warp = 0.2     // how violently the field folds
-export var twinkle = 0.2  // star density in the voids
+export var warp = 0.16    // how violently the field folds
+export var twinkle = 0.25 // star density in the voids
 
 export function sliderSpeed(v) { speed = v }
 export function sliderZoom(v) { zoom = v }

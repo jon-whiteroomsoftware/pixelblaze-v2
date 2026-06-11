@@ -3,10 +3,10 @@
 // Cheap inverse-square blobs give the impression of fluid merging without
 // raymarching or noise. The only moving parts are five orbiting centres.
 
-export var speed = 0.38       // drift speed
-export var blobCount = 0.7    // number of active cells
-export var softness = 0.55    // merge softness
-export var palette = 0.33     // base hue
+export var speed = 0.25       // drift speed
+export var blobCount = 0.71   // number of active cells
+export var softness = 0.77    // merge softness
+export var palette = 0.34     // base hue
 
 export function sliderSpeed(v) { speed = v }
 export function sliderBlobCount(v) { blobCount = v }

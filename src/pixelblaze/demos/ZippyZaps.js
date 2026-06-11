@@ -24,7 +24,7 @@
 
 // Iteration count (perf/detail). Raw 0..1 → floor(3 + v*12) → 3..15. The
 // hardware default intentionally runs a tiny version of the original loop.
-export var iterations = 0
+export var iterations = 0.13
 export function sliderIterations(v) { iterations = v }
 
 // Per-iteration, frame-constant tables (loop-index/time-only — identical for

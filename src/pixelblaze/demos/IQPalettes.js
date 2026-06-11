@@ -60,7 +60,7 @@ var dTbl = [
 ]
 
 // Scroll speed of the palette parameter. Default ≈ the original's 0.01*iTime.
-export var speed = 0.3
+export var speed = 0.49
 export function sliderSpeed(v) { speed = v }
 
 export var t = 0

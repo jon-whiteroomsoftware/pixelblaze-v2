@@ -4,10 +4,10 @@
 // of moving "magnets" contributes inverse-distance fields, and the colour comes
 // from the signed balance between them. Rich motion, few expensive calls.
 
-export var speed = 0.45       // field drift speed
-export var spacing = 0.48     // filament density
-export var glow = 0.55        // line brightness
-export var contrast = 0.6     // field-line sharpness
+export var speed = 0.08       // field drift speed
+export var spacing = 0        // filament density
+export var glow = 1           // line brightness
+export var contrast = 0.96    // field-line sharpness
 
 export function sliderSpeed(v) { speed = v }
 export function sliderSpacing(v) { spacing = v }

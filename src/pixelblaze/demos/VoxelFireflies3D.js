@@ -3,10 +3,10 @@
 // A deterministic cell hash places one animated light in each occupied cell.
 // No arrays or particle state, just repeated coordinates and distance falloff.
 
-export var speed = 0.42       // drift speed
-export var density = 0.48     // number of cells
-export var glow = 0.55        // falloff size
-export var color = 0.18       // base hue
+export var speed = 0.92       // drift speed
+export var density = 0.46     // number of cells
+export var glow = 0.89        // falloff size
+export var color = 0.23       // base hue
 
 export function sliderSpeed(v) { speed = v }
 export function sliderDensity(v) { density = v }
@@ -19,7 +19,7 @@ var cells, falloff
 export function beforeRender(delta) {
   t = t + delta * 0.001 * (0.12 + speed * 1.4)
   cells = 3 + floor(density * 6)
-  falloff = 0.018 + glow * 0.055
+  falloff = 0.030 + glow * 0.090
 }
 
 function hash(n) {
@@ -40,7 +40,7 @@ export function render3D(index, x, y, z) {
   var d2 = dx * dx + dy * dy + dz * dz
   var blink = wave(t * (0.3 + h0 * 0.8) + h1)
   blink = blink * blink
-  var val = clamp(1 - d2 / falloff, 0, 1) * (0.35 + blink * 0.85)
+  var val = clamp(1 - d2 / falloff, 0, 1) * (0.55 + blink * 0.95)
 
-  hsv(frac(color + h0 * 0.16 + blink * 0.05), 0.82, val)
+  hsv(frac(color + h0 * 0.16 + blink * 0.05), 0.78, clamp(val + 0.018, 0, 1))
 }

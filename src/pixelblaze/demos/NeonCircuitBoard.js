@@ -4,9 +4,9 @@
 // draft used true SDF capsules/circles; these approximations keep the circuit
 // look and avoid several hypot calls per pixel.
 
-export var speed = 0.45       // packet speed
-export var density = 0.45     // cell density
-export var pulse = 0.65       // packet brightness
+export var speed = 0.62       // packet speed
+export var density = 0.08     // cell density
+export var pulse = 0.85       // packet brightness
 export var hue = 0.43         // trace colour
 
 export function sliderSpeed(v) { speed = v }

@@ -157,7 +157,7 @@ export default function App() {
   }, [source])
 
   const [leftWidth, setLeftWidth] = useState(224)
-  const [rightWidth, setRightWidth] = useState(320)
+  const [rightWidth, setRightWidth] = useState(460)
   const MIN_PREVIEW_WIDTH = 300
 
   const activeFileName =

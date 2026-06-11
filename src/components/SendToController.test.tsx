@@ -82,7 +82,7 @@ describe('SendToController', () => {
 
   it('offers the recommended-map remedy for a demo with a matching-dim recommendation', () => {
     setControllerProvider(new ConnectedProvider())
-    // NebulaSphere is a 3D demo recommending sphere-volume (3D, 2048px); the device map
+    // NebulaSphere is a 3D demo recommending Sphere shell (3D, 2048px); the device map
     // is 2D, so the dim warning fires and the remedy checkbox is offered. The confirm
     // action is mocked up front (it is wired through a prop closure, so a later swap
     // wouldn't take) — requestPush stays real to open the dialog and arm the remedy.
@@ -99,7 +99,7 @@ describe('SendToController', () => {
 
     const dialog = screen.getByTestId('pattern-preflight-dialog')
     expect(screen.getByRole('checkbox')).toBeChecked()
-    expect(dialog).toHaveTextContent(/Sphere volume/)
+    expect(dialog).toHaveTextContent(/Sphere shell/)
 
     // With the box checked the action installs the map first.
     fireEvent.click(screen.getByRole('button', { name: /install & send/i }))
