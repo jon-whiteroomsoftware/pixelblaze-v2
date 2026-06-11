@@ -1,416 +1,435 @@
 # PXLBLZ — Feature Guide
 
-This is the guide for someone who **uses Pixelblaze** and wants to know what
-**PXLBLZ** does for them — what's on the screen, what each control means, and how the
-whole thing fits the way a real Pixelblaze works. It assumes you already understand
-Pixelblaze concepts (patterns, maps, controls, fixed-point); if you don't, read the
-**Pixelblaze Ecosystem Primer** first. It says nothing about how PXLBLZ is *built* —
-for that, see the **PXLBLZ Technical Reference**.
+For people who use Pixelblaze and want to know what **PXLBLZ** does for them. It
+assumes you know the Pixelblaze concepts — patterns, maps, controls, fixed-point;
+if you don't, read the **Pixelblaze Ecosystem Primer** first. How PXLBLZ is *built*
+is the **PXLBLZ Technical Reference**'s job.
 
----
-
-## What it is, in a sentence
-
-A browser-based pattern editor for Pixelblaze that lets you **write, preview, and
-tune patterns entirely offline** — no controller, no network, no install — and then
-paste or download the result straight onto your device.
+**The whole document in two sentences.** PXLBLZ is a browser-based pattern editor
+for Pixelblaze that lets you write, preview, and tune patterns entirely offline —
+no controller, no network, no install — and then put the result onto your device,
+either by hand or over a live connection. The preview is built to be faithful to
+real hardware (down to optional 16.16 fixed-point emulation), and everything the
+IDE invents for previewing stays in the browser: only patterns and maps ever reach
+a controller.
 
 **[Open PXLBLZ →](https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/)**
 
----
-
-## Why you'd use it instead of the on-device editor
-
-The editor built into every Pixelblaze is functional but bare. PXLBLZ exists to
-fix three specific limitations:
-
-1. **It needs no hardware.** The stock editor only works with a controller powered up
-   and on the network. This one runs the whole loop — editing, compiling, and a live
-   animated preview — in your browser. You can develop patterns on a plane.
-2. **It's a real editor.** Instead of a plain text box, you get Monaco (the engine
-   behind VS Code): autocomplete, signature hints, and live error-checking that knows
-   the Pixelblaze dialect and flags constructs the firmware won't accept *before* you
-   ever upload.
-3. **It has reusable libraries.** The stock editor makes every pattern self-contained
-   — no shared code. Here you can call `SDF.circle(...)` or `Anim.ease(...)` from a
-   bundled library, and the IDE inlines only what you actually use into the exported
-   file, keeping it small enough for the device.
-
-Everything is offline-first: editing, compiling, and previewing never need a device or
-a network. When you *do* have a Pixelblaze on your LAN, the IDE can also **connect to
-it live** — read its state, drive its controls, and push patterns and maps straight to
-it — through a small browser extension (see "Connecting to a Controller"). And with no
-device at all, Copy/Download still bridges your work onto hardware by hand.
+**Part 1** is the tour — what's on the screen and what it's for. **Part 2** is the
+reference — exact control semantics, what sticks where, and the full Controller
+details.
 
 ---
 
-## The preview — the heart of the IDE
+# Part 1 — Tour
 
-The preview is not a rough approximation. It is built to match what your hardware
-will actually do, across all three dimensionalities.
+## 1. What it does — and doesn't
 
-### It renders 1D, 2D, and 3D
+PXLBLZ is a modern IDE for Pixelblaze patterns. It sits alongside the on-device
+editor rather than replacing it — it deliberately doesn't mirror every device
+function, and the device's own web UI remains the place for device management.
 
-The IDE reads your render functions and figures out the pattern's dimensionality
-automatically: a `render()` pattern is 1D, `render2D` is 2D, `render3D` is 3D. Then
-it draws the pattern on a configurable arrangement of glowing LED dots you can watch
-animate in real time.
+### What's different about it
 
-For 3D patterns (and for 1D/2D patterns wrapped onto a 3D form) you get an **orbit
-viewport**: it auto-spins by default, and you can drag to freely orbit it — horizontal
-drags yaw, vertical drags tilt (dragging down tips the top toward you), with the
-horizon held level so you never roll. Grabbing the model just holds the spin still;
-it resumes the instant you let go. Only play/pause and reset change whether it spins.
-Nearer dots are drawn larger and brighter (depth cueing) and properly occlude the ones
-behind, so a sphere reads as a sphere.
+- **It needs no hardware.** The whole loop — editing, compiling, a live animated
+  preview faithful to the device's fixed-point math — runs in your browser. A
+  controller is a deploy target, not your workspace. You can develop patterns on
+  a plane.
+- **Your work lives off the device.** Patterns and maps are saved outside
+  Pixelblaze hardware, so they aren't tied to any one controller's storage
+  (§10).
+- **Modern IDE features.** Monaco (the engine behind VS Code) with autocomplete,
+  signature hints, and hover API cards for the built-ins and libraries;
+  background compilation with inline error markers that know the Pixelblaze
+  dialect (broken code keeps the last good version running in the preview);
+  quiet auto-save (§9).
+- **Reusable libraries.** Call `SDF.circle(...)` or `Anim.ease(...)` from a
+  bundled library; export inlines only what you actually use, keeping the
+  artifact small enough for the device (§5).
+- **A first-class Controller connection.** With a Pixelblaze on your LAN you can
+  discover and connect to it, mirror its state live, drive the running pattern's
+  controls in real time, and push patterns and maps (§6, §11).
+- **A bench harness.** Scripted, repeatable benchmarking that runs a pattern
+  under the emulator or pushes it to a real controller and reads back FPS. Not
+  covered in this guide — see **Optimizing Pixelblaze patterns**.
 
-### The map is yours, not the device's
+### What else you can do
 
-Just like real hardware, a **pixel map** describes where each LED physically sits,
-decoupled from its order in the chain. You choose what your pattern previews against:
+- Import `.epe` files exported from the hardware editor or downloaded from the
+  pattern library site (§7).
+- Copy or download a flat, tree-shaken `.js` of your pattern plus the library
+  code it uses, ready to paste into the device editor (§7).
+- Preview in 1D, 2D, and 3D, with an orbit viewport and a Fast/Precise
+  fixed-point renderer toggle (§3).
+- Author custom maps in real Mapper JavaScript, and push stock or custom maps to
+  a connected device (§4, §11).
+- Clone any demo or stock map into an editable copy (§5).
+- Keep your patterns and maps saved locally in the browser — no account, no
+  cloud (§10).
 
-- **Stock maps** ship ready to use: **Square**, **Wide 2:1**, **Ring**, **Cube shell**
-  and **Cube volume**, **Sphere shell** and **Sphere volume**, **Star shell** and **Star
-  volume**, and **Tetra shell** and **Tetra volume** (a four-sided die / d4). "Shell"
-  maps put LEDs on the surface of the shape; "volume" maps fill the interior.
-- **Custom maps** — click **New Map** and you get an editor on a plain
-  `function(pixelCount)`, *exactly* the thing a real Pixelblaze Mapper tab evaluates.
-  Write the geometry of your actual tree, sphere, or sculpture and preview your
-  pattern against it. (Because it's the real Mapper dialect, it's full JavaScript with
-  `Math.*` — not the pattern dialect. The IDE handles the difference.) Author in
-  whatever units fit the build — inches, millimetres, raw pixels — and it scales
-  itself; the firmware derives the world's extent from your coordinates' limits and
-  normalizes to `0..1`. (Hardware's Mapper also accepts a hand-written JSON array of
-  coordinates for irregular layouts; the IDE's editor is the function flavor.)
-- **Clone stock maps** — every stock map is real, pasteable Mapper code with no hidden
-  magic. Open one read-only under **Stock Maps**, then click **Clone** to create an
-  editable custom map from the same source.
+### What it doesn't do
 
-Custom maps auto-bake as you edit (the same once-at-save evaluation hardware does),
-but they do not automatically change the running preview. To try a map with a pattern,
-choose it deliberately from the preview's **Map** control.
+- **Pattern management on the device.** It won't list, rename, or delete the
+  device's saved patterns, or drive playlists — that belongs to the device's own
+  UI. Send pushes one pattern at a time (run or save), nothing more (§11).
+- **Read patterns back from a controller.** The import path is `.epe` files, not
+  a device connection.
+- **Device setup.** LED hardware type, WiFi, expanders, and the rest of the
+  device's settings stay on the device's settings page. (The live panel's
+  editable pixel count is the one exception, §11.)
+- **Sensor input in the preview.** Sensor-reactive patterns load and run, but
+  sound, accelerometer, and light inputs are inert stubs off-device (§12).
+- **Multi-controller sync.** Several Controllers can be connected at once, but
+  each independently — synchronised playback across devices is Firestorm
+  territory (Ecosystem Primer).
 
-### How the layout controls work
+## 2. Screen at a glance
 
-Where each dot is *drawn* is a display choice, separate from what coordinates your
-pattern reads. The IDE splits this into two controls, deliberately placed to make the
-real-versus-viewport boundary legible:
+- **Header** — the PXLBLZ wordmark and the **Libraries** menu on the left
+  (authoring reference); the **Controller** connection surface on the right
+  (hardware).
+- **Left rail** — your patterns and maps, plus the shipped demos and stock maps,
+  with a dimension filter and name search (§10).
+- **Editor pane** (centre) — Monaco, in pattern mode or map mode (§9).
+- **Preview pane** (right) — the animated canvas, a play/pause transport row, and
+  the **control deck** below it: device-like settings, preview-only viewing
+  controls, your pattern's own controls, and a variable watcher (§8).
 
-- A **Map** control (for 2D and 3D patterns) — picks the geometry your pattern reads.
-  It lives **inside the PIXELBLAZE block** of the control deck, alongside the other
-  settings a real device would carry (it's a stacked, full-width field, since map names
-  are long). For a **1D** pattern there is no map at all — the Map control is absent
-  entirely, not just disabled.
-- An **embedding** control — picks how it's drawn. It sits on the **transport row**
-  next to the play/pause toggle (a viewport affordance, not a device setting). For a
-  **1D** pattern this offers **shapes**: a straight **line**, a **ring**, or a **pole**
-  (a helix wound around a cylinder, with an adjustable wrap density). For a **2D**
-  pattern it offers **surfaces**: **Flat** (the ordinary grid) or **Cylinder** (the
-  grid wrapped onto a tube). The cylinder's proportions come from your map's aspect — a
-  square map makes a tall slender tube, a 2:1 map a fatter one.
+## 3. Preview
 
-So a 1D pattern shows just the embedding (no map), a 2D pattern with a wrappable map
-shows both, and a 3D pattern shows just the map. Controls that offer no real choice are
-hidden. Your selection is remembered per pattern.
+The preview is not a rough approximation; it is built to match what your hardware
+will do, across all three dimensionalities.
 
-### Hardware-faithful math: Fast vs. Precise
+**It renders 1D, 2D, and 3D.** The IDE reads your render functions and infers the
+pattern's dimensionality (a `render()` pattern is 1D, `render2D` 2D, `render3D`
+3D), then draws it on a configurable arrangement of glowing dots. For 3D — and for
+1D/2D patterns wrapped onto a 3D form — you get an **orbit viewport**: it
+auto-spins, you can drag to orbit freely (horizontal drags yaw, vertical drags
+tilt, horizon held level), and grabbing it just holds the spin until you let go.
+Nearer dots draw larger and brighter and occlude the ones behind, so a sphere reads
+as a sphere.
 
-Pixelblaze runs 16.16 fixed-point, not floats — and that difference is exactly where
-ported GPU shaders break (a big-number hash that looks perfect in floating point
-overflows and turns to noise on the device). The preview's **renderer** toggle lets
-you choose:
+**Hardware-faithful math.** Pixelblaze runs 16.16 fixed-point, not floats — and
+that gap is exactly where ported GPU shaders break. The **renderer** toggle picks:
 
-- **Fast** (the default) — plain float64. Smooth and good enough for everyday
-  editing.
-- **Precise** — emulates the controller's exact 16.16 arithmetic: overflow,
-  precision loss, bitwise semantics and all, validated against a real device. Flip to
-  Precise when you need to trust that what you see is what the device will do.
+- **Fast** (default) — plain float64. Smooth, right for everyday editing.
+- **Precise** — emulates the controller's 16.16 arithmetic: overflow, precision
+  loss, bitwise semantics, validated against a real device. Flip to Precise when
+  you need to trust that what you see is what the device will do.
 
-A couple of honest caveats: `perlin` and the random functions are *different
-algorithms* from firmware, so they diverge slightly even in Precise mode (pure
-integer math is bit-identical). And Precise is slower — that's why Fast is the
-default.
+Two honest caveats: `perlin` and the random functions are different algorithms
+from firmware, so they diverge slightly even in Precise mode (pure integer math is
+bit-identical), and Precise is slower — which is why Fast is the default.
 
-### Light size, diffusion, and solidity
+**Viewing controls.** Three preview-only sliders shape how the dots look — none
+touch your pattern's math or ever reach hardware: **light size** (how big each
+source draws), **diffusion** (blurs sources together like a diffuser sheet), and
+**solidity** (for closed shapes, fades the back-facing dots so a solid object
+hides its own back). Exact semantics and what sticks where: §8.
 
-Three preview-only viewing controls shape how the dots *look* (none of them touch
-your pattern's math or ever reach hardware):
+## 4. Maps and embeddings — what's read vs. how it's drawn
 
-- **Light size** — how big each light source is drawn, as a fraction of the spacing
-  between dots. It grows the dots in place; it never moves them or resizes anything.
-- **Diffusion** — blurs the sources together like a physical diffuser sheet over real
-  LEDs. At 0 they're crisp and distinct; turned up, they merge into a smooth gap-free
-  field. It never changes a source's size and never dims the overall image.
-- **Solidity** — appears only for shapes that have a front and a back (a sphere shell,
-  a cube shell, a cylinder, a pole). It fades out the back-facing dots so a solid
-  object hides its own back, on a slider from transparent (see straight through, like
-  LEDs on glass or wire mesh) to fully solid.
+Just like real hardware, a **pixel map** describes where each LED sits, decoupled
+from chain order. The IDE splits "layout" into two deliberately separate controls:
 
-Light size and diffusion are *comfort* settings: the value you dial in becomes your
-default for every pattern (set once, stays set), unless a particular pattern needs its
-own — then your adjustment on that pattern sticks to just that pattern. Solidity is
-always *per-pattern*: it's part of what the object *is*, not a viewing preference.
+- The **Map** control picks the geometry your pattern *reads* — the coordinates
+  fed to `render2D`/`render3D`. It lives inside the **PIXELBLAZE block** of the
+  deck, with the other settings a real device would carry.
+- The **embedding** control picks how the dots are *drawn* — a viewport choice the
+  device never sees. It sits on the **transport row** beside play/pause.
 
-### Fill vs. Contain
+Which controls appear depends on the pattern's dimensionality; a control that
+offers no real choice is hidden, not disabled:
 
-The **fit** control mirrors the Pixelblaze Mapper's own Fill/Contain dropdown — both
-are real device behaviours, chosen per pattern:
+| Pattern | Map control | Embedding control |
+|---|---|---|
+| 1D | — (no map at all) | shape: **line**, **ring**, or **pole** (a helix with adjustable wrap density) |
+| 2D | ✓ | surface: **Flat** or **Cylinder** (proportions follow the map's aspect) |
+| 3D | ✓ | — (the map owns the geometry) |
 
-- **Contain** (default) keeps your map's true aspect ratio (a circle stays a circle on
-  a non-square map).
-- **Fill** stretches each axis independently to fill the unit square.
+**Stock maps** ship ready to use: Square, Wide 2:1, Ring, and a 3D set in
+shell/volume pairs — Cube, Sphere, Star, and Tetra (a d4), where "shell" puts LEDs
+on the surface and "volume" fills the interior. Every stock map is real, pasteable
+Mapper code: open one read-only under Stock Maps and **Clone** it into an editable
+copy.
 
-### The control deck, at a glance
+**Custom maps**: click **New Map** and you get an editor on a plain
+`function(pixelCount)` — exactly what a real Pixelblaze Mapper tab evaluates, full
+JavaScript with `Math.*`, authored in whatever units fit your build. Custom maps
+re-bake automatically as you edit (the same once-at-save evaluation hardware does)
+but never change the running preview on their own; you assign a map to a pattern
+with the preview's Map control.
 
-Below the canvas, controls are grouped by what they *are* — a distinction the IDE
-makes visible:
+## 5. Patterns, demos, and libraries
 
-- **Pixelblaze group** — settings that exist on real hardware and would round-trip to
-  a controller: the **map**, **pixels** (the count — a single number; the map arranges
-  it, e.g. the Square map squares it up), **fit** (Fill/Contain), and **brightness**.
-  The map is a stacked, full-width field; for a 1D pattern the map and fit are absent
-  entirely, leaving just pixels and brightness. The brightness slider is
-  **logarithmic** — its travel devotes more of the track to the dim end, where small
-  changes matter most, while still reading and writing plain `0..1` brightness.
-- **Preview group** — things the IDE's renderer invents and the device never sees,
-  with the live read-only telemetry folded in at the top: **fps**, **elapsed** time,
-  and the active **layout**'s dimensions, then **renderer** (Fast/Precise) and
-  **speed** (0.1×–2× playback via a virtual clock), then the viewing sliders **light
-  size**, **diffusion**, and **solidity** (when applicable). A **rewind icon** next to
-  the section title pops in whenever you've changed a setting from its default, and
-  resets the preview with one click (see below).
-- **Pattern controls** — the sliders, toggles, and colour pickers your pattern
-  exports (see below).
-- **Watch variables** — the var watcher (see below).
+The left rail holds **Your patterns** (stored in this browser, no account or
+cloud), **Demos** (read-only, runnable examples — shader ports, eased sweeps,
+noise fields, test patterns), and in Maps mode **Your maps** and **Stock maps**. A
+new pattern starts from a runnable animated starter; any demo or stock map can be
+**cloned** into an editable copy. Demos can open with a recommended map, pixel
+count, and solidity — defaults only, everything stays switchable (§8).
 
-A play/pause toggle sits on the transport row, with the embedding (shape/surface)
-control beside it; the preview runs by default.
-
----
-
-## Live controls and the var watcher
-
-These reproduce two things you'd see on the device's own UI:
-
-- **Pattern controls.** Export a `sliderX`, `toggleX`, `hsvPickerX`, or `rgbPickerX`
-  function and the IDE renders the matching widget — the same controls the hardware
-  shows — and feeds your function the values live. (The output-style controls
-  `showNumber`, `gauge`, plus `trigger` and `inputNumber`, are recognised but don't
-  yet render a widget; the pattern still loads and runs.)
-- **Watch variables.** Turn on the var watcher to see the live value of every `export var`
-  in your pattern, refreshed each frame — arrays shown element by element, just like
-  the on-device Var Watcher.
-
----
-
-## The editor
-
-Monaco in a Pixelblaze language mode:
-
-- **Autocomplete and signature hints** for the full built-in surface and for every
-  function in the bundled libraries.
-- **Live error checking.** As you type, the IDE flags both syntax errors and
-  Pixelblaze-specific violations — using `let`/`const`/`class`/`new`/`switch`/`try`/
-  `throw`/`import`, the things the firmware rejects — as inline markers, plus a
-  Good/Broken status badge. Broken code keeps the last good version running in the
-  preview rather than blanking it.
-- **Hover cards** on library functions with usage summaries.
-- It quietly **auto-saves** your work to the browser's local storage, and pushes
-  clean changes to the preview as you pause typing.
-
-The editor also doubles as the **map editor** (map mode) when you're writing or reading
-map source — there it's a plain-JavaScript surface with its own parse-checking badge.
-Custom maps are editable and deletable; stock maps open read-only with **Clone**.
-
----
-
-## Patterns, libraries, and demos
-
-The left rail has a primary **Patterns / Maps** switch. **Patterns** shows **Your
-patterns** and **Demos**; **Maps** shows **Your maps** and **Stock maps**. The
-**libraries** live outside the rail in a dropdown in the header (see below). Below the
-mode switch is a **filter row** that combines two things:
-
-- A **dimension lens** — a single-select **All / 1D / 2D / 3D** filter. Pick a
-  dimensionality and the rail shows only items of that native dimension in the active
-  mode (a pattern's dimension is the highest render function it defines). Maps have no
-  1D form — 1D uses viewport shapes, not maps — so the 1D pill is hidden in Maps mode;
-  if you enter Maps while the lens is on 1D, the IDE silently switches the lens to 2D.
-  Empty demo subsections are hidden rather than left as bare headers. The lens is
-  ephemeral — it resets to All on reload, and the active document stays loaded even
-  when filtered out of view.
-- A **type-down name search** — a magnifier on the right of the same row expands into a
-  search box; type to filter by name. It AND-combines with the dimension lens (both must
-  match). An active query force-expands any collapsed groups to surface hits, restoring
-  their collapse state when you clear it. Clicking the magnifier opens and focuses the
-  box; once open it becomes an X that clears and closes; clicking anywhere else in the
-  IDE also closes it. The search text is separate between Patterns and Maps, while the
-  dimension lens is shared.
-
-The mode switch and filter row stay fixed at the top of the rail. Only the item lists
-scroll, with a slim overlay thumb that does not take horizontal space, so switching
-between a long Patterns list and a shorter Maps list does not shift row widths.
-
-What's in the rail:
-
-- **Your patterns** — created, renamed, and deleted by you; stored in the browser
-  (IndexedDB), so they persist between sessions with no account or cloud. A new
-  pattern starts from a runnable animated starter. Delete is available from the editor
-  header as a visible, confirmation-guarded action, with the rail hover action as a
-  shortcut.
-- **Your maps** — your custom maps (see "The map is yours").
-- **Stock maps** — every shipped source-backed map, browseable read-only in map mode,
-  cloneable into Your Maps, and sendable directly to a Controller.
-- **Demos** — ready-to-run examples: shader ports, eased sweeps, noise fields, and
-  per-dimension test patterns. The *code* is read-only, but **Clone** forks any demo
-  into your own editable copy. Some demos open on a recommended map, pixel count, and
-  solidity (e.g. the sphere demos open as dense, solid spheres) — defaults only;
-  everything stays switchable, and your changes to a demo's preview settings are
-  remembered for that demo (its code stays read-only). Forking takes a snapshot of how
-  the demo looks *right now* into your copy, with no live link back: later tweaks to
-  the demo's recommended look won't change your fork.
-
-### Libraries (in the header)
-
-The bundled libraries live in a **Libraries** dropdown in the header's left zone, beside
-the PXLBLZ wordmark (the header's spatial grammar: identity and authoring reference on
-the left, hardware and preview on the right). Open the menu and click a library to view
-its source read-only in the editor (and its API surface appears on hover). The menu also
-lists **PixelBlaze**, the built-in surface, which is hover-only documentation with no
-source to open.
+The bundled **libraries** live in the header's Libraries menu — click one to view
+its source read-only, hover for its API reference:
 
 | Library | What it provides |
 |---|---|
 | `SDF` | 2D signed distance fields — circles, rects, rings, stars, polygons, smooth boolean ops |
-| `Anim` | Easing curves, oscillators, phase timing, looping primitives |
+| `Anim` | easing curves, oscillators, phase timing, looping primitives |
 | `Color` | HSV/RGB blends, palette interpolation, colour math |
-| `Coord` | Polar coordinates, rect↔polar conversion, transforms |
-| `Noise` | Value noise, organic variation (hashes made hardware-safe) |
-| `Shader` | GLSL gap-fillers (`fract`, `step`, `dot`, `reflect`, palettes, integer hashes) for shader ports |
+| `Coord` | polar coordinates, rect↔polar conversion, transforms |
+| `Noise` | value noise, organic variation (hashes made hardware-safe) |
+| `Shader` | GLSL gap-fillers (`fract`, `step`, `dot`, palettes, integer hashes) for shader ports |
 
-Once you adjust a pattern's *or a demo's* preview settings, those tweaks are remembered
-with that pattern (or demo) and restored next time you open it. The **rewind icon** by
-the Preview section header appears once you've changed anything from its default; click
-it to reset the whole preview at once — a user pattern drops back to the app defaults, a
-demo reverts to how its author recommended it. Your personal light-size and diffusion
-comfort baseline isn't touched by a reset (that's a global preference, not part of the
-pattern).
+The `Shader` library plus the Precise renderer make the IDE a comfortable home for
+porting ShaderToy-style GLSL: the library fills the genuine GLSL gaps with
+hardware-safe equivalents (notably integer hashes that don't overflow on the
+device). Porting is human-driven — some idioms translate cleanly, some need
+rewriting, and GPU-only features (textures, multipass feedback, `dFdx`) won't port.
 
----
+## 6. Working with a real Controller
 
-## Porting GPU shaders
+When a Pixelblaze is on your LAN, the IDE talks to it live through a small Chrome
+helper extension (a deployed web page can't open a `ws://` LAN connection itself —
+Ecosystem Primer §11). Install it once; the in-app Connect surface walks you
+through it. Then:
 
-Because the Precise renderer lets you trust the preview against real fixed-point
-behaviour, the IDE is a comfortable home for porting ShaderToy-style GLSL onto LEDs.
-The `Shader` library fills the genuine GLSL gaps (`fract`, `step`, `sign`, vector
-helpers, IQ palettes, and integer hashes that *don't* overflow on the device). Some
-idioms translate cleanly, others need rewriting, and GPU-only features simply won't
-port (textures, multipass feedback, `dFdx`, etc.). Porting is human-driven with
-library support — there's no automatic GLSL converter.
+- **Find your Controller** from the connect dropdown (top right): pick it from the
+  auto-discovered list, or type its IP.
+- **Grant access once per device** — Chrome's native "Allow access to `<ip>`?"
+  prompt, remembered thereafter.
+- **Mirror and drive it live**: a panel shows the active pattern, brightness,
+  pixel count, installed map size, and FPS, with the running pattern's controls
+  draggable in real time.
+- **Send to Controller** compiles the open pattern with the device's own compiler
+  and pushes it — transiently (**Run**) or into the device's Saved Patterns
+  (**Save**).
+- **Send map to Controller** writes the open map to the device's single shared map
+  slot, confirm-first.
 
----
+Connecting is strictly additive — the offline workflow doesn't change, and nothing
+the preview invents (light size, diffusion, solidity, Fast/Precise) is ever sent
+to the device. Full reference: §11.
 
-## Connecting to a Controller
+## 7. On and off hardware by hand
 
-When a Pixelblaze is on your LAN, the IDE can talk to it live. A deployed web page can't
-reach a `ws://` device by itself (see the Ecosystem Primer §7), so this works through a
-small **Chrome extension** that relays the connection. Install it once (unpacked, from
-the `extension/` folder — see its README), and a connection surface appears top-right.
-Before anything is connected it reads as a **Connect** button (a two-prong plug glyph
-plus the word "Connect"), the same visual family as the pill it becomes once a device is
-attached.
+No device, no extension, or just by preference:
 
-- **Find your Controller.** Open the connect dropdown (top-right) and you get two ways in:
-  - **Discover.** The dropdown lists Pixelblazes it found on your network, by name. A
-    browser can't scan the LAN itself, so discovery goes through Pixelblaze's cloud
-    finder (the same service the official tools use) — your devices just need to have
-    reached the internet at least once. The list runs automatically when you open the
-    dropdown and refreshes itself periodically; a **rescan** button (it spins while
-    working) forces a fresh look. Click a device to connect to it.
-  - **By IP.** If you know the Controller's LAN address, type it in and connect. This
-    always works, even if cloud discovery can't see the device.
-- **Grant access, once per device.** The first time you connect to a given Pixelblaze,
-  the extension surfaces Chrome's native **"Allow access to `<ip>`?"** prompt — approve
-  it once and that device is remembered. (Connecting to several discovered devices can
-  batch their prompts into one.) This per-device grant is what lets the extension be
-  least-privilege rather than asking for blanket network access.
-- **Connect and status.** The status dot reads at a glance: **dark grey** = the extension
-  isn't installed; **grey** = installed but nothing connected; **amber, blinking** =
-  connecting; **green** = connected; **red** = a connection error. Each connected
-  Controller gets its own **pill** showing its **name** — the IDE remembers the name, so
-  the pill reads "burner-bag" rather than a bare IP, even mid-connect or right after a
-  reload. The connection **reconnects on its own** if the device blips off and back.
-  Click a pill to make it active and open its panel; you can keep more than one connected.
-- **The live panel** (a pinned popover under the active pill) mirrors the device in real
-  time. It's laid out in rows: the **active pattern** name and a **brightness** slider on
-  top; the installed **map's point count** and the **pixel count** next; the device's
-  **IP** and **frame rate** last. The map-points figure is flagged amber when it
-  disagrees with the pixel count (a mismatched map is silently ignored by the firmware,
-  so this makes the footgun visible). The **pixel count is editable** — committing a new
-  value saves it to the device (it's the only way to make a fixed-size map apply); the
-  input holds your entered value, dimmed, while the slow saved write is in flight, so a
-  mid-write poll can't flash the old count back. The **brightness** slider (logarithmic,
-  like the preview's) and the running pattern's **live controls** drive the device
-  directly; these are volatile (not written to flash, to spare it). A control whose
-  device value can't be read as a real `0..1` position — a run-only pattern reports none,
-  and a saved pattern reports the bound variable's mutated value, not a slider position —
-  shows an **indeterminate** hollow-ring state with a `—` readout, still draggable so you
-  can set it. Closing and reopening the *same* device's panel shows its last-known values
-  immediately rather than flashing blank; switching to a different device clears first.
-- **Send to Controller** (in the editor header) compiles the open pattern with the
-  *device's own compiler* and pushes the result to the Controller. A small text
-  **Run / Save** pill beside the Send button picks the mode, and the primary Send
-  button's glyph and tooltip follow it:
-  - **Run** (default) — load and run the pattern transiently. It plays immediately but is
-    **not** added to the device's Saved Patterns; its name lives only in the IDE.
-  - **Save** (toggle armed) — persist the pattern to the device's Saved Patterns *and*
-    activate it, so it shows up named in the saved list and starts running. Save
-    **overwrites in place** — repeated Saves update the same on-device program instead of
-    piling up copies.
-
-  Run and save are tracked independently, so a clean run push doesn't satisfy a pending
-  save (flip the toggle and Send re-arms). Send is enabled when a Controller is connected
-  and the pattern compiles cleanly; if the IDE can tell the pattern's dimensionality won't
-  match the device's installed map, it says so. **Demos can be sent directly** — no need
-  to fork one into your own patterns first. (There's no longer a pre-push heads-up about
-  pixel-count differences: a pattern push sends bytecode only and keeps the device's
-  existing map, so a count mismatch is just "this won't look right," not something to
-  block on.)
-- **Send map to Controller** (in map mode) writes the open custom or stock map to the
-  device's single shared map slot — a deliberate, confirm-first action, since one map is
-  shared by every pattern on the device. The IDE re-bakes the map to the device's exact
-  pixel count first, because the firmware drops any map whose point count doesn't match.
-
-This is all **additive** — nothing about connecting changes the offline workflow, and
-nothing the preview invents (light size, diffusion, solidity, the fast/precise choice)
-is ever sent to the device; only the pattern and, when you ask, the map.
-
----
-
-## Getting patterns on and off hardware by hand
-
-When you don't have a live connection (no device, no extension, or just by preference):
-
-- **Copy Code / Download.** The IDE emits a single flat `.js` file — every library
-  function you used inlined, `export`s preserved — in exactly the format the device
-  expects. Paste it into the built-in Pixelblaze editor, or download it to upload.
-  (Disabled while your code has a compile error.)
-- **Import.** Open `.epe` files exported from the Pixelblaze hardware editor; they
+- **Copy Code / Download** emits a single flat `.js` — every library function you
+  used inlined, `export`s preserved — exactly the format the device expects. Paste
+  it into the built-in Pixelblaze editor or upload the file. Disabled while your
+  code has a compile error.
+- **Import** opens `.epe` files exported from the Pixelblaze hardware editor; they
   land as new editable patterns.
 
 ---
 
-## Good to know
+# Part 2 — Reference
 
-- **Patterns run on your browser's main thread.** A genuinely infinite loop can freeze
-  the tab — there's no watchdog like the real hardware has. The IDE reduces the risk by
-  only running code that compiles cleanly, but a valid-but-infinite loop will still
-  hang.
-- **`perlin` and the random functions diverge slightly** from firmware even in Precise
-  mode; they're different algorithms, not reverse-engineered. Pure integer math is
-  bit-identical on both sides.
-- **Sound- and sensor-reactive patterns load and run**, but the sensor inputs (the
-  sound FFT, accelerometer, light sensor) are inert stubs here, so those patterns
-  won't animate from audio or motion in the preview.
-- **Everything is per-browser.** Your patterns and settings live in this browser's
-  local storage. There's no account and no sync between machines.
+## 8. Control deck, control by control
+
+Controls group by what they *are*, and the IDE keeps that boundary visible.
+
+### PIXELBLAZE block — settings real hardware would carry
+
+These would round-trip to a controller:
+
+- **Map** — the geometry the pattern reads (§4). A stacked full-width field
+  (map names are long). Absent entirely for 1D patterns.
+- **Pixels** — the LED count, a single number; the map arranges it (the Square
+  map squares it up).
+- **Fit** — the Fill/Contain choice, mirroring the Pixelblaze Mapper's own
+  dropdown; both are real device behaviours, chosen per pattern. **Contain**
+  (default) preserves the map's true aspect — a circle stays a circle; **Fill**
+  stretches each axis to the unit square. Absent for 1D.
+- **Brightness** — a **logarithmic** slider: more of the track is devoted to the
+  dim end, where small changes matter most, while reading and writing plain
+  `0..1`.
+
+### Preview block — things the device never sees
+
+Telemetry first: **fps**, **elapsed** time, and the active layout's dimensions.
+Then:
+
+- **Renderer** — Fast / Precise (§3).
+- **Speed** — 0.1×–2× playback via a virtual clock; the pattern's own sense of
+  time scales with it.
+- **Light size** — how big each light source draws, as a fraction of the spacing
+  between dots. Grows dots in place; never moves them.
+- **Diffusion** — blurs sources together like a physical diffuser sheet. At 0
+  they're crisp; turned up, they merge into a smooth, gap-free field. Never
+  changes a source's size, never dims the image.
+- **Solidity** — only for shapes with a front and a back (sphere shell, cube
+  shell, cylinder, pole). Fades back-facing dots, from transparent (LEDs on glass
+  or mesh) to fully solid.
+
+A **rewind icon** beside the Preview title appears whenever any setting differs
+from its default, and resets the whole preview in one click (semantics below).
+
+### What sticks where
+
+- **Per pattern**: map, pixels, fit, solidity, speed, brightness — adjust them on
+  a pattern (or a demo) and they're remembered for it and restored next open.
+- **Comfort baselines**: light size and diffusion are global — dial them in once
+  and they're your default everywhere. Adjusting one *on a particular pattern*
+  sticks to just that pattern, on top of your baseline.
+- **Demos** may carry recommended settings (map, pixel count, solidity — the
+  sphere demos open as dense solid spheres). They're defaults only; your tweaks
+  outrank them and are remembered per demo. **Forking** a demo snapshots how it
+  looks right now into your copy, with no live link back.
+- **Reset (the rewind icon)**: a user pattern drops back to app defaults; a demo
+  reverts to its author's recommended look. Your light-size/diffusion comfort
+  baseline is never touched by a reset — it's a preference, not part of the
+  pattern.
+- **Renderer (Fast/Precise) is the one pure-global setting** — a machine choice,
+  never per-pattern.
+
+### Pattern controls and the var watcher
+
+- **Pattern controls** — export a `sliderX`, `toggleX`, `hsvPickerX`, or
+  `rgbPickerX` function and the IDE renders the matching widget, feeding your
+  function values live — the same controls the hardware shows. `showNumber`,
+  `gauge`, `trigger`, and `inputNumber` are recognised but don't render a widget
+  yet; the pattern still loads and runs.
+- **Watch variables** — the var watcher shows the live value of every
+  `export var`, refreshed each frame, arrays element by element — just like the
+  on-device Var Watcher.
+
+## 9. Editor in detail
+
+Monaco in a Pixelblaze language mode:
+
+- **Autocomplete and signature hints** for the full built-in surface and every
+  bundled library function, with **hover cards** on library functions.
+- **Live error checking** — syntax errors plus the Pixelblaze-specific violations
+  (`let`, `const`, `class`, `new`, `switch`, `try`/`throw`, `import`) as inline
+  markers, with a Good/Broken status badge. Broken code keeps the last good
+  version running in the preview rather than blanking it.
+- **Quiet auto-save** to the browser's storage, with clean changes pushed to the
+  preview as you pause typing.
+
+The editor doubles as the **map editor** in map mode — a plain-JavaScript surface
+with its own parse-checking badge. Custom maps are editable and deletable (delete
+is confirmation-guarded); stock maps open read-only with **Clone**.
+
+## 10. Rail in detail
+
+A primary **Patterns / Maps** switch, then a filter row combining two things:
+
+- **Dimension lens** — single-select All / 1D / 2D / 3D; shows only items of that
+  native dimension (a pattern's dimension is the highest render function it
+  defines). Maps have no 1D form, so the 1D pill is hidden in Maps mode; entering
+  Maps with the lens on 1D silently switches it to 2D. Empty demo subsections hide
+  rather than leaving bare headers. The lens is ephemeral (resets on reload), and
+  the active document stays loaded even when filtered out of view.
+- **Name search** — the magnifier expands into a type-down filter that
+  AND-combines with the lens. An active query force-expands collapsed groups to
+  surface hits, restoring their collapse state when cleared. Search text is kept
+  separately for Patterns and Maps; the lens is shared.
+
+The switch and filter row stay fixed; only the lists scroll. Your patterns and
+maps are created, renamed, and deleted by you, stored in the browser (IndexedDB) —
+persistent across sessions, no account. Delete lives in the editor header as a
+visible, confirmation-guarded action, with the rail hover action as a shortcut.
+
+## 11. Controller reference
+
+### Connecting
+
+The helper is a Chrome extension that relays the `ws://` connection a deployed
+page can't open itself. With it installed, a **Connect** affordance appears top
+right; its dropdown offers two ways in:
+
+- **Discover** — lists Pixelblazes found via ElectroMage's cloud finder (the same
+  service the official tools use; your device needs to have reached the internet
+  at least once). The list runs automatically when the dropdown opens and
+  refreshes periodically; a rescan button (spins while working) forces a fresh
+  look. Click a device to connect.
+- **By IP** — type the LAN address and connect. Always works, even when cloud
+  discovery can't see the device.
+
+The first connection to a given device surfaces Chrome's native **"Allow access
+to `<ip>`?"** prompt — approve once and it's remembered (several discovered
+devices can batch into one prompt). This per-device grant is what lets the
+extension be least-privilege rather than holding blanket network access.
+
+### Status vocabulary
+
+The status dot: **dark grey** = extension not installed; **grey** = installed,
+nothing connected; **amber, blinking** = connecting; **green** = connected;
+**red** = error. Each connected Controller gets its own **pill** showing its
+name — remembered across reloads, so it reads "burner-bag" rather than a bare IP
+even mid-connect. Connections **reconnect on their own** if the device blips off
+and back. Click a pill to make that Controller active and open its panel; more
+than one can stay connected.
+
+### Live panel
+
+A pinned popover under the active pill, polled live, in rows:
+
+- **Active pattern** name and a **brightness** slider (logarithmic, like the
+  preview's). Brightness and control writes are volatile — never written to
+  flash, to spare it.
+- **Map points** and **pixel count**. The map-points figure flags **amber** when
+  it disagrees with the pixel count — a mismatched map is silently ignored by the
+  firmware, so this makes that footgun visible. The **pixel count is editable**;
+  committing a new value saves it to the device (the only way to make a
+  fixed-size map apply). The input holds your entered value, dimmed, while the
+  slow write is in flight.
+- **IP** and reported **frame rate**.
+- The running pattern's **live controls**, draggable in real time. A control
+  whose device value can't be read as a real `0..1` position — run-only patterns
+  report none; saved patterns report mutated variable values, not slider
+  positions — shows an **indeterminate** hollow-ring state with a `—` readout,
+  still draggable so you can set it.
+
+Closing and reopening the same device's panel shows last-known values immediately;
+switching devices clears first.
+
+### Send to Controller (patterns)
+
+Send compiles the open pattern with the **device's own compiler** and pushes the
+result. A small **Run / Save** pill beside the button picks the mode; the Send
+button's glyph and tooltip follow it:
+
+- **Run** (default) — load and run transiently. Plays immediately, but is **not**
+  added to the device's Saved Patterns; its name lives only in the IDE.
+- **Save** — persist into Saved Patterns *and* activate it. Save **overwrites in
+  place**: repeated Saves update the same on-device program instead of piling up
+  copies.
+
+Run and save are tracked independently — a clean run push doesn't satisfy a
+pending save; flipping the toggle re-arms Send. Send is enabled when a Controller
+is connected and the pattern compiles cleanly; if the IDE can tell the pattern's
+dimensionality won't match the device's installed map, it says so. **Demos can be
+sent directly**, no fork needed. There's no pixel-count warning on pattern push: a
+pattern push sends bytecode only and keeps the device's existing map, so a count
+mismatch is "this won't look right," not an error.
+
+### Send map to Controller
+
+Writes the open custom or stock map to the device's **single shared map slot** — a
+deliberate, confirm-first action, since one map is shared by every pattern on the
+device. The IDE re-bakes the map to the device's exact pixel count first, because
+the firmware drops any map whose point count doesn't match (Ecosystem Primer §10).
+
+## 12. Good to know
+
+- **Patterns run on your browser's main thread.** A genuinely infinite loop can
+  freeze the tab — there's no watchdog like real hardware has. The IDE only runs
+  code that compiles cleanly, which reduces but doesn't eliminate the risk.
+- **`perlin` and the random functions diverge slightly** from firmware even in
+  Precise mode — different algorithms, not reverse-engineered. Pure integer math
+  is bit-identical on both sides.
+- **Sensor-reactive patterns load and run**, but the sensor inputs (sound FFT,
+  accelerometer, light) are inert stubs, so they won't animate from audio or
+  motion in the preview.
+- **Everything is per-browser.** Patterns and settings live in this browser's
+  storage; there's no account and no sync between machines.
+
+---
+
+For the platform itself — fixed-point, maps, the WebSocket wall — see the
+**Pixelblaze Ecosystem Primer**. For making patterns fast, **Optimizing
+Pixelblaze patterns**. For how PXLBLZ is built, the **PXLBLZ Technical
+Reference**.

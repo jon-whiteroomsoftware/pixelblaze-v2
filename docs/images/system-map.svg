@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 470" font-family="'IBM Plex Mono','SF Mono',ui-monospace,Menlo,monospace">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a7aa8"/>
+    </marker>
+  </defs>
+  <rect width="720" height="470" fill="#ffffff"/>
+
+  <!-- UI + stores -->
+  <rect x="40" y="30" width="300" height="56" rx="6" fill="#f5f7f9" stroke="#2b3036"/>
+  <text x="56" y="54" font-size="12" font-weight="bold" fill="#2b3036">UI — React components</text>
+  <text x="56" y="72" font-size="10" fill="#6b7480">thin views; no business logic</text>
+
+  <rect x="420" y="30" width="260" height="56" rx="6" fill="#f5f7f9" stroke="#2b3036"/>
+  <text x="436" y="54" font-size="12" font-weight="bold" fill="#2b3036">Zustand stores</text>
+  <text x="436" y="72" font-size="10" fill="#6b7480">readable outside React</text>
+
+  <line x1="340" y1="58" x2="416" y2="58" stroke="#4a7aa8" stroke-width="1.5" marker-start="url(#arr)" marker-end="url(#arr)"/>
+
+  <line x1="190" y1="86" x2="190" y2="126" stroke="#4a7aa8" stroke-width="1.5" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <line x1="550" y1="86" x2="550" y2="126" stroke="#4a7aa8" stroke-width="1.5" marker-start="url(#arr)" marker-end="url(#arr)"/>
+
+  <!-- engine -->
+  <rect x="40" y="130" width="640" height="158" rx="6" fill="none" stroke="#2b3036" stroke-width="1.5"/>
+  <text x="56" y="156" font-size="12" font-weight="bold" fill="#2b3036">ENGINE — pure TypeScript, zero React imports</text>
+
+  <g font-size="11" fill="#2b3036">
+    <rect x="56" y="172" width="186" height="40" rx="4" fill="#f5f7f9" stroke="#aab3bd"/>
+    <text x="68" y="190">bundle · validate</text>
+    <text x="68" y="204" font-size="10" fill="#6b7480">Acorn AST</text>
+
+    <rect x="256" y="172" width="186" height="40" rx="4" fill="#f5f7f9" stroke="#aab3bd"/>
+    <text x="268" y="190">fixedpoint · fxEmit · shim</text>
+    <text x="268" y="204" font-size="10" fill="#6b7480">Fast / Precise</text>
+
+    <rect x="456" y="172" width="208" height="40" rx="4" fill="#f5f7f9" stroke="#aab3bd"/>
+    <text x="468" y="190">maps · layout · camera</text>
+    <text x="468" y="204" font-size="10" fill="#6b7480">sample / pos split</text>
+
+    <rect x="56" y="226" width="186" height="40" rx="4" fill="#f5f7f9" stroke="#aab3bd"/>
+    <text x="68" y="244">renderLoop</text>
+    <text x="68" y="258" font-size="10" fill="#6b7480">rAF, dispatch by arity</text>
+
+    <rect x="256" y="226" width="186" height="40" rx="4" fill="#f5f7f9" stroke="#aab3bd"/>
+    <text x="268" y="244">storage</text>
+    <text x="268" y="258" font-size="10" fill="#6b7480">patterns · maps · settings</text>
+
+    <rect x="456" y="226" width="208" height="40" rx="4" fill="#f5f7f9" stroke="#aab3bd"/>
+    <text x="468" y="244">ControllerProvider</text>
+    <text x="468" y="258" font-size="10" fill="#6b7480">the transport seam</text>
+  </g>
+
+  <!-- outputs -->
+  <line x1="149" y1="288" x2="149" y2="328" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="349" y1="288" x2="349" y2="328" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="560" y1="288" x2="560" y2="328" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="64" y="332" width="170" height="48" rx="6" fill="#f5f7f9" stroke="#2b3036"/>
+  <text x="80" y="352" font-size="12" font-weight="bold" fill="#2b3036">WebGL canvas</text>
+  <text x="80" y="368" font-size="10" fill="#6b7480">one gl.POINTS pass</text>
+
+  <rect x="264" y="332" width="170" height="48" rx="6" fill="#f5f7f9" stroke="#2b3036"/>
+  <text x="280" y="352" font-size="12" font-weight="bold" fill="#2b3036">IndexedDB</text>
+  <text x="280" y="368" font-size="10" fill="#6b7480">offline, no backend</text>
+
+  <rect x="464" y="332" width="200" height="48" rx="6" fill="#f5f7f9" stroke="#2b3036"/>
+  <text x="480" y="352" font-size="12" font-weight="bold" fill="#2b3036">extension relay</text>
+  <text x="480" y="368" font-size="10" fill="#6b7480">page &#8594; content &#8594; worker</text>
+
+  <!-- device -->
+  <line x1="560" y1="380" x2="560" y2="420" stroke="#4a7aa8" stroke-width="1.5" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <line x1="430" y1="400" x2="700" y2="400" stroke="#aab3bd" stroke-dasharray="5 5"/>
+  <text x="436" y="394" font-size="10" fill="#6b7480" letter-spacing="2">WIFI</text>
+
+  <rect x="464" y="424" width="200" height="36" rx="6" fill="#eef2f6" stroke="#2b3036"/>
+  <text x="480" y="447" font-size="12" font-weight="bold" fill="#2b3036">Pixelblaze — ws://&#60;ip&#62;:81</text>
+</svg>

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 360" font-family="'IBM Plex Mono','SF Mono',ui-monospace,Menlo,monospace">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a7aa8"/>
+    </marker>
+  </defs>
+  <rect width="780" height="360" fill="#ffffff"/>
+
+  <!-- raw map -->
+  <text x="40" y="106" font-size="11" fill="#2b3036">raw map — 2:1 aspect, any units</text>
+  <rect x="40" y="120" width="220" height="110" fill="#f5f7f9" stroke="#2b3036"/>
+  <circle cx="150" cy="175" r="45" fill="none" stroke="#4a7aa8" stroke-width="2"/>
+
+  <line x1="266" y1="160" x2="412" y2="100" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="266" y1="195" x2="412" y2="252" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- CONTAIN panel -->
+  <text x="420" y="14" font-size="11" font-weight="bold" fill="#2b3036">CONTAIN <tspan font-weight="normal" fill="#6b7480">— the default</tspan></text>
+  <rect x="420" y="20" width="130" height="130" fill="#ffffff" stroke="#2b3036"/>
+  <rect x="420" y="85" width="130" height="65" fill="#eef2f6"/>
+  <circle cx="485" cy="117.5" r="26.6" fill="none" stroke="#4a7aa8" stroke-width="2"/>
+  <line x1="420" y1="85" x2="550" y2="85" stroke="#4a7aa8" stroke-dasharray="3 3" opacity="0.6"/>
+  <text x="412" y="89" text-anchor="end" font-size="10" fill="#4a7aa8">0.5</text>
+  <text x="412" y="154" text-anchor="end" font-size="10" fill="#6b7480">0</text>
+  <text x="412" y="28" text-anchor="end" font-size="10" fill="#6b7480">1</text>
+  <text x="420" y="164" text-anchor="middle" font-size="10" fill="#6b7480">0</text>
+  <text x="550" y="164" text-anchor="middle" font-size="10" fill="#6b7480">1</text>
+  <text x="575" y="58" font-size="11" fill="#2b3036">longest axis fits 0..1,</text>
+  <text x="575" y="76" font-size="11" fill="#2b3036">aspect preserved —</text>
+  <text x="575" y="94" font-size="11" fill="#2b3036">a circle stays a circle</text>
+  <text x="575" y="118" font-size="11" fill="#6b7480">y only reaches 0.5 here</text>
+
+  <!-- FILL panel -->
+  <text x="420" y="184" font-size="11" font-weight="bold" fill="#2b3036">FILL</text>
+  <rect x="420" y="190" width="130" height="130" fill="#eef2f6" stroke="#2b3036"/>
+  <ellipse cx="485" cy="255" rx="26.6" ry="53.2" fill="none" stroke="#4a7aa8" stroke-width="2"/>
+  <text x="412" y="324" text-anchor="end" font-size="10" fill="#6b7480">0</text>
+  <text x="412" y="198" text-anchor="end" font-size="10" fill="#6b7480">1</text>
+  <text x="420" y="334" text-anchor="middle" font-size="10" fill="#6b7480">0</text>
+  <text x="550" y="334" text-anchor="middle" font-size="10" fill="#6b7480">1</text>
+  <text x="575" y="228" font-size="11" fill="#2b3036">each axis stretched</text>
+  <text x="575" y="246" font-size="11" fill="#2b3036">to 0..1 independently —</text>
+  <text x="575" y="264" font-size="11" fill="#2b3036">a circle becomes</text>
+  <text x="575" y="282" font-size="11" fill="#2b3036">an ellipse</text>
+
+  <text x="390" y="352" text-anchor="middle" font-size="10" fill="#6b7480">both are real Mapper behaviours — the Mapper tab's Fill / Contain dropdown, chosen per map</text>
+</svg>

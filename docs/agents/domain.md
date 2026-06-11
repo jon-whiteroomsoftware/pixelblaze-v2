@@ -31,4 +31,4 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 
 If your output contradicts a decision recorded in the Technical Reference, surface it explicitly rather than silently overriding:
 
-> _Contradicts Technical Reference §9 (maps authoritative for true aspect) — but worth reopening because…_
+> _Contradicts Technical Reference §8 (maps authoritative for true aspect) — but worth reopening because…_

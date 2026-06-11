@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 400" font-family="'IBM Plex Mono','SF Mono',ui-monospace,Menlo,monospace">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a7aa8"/>
+    </marker>
+  </defs>
+  <rect width="840" height="400" fill="#ffffff"/>
+
+  <!-- WiFi divider -->
+  <line x1="420" y1="34" x2="420" y2="386" stroke="#aab3bd" stroke-dasharray="5 5"/>
+  <text x="420" y="24" text-anchor="middle" font-size="11" fill="#6b7480" letter-spacing="3">WIFI</text>
+
+  <!-- browser box -->
+  <rect x="30" y="44" width="330" height="330" rx="8" fill="none" stroke="#2b3036" stroke-width="1.5"/>
+  <text x="50" y="72" font-size="13" font-weight="bold" fill="#2b3036">BROWSER</text>
+  <text x="118" y="72" font-size="11" fill="#6b7480">— authoring</text>
+
+  <!-- device box -->
+  <rect x="480" y="44" width="330" height="330" rx="8" fill="none" stroke="#2b3036" stroke-width="1.5"/>
+  <text x="500" y="72" font-size="13" font-weight="bold" fill="#2b3036">PIXELBLAZE</text>
+  <text x="592" y="72" font-size="11" fill="#6b7480">— device</text>
+
+  <!-- left rows -->
+  <rect x="46" y="92" width="298" height="60" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="58" y="116" font-size="12" font-weight="bold" fill="#2b3036">pattern source</text>
+  <text x="58" y="136" font-size="11" fill="#6b7480">written and edited here</text>
+
+  <rect x="46" y="168" width="298" height="60" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="58" y="192" font-size="12" font-weight="bold" fill="#2b3036">map function</text>
+  <text x="58" y="212" font-size="11" fill="#6b7480">runs here — full JavaScript, float64</text>
+
+  <rect x="46" y="244" width="298" height="60" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="58" y="268" font-size="12" font-weight="bold" fill="#2b3036">control widgets</text>
+  <text x="58" y="288" font-size="11" fill="#6b7480">sliders and pickers drawn here</text>
+
+  <!-- right rows -->
+  <rect x="496" y="92" width="298" height="60" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="508" y="114" font-size="12" font-weight="bold" fill="#2b3036">pattern</text>
+  <text x="508" y="132" font-size="11" fill="#6b7480">compiled to bytecode, run per frame</text>
+  <text x="508" y="146" font-size="11" fill="#6b7480">in 16.16 fixed-point</text>
+
+  <rect x="496" y="168" width="298" height="60" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="508" y="190" font-size="12" font-weight="bold" fill="#2b3036">map data</text>
+  <text x="508" y="208" font-size="11" fill="#6b7480">coordinate array only —</text>
+  <text x="508" y="222" font-size="11" fill="#6b7480">the function never arrives</text>
+
+  <rect x="496" y="244" width="298" height="60" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="508" y="268" font-size="12" font-weight="bold" fill="#2b3036">control values</text>
+  <text x="508" y="288" font-size="11" fill="#6b7480">persisted per pattern</text>
+
+  <rect x="496" y="316" width="298" height="44" rx="6" fill="#f5f7f9" stroke="#aab3bd"/>
+  <text x="508" y="334" font-size="12" font-weight="bold" fill="#2b3036">pixelCount</text>
+  <text x="508" y="350" font-size="11" fill="#6b7480">a device setting, separate from the map</text>
+
+  <!-- arrows -->
+  <line x1="344" y1="122" x2="474" y2="122" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="410" y="112" text-anchor="middle" font-size="10" fill="#4a7aa8">upload</text>
+
+  <line x1="344" y1="198" x2="474" y2="198" stroke="#4a7aa8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="410" y="188" text-anchor="middle" font-size="10" fill="#4a7aa8">baked array</text>
+
+  <line x1="346" y1="274" x2="474" y2="274" stroke="#4a7aa8" stroke-width="1.5" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="410" y="264" text-anchor="middle" font-size="10" fill="#4a7aa8">ws://:81</text>
+</svg>

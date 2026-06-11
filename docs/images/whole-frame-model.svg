@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 330" font-family="'IBM Plex Mono','SF Mono',ui-monospace,Menlo,monospace">
+  <rect width="720" height="330" fill="#ffffff"/>
+
+  <text x="40" y="34" font-size="13" fill="#2b3036">frame &#8776; beforeRender + pixelCount &#215; (per-pixel body)</text>
+
+  <!-- legend -->
+  <rect x="40" y="52" width="14" height="11" fill="#4a7aa8"/>
+  <text x="60" y="62" font-size="10" fill="#6b7480">pixel-invariant work (hoistable)</text>
+  <rect x="300" y="52" width="14" height="11" fill="#c7cdd4"/>
+  <text x="320" y="62" font-size="10" fill="#6b7480">genuinely per-pixel work</text>
+
+  <!-- cheap body -->
+  <text x="40" y="100" font-size="11" font-weight="bold" fill="#2b3036">cheap per-pixel body</text>
+  <text x="220" y="100" font-size="11" fill="#6b7480">(a few SDF calls, a hypot)</text>
+
+  <text x="92" y="124" text-anchor="end" font-size="10" fill="#6b7480">before</text>
+  <rect x="100" y="112" width="180" height="18" fill="#4a7aa8"/>
+  <rect x="280" y="112" width="220" height="18" fill="#c7cdd4"/>
+
+  <text x="92" y="152" text-anchor="end" font-size="10" fill="#6b7480">after</text>
+  <rect x="100" y="140" width="220" height="18" fill="#c7cdd4"/>
+  <text x="334" y="153" font-size="11" fill="#2b3036">hoist &#8594; +49.7% FPS (ControlsShowcase)</text>
+
+  <!-- heavy body -->
+  <text x="40" y="200" font-size="11" font-weight="bold" fill="#2b3036">heavy per-pixel body</text>
+  <text x="226" y="200" font-size="11" fill="#6b7480">(perlin octaves, raymarch steps)</text>
+
+  <text x="92" y="224" text-anchor="end" font-size="10" fill="#6b7480">before</text>
+  <rect x="100" y="212" width="20" height="18" fill="#4a7aa8"/>
+  <rect x="120" y="212" width="380" height="18" fill="#c7cdd4"/>
+
+  <text x="92" y="252" text-anchor="end" font-size="10" fill="#6b7480">after</text>
+  <rect x="100" y="240" width="380" height="18" fill="#c7cdd4"/>
+  <text x="494" y="253" font-size="11" fill="#2b3036">same hoist &#8594; +2&#8211;5%</text>
+
+  <text x="40" y="302" font-size="11" fill="#2b3036">the same move, two outcomes — a hoist is worth the cost of what you move,</text>
+  <text x="40" y="318" font-size="11" fill="#2b3036">as a fraction of the whole frame</text>
+</svg>
