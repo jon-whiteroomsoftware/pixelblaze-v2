@@ -5,6 +5,9 @@ PXLBLZ-IDE is a browser-based pattern editor for
 preview, tune, and export Pixelblaze patterns without needing a controller on
 your desk, then push the result to hardware when you are ready.
 
+You can run it here without building or installing anything; connecting to a
+controller just requires the companion Chrome extension.
+
 **[Open PXLBLZ-IDE](https://jon-whiteroomsoftware.github.io/PXLBLZ-IDE/)**
 
 ## Why it exists
