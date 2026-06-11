@@ -38,55 +38,57 @@ function newPatternRecord(name: string, src: string): PatternRecord {
 
 const DEMO_NAMES = Object.keys(DEMOS).sort()
 
-const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ShaderShowcase', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
-const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom', 'AuroraSphere']
+const OPENGL_DEMOS = ['Kishimisu', 'NeonSquircles', 'ZippyZaps', 'IQPalettes', 'PhantomStar']
+const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'AuroraSphere', 'NebulaSphere', 'ShaderShowcase']
 // Pixelblaze-native sketches built around cheap fields, SDFs, and 3D math that
 // should scale better than direct shader ports.
-const NATIVE_SKETCHES = [
-  'CometLoom',
+const FPS_FRIENDLY_DEMOS = [
+  'KaleidoBloom',
   'CompassRose',
   'CorePulse3D',
   'CrystalLattice3D',
   'CrystalRain3D',
   'GyroidGlow3D',
   'HelixForge3D',
-  'HeatShimmerTiles',
   'LatticeWarp3D',
+  'NebulaShells3D',
+  'VoxelFireflies3D',
+  'HeatShimmerTiles',
   'MagneticFilaments',
   'MetaballGarden',
-  'MetroLines',
   'MoireCathedral',
-  'NebulaShells3D',
   'NeonCircuitBoard',
   'RibbonLoom',
   'SignalMandala',
   'StainedGlassWeather',
   'TopographicBloom',
-  'VoxelFireflies3D',
 ]
 // 1D effects that lean on rhythm and emergence rather than the usual chases and
 // crawls.
-const LIVING_1D_DEMOS = ['PulseLoom', 'FireflyChoir']
+const LIVING_1D_DEMOS = ['PulseLoom', 'FireflyChoir', 'CometLoom', 'MetroLines']
 // Minimal patterns — one per render dimensionality — for visually verifying
 // 1D / 2D / 3D preview behavior.
 const TEST_PATTERNS = ['EasedSweep', 'TestPattern1D', 'TestPattern2D', 'TestPattern3D']
 const GROUPED_DEMOS = new Set([
   ...OPENGL_DEMOS,
   ...BRAND_NEW_DEMOS,
-  ...NATIVE_SKETCHES,
+  ...FPS_FRIENDLY_DEMOS,
   ...LIVING_1D_DEMOS,
   ...TEST_PATTERNS,
 ])
 
 // "Old Favorites" is the rest — anything not explicitly grouped, so new demos
 // land there by default until reassigned.
+const demoSectionNames = (names: string[]) =>
+  names.filter((n) => DEMO_NAMES.includes(n)).sort((a, b) => a.localeCompare(b))
+
 const DEMO_SECTIONS: { label: string; names: string[] }[] = [
-  { label: 'OpenGL', names: OPENGL_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
+  { label: 'ShaderToy Ports', names: demoSectionNames(OPENGL_DEMOS) },
   { label: 'Old Favorites', names: DEMO_NAMES.filter((n) => !GROUPED_DEMOS.has(n)) },
-  { label: 'Brand New', names: BRAND_NEW_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
-  { label: 'Native Sketches', names: NATIVE_SKETCHES.filter((n) => DEMO_NAMES.includes(n)) },
-  { label: 'Living 1D', names: LIVING_1D_DEMOS.filter((n) => DEMO_NAMES.includes(n)) },
-  { label: 'Test Patterns', names: TEST_PATTERNS.filter((n) => DEMO_NAMES.includes(n)) },
+  { label: 'FPS Heavyweights', names: demoSectionNames(BRAND_NEW_DEMOS) },
+  { label: 'FPS Friendly', names: demoSectionNames(FPS_FRIENDLY_DEMOS) },
+  { label: 'Living 1D', names: demoSectionNames(LIVING_1D_DEMOS) },
+  { label: 'Test Patterns', names: demoSectionNames(TEST_PATTERNS) },
 ]
 
 // A turn-down chevron, sized to read as a clear interactive affordance. Points down
@@ -150,7 +152,10 @@ function SectionHeader({
     <div
       onClick={onToggle}
       style={{ letterSpacing: '0.04em' }}
-      className={`${first ? 'pt-1.5' : 'pt-3.5'} pb-1 px-3 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-structural uppercase hover:text-live`}
+      className={[
+        first ? 'pt-1.5' : 'mt-2 pt-2.5 border-t border-zinc-700/80',
+        'pb-1 px-3 border-b border-zinc-700/65 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-structural uppercase hover:text-live',
+      ].join(' ')}
     >
       <span className="truncate">{label}</span>
       <div className="flex items-center gap-1.5">
@@ -173,8 +178,8 @@ function SubsectionHeader({
   return (
     <div
       onClick={onToggle}
-      style={{ letterSpacing: '0.04em', paddingLeft: '26px' }}
-      className="pt-2 pb-0.5 pr-3 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-structural uppercase hover:text-live"
+      style={{ letterSpacing: '0.04em' }}
+      className="pt-2 pb-0.5 px-3 flex items-center justify-between gap-1 cursor-pointer select-none text-[11px] font-mono font-semibold text-structural uppercase hover:text-live"
     >
       <span className="truncate">{label}</span>
       <CollapseChevron collapsed={collapsed} />
@@ -182,10 +187,9 @@ function SubsectionHeader({
   )
 }
 
-// First-level rows align flush with their section header (12px); rows beneath a
-// Demos sub-category align flush with the sub-header (26px).
-const ROW_PAD_FIRST = '12px'
-const ROW_PAD_SUB = '26px'
+// Rows align flush with their nearest rail header so the pattern names share one
+// clean reading edge across "Your Patterns" and grouped demos.
+const ROW_PAD = '12px'
 
 // Shared row chrome (#182): tight ~19px rows, a 2px amber left accent bar + subtle
 // warm bg when active, and absolutely-positioned hover affordances so the dim pill
@@ -419,7 +423,6 @@ function ListItem({
   label,
   active,
   dim,
-  subItem,
   navKey,
   onFork,
   onClick,
@@ -431,7 +434,6 @@ function ListItem({
   label: string
   active: boolean
   dim?: string
-  subItem?: boolean
   navKey?: string
   onFork?: () => void
   onClick: () => void
@@ -449,7 +451,7 @@ function ListItem({
       onMouseLeave={onMouseLeave}
       tabIndex={navKey ? 0 : undefined}
       data-pattern-nav-key={navKey}
-      style={{ paddingLeft: subItem ? ROW_PAD_SUB : ROW_PAD_FIRST }}
+      style={{ paddingLeft: ROW_PAD }}
       className={rowClass(active)}
     >
       {active && <ActiveBar />}
@@ -542,7 +544,7 @@ function EditableListItem({
         onKeyDown={!editing && navKey ? (e) => onRowKeyDown?.(e, navKey) : undefined}
         tabIndex={!editing && navKey ? 0 : undefined}
         data-pattern-nav-key={navKey}
-        style={{ paddingLeft: ROW_PAD_FIRST }}
+        style={{ paddingLeft: ROW_PAD }}
         className={rowClass(active)}
       >
         {active && <ActiveBar />}
@@ -777,25 +779,11 @@ export function PatternList() {
       const { userPatterns, setActivePattern, setActiveLibrary, setActiveDemo } = usePatternStore.getState()
       const { setSource, setIsReadOnly, setPreviewSource, setPreviewPatternName } = useEditorStore.getState()
       if (!last) {
-        const p = userPatterns[0]
-        if (p) {
-          setActivePattern(p.id)
-          setSource(p.src)
-          setPreviewSource(p.src)
-          setPreviewPatternName(p.name)
-          setIsReadOnly(false)
-        } else {
-          const { addPattern } = usePatternStore.getState()
-          const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          const name = uniquePatternName('Untitled Pattern', [])
-          const record = { id, name, src: NEW_PATTERN_SRC, controls: {}, updatedAt: Date.now() }
-          await addPattern(record)
-          setActivePattern(id)
-          setSource(record.src)
-          setPreviewSource(record.src)
-          setPreviewPatternName(record.name)
-          setIsReadOnly(false)
-        }
+        setActiveDemo('AuroraSphere')
+        setSource(DEMOS.AuroraSphere)
+        setPreviewSource(DEMOS.AuroraSphere)
+        setPreviewPatternName('AuroraSphere')
+        setIsReadOnly(true)
         return
       }
       if (last.type === 'pattern') {
@@ -1041,7 +1029,6 @@ export function PatternList() {
                           key={name}
                           label={name}
                           navKey={`demo:${name}`}
-                          subItem
                           dim={dimLens === 'all' ? `${nativeDim(DEMOS[name] ?? '')}D` : undefined}
                           active={activeDemoName === name}
                           onClick={() => openDemo(name)}

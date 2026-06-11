@@ -59,7 +59,7 @@ export const RECOMMENDED_SETTINGS: Record<string, Partial<Settings>> = {
   PhantomStar: { mapId: 'plane', surfaceId: 'flat', pixelCount: 1024, normalize: 'fill', brightness: 0.9, lightSize: 0.85, diffusion: 0.68 },
   PlasmaNebula: { mapId: 'panel-winding', surfaceId: 'flat', pixelCount: 1024, normalize: 'fill', brightness: 1, lightSize: 0.85, diffusion: 0.84 },
   RibbonLoom: { mapId: 'plane', surfaceId: 'flat', pixelCount: 1536, normalize: 'fill', brightness: 0.9, lightSize: 0.85, diffusion: 0.73 },
-  ShaderShowcase: { mapId: 'plane', surfaceId: 'flat', pixelCount: 1024, normalize: 'fill', brightness: 0.68, lightSize: 0.70, diffusion: 0.69 },
+  ShaderShowcase: { mapId: 'plane', surfaceId: 'flat', pixelCount: 2048, normalize: 'fill', brightness: 1, lightSize: 0.70, diffusion: 0.96 },
   SignalMandala: { mapId: 'plane', surfaceId: 'flat', pixelCount: 2048, normalize: 'fill', brightness: 1, lightSize: 0.85, diffusion: 0.54 },
   StainedGlassWeather: { mapId: 'plane', surfaceId: 'cylinder', pixelCount: 1024, normalize: 'contain', brightness: 0.9, lightSize: 0.55, diffusion: 0.75, solidity: 0.82 },
   TopographicBloom: { mapId: 'plane', surfaceId: 'flat', pixelCount: 1024, normalize: 'fill', brightness: 0.9, lightSize: 0.85, diffusion: 0.64 },

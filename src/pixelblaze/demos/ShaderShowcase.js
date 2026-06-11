@@ -14,7 +14,7 @@
 // cr/cg/cb); read them immediately, before the next Shader call overwrites them.
 
 // ── Adjustable controls ────────────────────────────────────────────────────
-export var speed = 0.5  // animation rate
+export var speed = 0    // animation rate
 export var zoom  = 0    // kaleidoscope density
 
 export function sliderSpeed(v) { speed = v }

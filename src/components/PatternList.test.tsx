@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PatternList } from './PatternList'
 import { useEditorStore, editorInitialState } from '@/store/editorStore'
@@ -22,9 +22,10 @@ vi.mock('@/engine/storage', async (importOriginal) => {
   }
 })
 
-import { listMaps } from '@/engine/storage'
+import { createPattern, listMaps } from '@/engine/storage'
 
 beforeEach(() => {
+  vi.clearAllMocks()
   useEditorStore.setState(editorInitialState)
   usePatternStore.setState(patternInitialState)
   useMapStore.setState(mapInitialState)
@@ -45,6 +46,19 @@ async function switchToMaps(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('PatternList', () => {
+  it('opens AuroraSphere for visitors without a saved last-active pattern', async () => {
+    render(<PatternList />)
+
+    await waitFor(() => {
+      expect(usePatternStore.getState().activeDemoName).toBe('AuroraSphere')
+    })
+    expect(usePatternStore.getState().activePatternId).toBeNull()
+    expect(useEditorStore.getState().previewPatternName).toBe('AuroraSphere')
+    expect(useEditorStore.getState().previewSource).toBe(DEMOS.AuroraSphere)
+    expect(useEditorStore.getState().isReadOnly).toBe(true)
+    expect(createPattern).not.toHaveBeenCalled()
+  })
+
   it('clicking a demo sets previewSource to the demo source', async () => {
     const user = userEvent.setup()
     render(<PatternList />)
