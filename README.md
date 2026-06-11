@@ -44,11 +44,17 @@ software.
 - Run or save the open pattern on a connected controller.
 - Push stock or custom maps to a connected controller.
 
-## What it deliberately does not do
+## What it does not do
 
 - It does not manage saved patterns, playlists, WiFi, LED hardware settings, or
   other device administration. Use the Pixelblaze web UI for that.
 - It does not read patterns back from a controller. Import `.epe` files instead.
+
+## Acknowledgement
+
+Thanks to [Ben Hencke](https://electromage.com/about) and ElectroMage for
+building Pixelblaze. It has been a small box with an outsized effect: a lot of
+fun, and a generous way into making electronics feel approachable.
 
 ## Bundled libraries
 
@@ -65,6 +71,9 @@ Open the **Code** menu in the app header for source and hover summaries.
 
 ## Good to know
 
+- If the app does not reconnect to a Pixelblaze Controller when it opens, reload
+  the browser window first. If it still does not pick up, manually disconnect and
+  reconnect from the Controller menu.
 - Patterns, maps, and demo setting overrides are stored in this browser's
   IndexedDB. Clearing site data clears that local workspace.
 - Preview brightness is for the screen. Controller brightness is controlled from
@@ -108,3 +117,12 @@ npm run build
 PXLBLZ-IDE is small, local-first, and still evolving. Expect rough edges, keep
 copies of patterns you care about, and file issues with enough detail to
 reproduce the problem.
+
+## Where from here
+
+This feels useful and feature-complete enough to call a 1.0, but it probably has
+some bugs left to shake out. If you try it and something breaks, please open a
+GitHub issue with enough detail to reproduce it.
+
+More features are welcome if there is real interest, and pull requests are also
+welcome. Small, focused changes with a clear use case are easiest to review.
