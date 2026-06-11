@@ -14,6 +14,7 @@ describe('stock catalogue', () => {
     expect(STOCK_MAP_SPECS.map((s) => s.id)).toEqual([
       'plane',
       'wide',
+      'panel-winding',
       'cube',
       'cube-shell',
       'star-shell',
@@ -68,6 +69,7 @@ describe('stock catalogue', () => {
     // their `.js` sources, so the cylinder wrap and layout readout read the grid
     // off the map with no provenance switch.
     expect(mapById('plane').gridDims(100)).toEqual(squarePlaneDims(100))
+    expect(mapById('panel-winding').gridDims(100)).toEqual(squarePlaneDims(100))
     expect(mapById('wide').gridDims(100)).toEqual(widePlaneDims(100))
     // The volumetric cube is a regular side³ lattice, so it reports cols×rows×depth
     // (512 = 8³). An irregular 2D cloud and the shells still expose no clean lattice.
@@ -222,6 +224,18 @@ describe('star volume (filled stellated solid)', () => {
     // A healthy fraction sit well inside the outer half.
     const inner = fracs.filter((f) => f < 0.5).length
     expect(inner / fracs.length).toBeGreaterThan(0.1)
+  })
+})
+
+describe('2D panel winding', () => {
+  it('snakes by column on a 16x16 panel', () => {
+    const pts = mapById('panel-winding').resolve(256)
+
+    expect(pts[0].pos).toEqual([0, 0])
+    expect(pts[15].pos).toEqual([0, 1])
+    expect(pts[16].pos).toEqual([1 / 15, 1])
+    expect(pts[31].pos).toEqual([1 / 15, 0])
+    expect(pts[32].pos).toEqual([2 / 15, 0])
   })
 })
 

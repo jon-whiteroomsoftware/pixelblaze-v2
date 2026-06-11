@@ -46,7 +46,7 @@ export const DEFAULT_NORMALIZE_MODE: NormalizeMode = 'contain'
 // surface can wrap. The Square and Wide maps qualify; the example
 // clouds (ring) and 3D maps do not. Custom maps advertise their grid via the
 // `gridDims` recorded at bake instead.
-const WRAPPABLE_STOCK_IDS = new Set(['plane', 'wide'])
+const WRAPPABLE_STOCK_IDS = new Set(['plane', 'wide', 'panel-winding'])
 // Default modeled pixel count for a 1D shape embedding when a pattern carries no
 // persisted count (a typical short strip). Map layouts default to rows×cols.
 export const DEFAULT_SHAPE_PIXEL_COUNT = 100

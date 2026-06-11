@@ -24,6 +24,7 @@ function source(name: string): string {
 export const STOCK_MAP_SPECS: SourceMapSpec[] = [
   { id: 'plane', name: 'Square', dim: 2, source: source('plane'), grid: 'square' },
   { id: 'wide', name: 'Wide 2:1', dim: 2, source: source('wide'), grid: 'wide' },
+  { id: 'panel-winding', name: '2D panel winding', dim: 2, source: source('panel-winding'), grid: 'square' },
   { id: 'cube', name: 'Cube volume', dim: 3, source: source('cube'), grid: 'cube' },
   // The faceted shell sibling of the volume cube: points on the six
   // faces, solid-eligible via per-face normals the preview derives (faceNormals,
