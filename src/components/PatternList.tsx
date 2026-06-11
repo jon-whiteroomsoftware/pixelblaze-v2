@@ -42,13 +42,27 @@ const BRAND_NEW_DEMOS = ['PlasmaNebula', 'Caustics', 'KaleidoBloom', 'AuroraSphe
 // Pixelblaze-native sketches built around cheap fields, SDFs, and 3D math that
 // should scale better than direct shader ports.
 const NATIVE_SKETCHES = [
+  'BubbleGlass',
+  'CometLoom',
+  'CompassRose',
   'CorePulse3D',
   'CrystalLattice3D',
+  'EclipseFactory',
+  'GearflowerClock',
   'GyroidGlow3D',
+  'HelixForge3D',
   'MagneticFilaments',
+  'MetaballGarden',
+  'MetroLines',
   'MoireCathedral',
+  'NebulaShells3D',
+  'NeonCircuitBoard',
+  'OrigamiLanterns',
   'RibbonLoom',
+  'SignalMandala',
+  'TopographicBloom',
   'Trainyard',
+  'VoxelFireflies3D',
 ]
 // 1D effects that lean on rhythm and emergence rather than the usual chases and
 // crawls.

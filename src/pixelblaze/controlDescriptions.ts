@@ -26,6 +26,24 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSharpness: 'Focus of the light: soft glowing pools at low, crisp bright veins at high.',
     sliderTint: 'Base water colour, swept around the colour wheel.',
   },
+  BubbleGlass: {
+    sliderSpeed: 'How quickly the bubbles drift through the glass.',
+    sliderBubbles: 'Number of active bubble rings.',
+    sliderShine: 'Strength of the glossy highlights.',
+    sliderTint: 'Base colour of the glass.',
+  },
+  CometLoom: {
+    sliderSpeed: 'How fast comet heads move around the strip.',
+    sliderComets: 'Number of active comet trails.',
+    sliderTail: 'Length of each comet tail.',
+    sliderPalette: 'Base colour of the comet palette.',
+  },
+  CompassRose: {
+    sliderSpeed: 'How fast the rose rotates.',
+    sliderPoints: 'Number of angular points in the rose.',
+    sliderSweep: 'Strength of the scanning beam.',
+    sliderHue: 'Base colour of the instrument glow.',
+  },
   ControlsShowcase: {
     sliderSpeed: 'How fast the shapes orbit.',
     sliderEdgeBlur: "Softness of the shapes' edges — sharp at low, glowing at high.",
@@ -45,6 +63,12 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderNodeSize: 'Size of the glowing lattice nodes and rods.',
     sliderHue: 'Base colour of the crystal.',
   },
+  EclipseFactory: {
+    sliderSpeed: 'How quickly the moons cross the sun.',
+    sliderMoonSize: 'Size of the eclipsing bodies.',
+    sliderCorona: 'Brightness and reach of the outer solar halo.',
+    sliderHue: 'Base solar colour.',
+  },
   FireflyChoir: {
     sliderCoupling:
       'How strongly the fireflies pull each other into sync — low stays in chaos, high snaps to a unified pulse.',
@@ -53,11 +77,23 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderColor: 'Base colour of the fireflies.',
     sliderVariance: 'Per-firefly colour jitter — low makes them identical, high scatters their tints.',
   },
+  GearflowerClock: {
+    sliderSpeed: 'How fast the interlocking petals rotate.',
+    sliderTeeth: 'Density of gear-like tooth detail.',
+    sliderBloom: 'Brightness of the gear petals and hubs.',
+    sliderHue: 'Base brass-to-neon colour.',
+  },
   GyroidGlow3D: {
     sliderSpeed: 'How fast the gyroid field drifts through the volume.',
     sliderScale: 'Density of the repeating gyroid cells.',
     sliderThickness: 'Thickness of the glowing gyroid surface.',
     sliderColor: 'Base colour of the gyroid.',
+  },
+  HelixForge3D: {
+    sliderSpeed: 'How fast the braided coils rotate.',
+    sliderTwist: 'How many turns the coils make through the volume.',
+    sliderRadius: 'Radius and thickness of the braid.',
+    sliderHue: 'Base colour of the forged glow.',
   },
   IQPalettes: {
     sliderSpeed: 'How fast the palette parameter scrolls across the bands.',
@@ -84,11 +120,41 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderGlow: 'Brightness of the glowing filaments.',
     sliderContrast: 'Sharpness of the field lines.',
   },
+  MetaballGarden: {
+    sliderSpeed: 'How quickly the soft cells drift.',
+    sliderBlobCount: 'How many cells are active in the garden.',
+    sliderSoftness: 'How smoothly neighbouring cells merge together.',
+    sliderPalette: 'Base colour of the luminous cells.',
+  },
+  MetroLines: {
+    sliderSpeed: 'How fast route pulses move around the line.',
+    sliderRoutes: 'Number of active virtual routes.',
+    sliderStationGlow: 'Brightness of station markers.',
+    sliderPalette: 'Base colour of the metro routes.',
+  },
   MoireCathedral: {
     sliderSpeed: 'How fast the stained-glass stripe fields rotate.',
     sliderDensity: 'Density of the crossing moire stripes.',
     sliderBloom: 'Brightness of the glowing glass.',
     sliderArch: 'Strength and softness of the arched window frame.',
+  },
+  NebulaShells3D: {
+    sliderSpeed: 'How quickly the spherical shells drift.',
+    sliderShellCount: 'Number of nested aurora shells.',
+    sliderThickness: 'Thickness of each glowing shell.',
+    sliderColor: 'Base colour of the nebula.',
+  },
+  NeonCircuitBoard: {
+    sliderSpeed: 'How fast packets move along the traces.',
+    sliderDensity: 'Density of the repeated circuit cells.',
+    sliderPulse: 'Brightness of packet glints travelling through the board.',
+    sliderHue: 'Base colour of the neon traces.',
+  },
+  OrigamiLanterns: {
+    sliderSpeed: 'How quickly the lanterns drift.',
+    sliderFold: 'Strength of the folded paper seam pattern.',
+    sliderGlow: 'Brightness of the warm inner lantern light.',
+    sliderHue: 'Base colour of the paper glow.',
   },
   NebulaSphere: {
     sliderSpeed: 'How fast the gas drifts through the volume.',
@@ -125,11 +191,29 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSpeed: 'Animation rate.',
     sliderZoom: 'Density of the kaleidoscope.',
   },
+  SignalMandala: {
+    sliderSpeed: 'How fast the scan pulses move through the mandala.',
+    sliderSpokes: 'Number of radial spokes.',
+    sliderRings: 'Density of circular signal rings.',
+    sliderColor: 'Base colour of the mandala.',
+  },
   Trainyard: {
     sliderSpeed: 'How fast pulses move around the virtual rail yard.',
     sliderTraffic: 'Number of active trains.',
     sliderTail: 'Length of each train trail.',
     sliderPalette: 'Base hue of the rail-yard lights.',
+  },
+  TopographicBloom: {
+    sliderSpeed: 'How quickly the flower shape breathes.',
+    sliderLayers: 'Strength and density of the contour bands.',
+    sliderSpacing: 'Distance between topographic contour lines.',
+    sliderColor: 'Base colour of the bloom.',
+  },
+  VoxelFireflies3D: {
+    sliderSpeed: 'How fast fireflies drift within their volume cells.',
+    sliderDensity: 'Density of repeated firefly cells.',
+    sliderGlow: 'Size of each firefly glow.',
+    sliderColor: 'Base colour of the fireflies.',
   },
   ZippyZaps: {
     sliderIterations: 'How many fold passes build the arcs — more adds detail but costs more.',
