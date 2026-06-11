@@ -21,13 +21,13 @@ export var barPhase = 0
 var hitsPerBar = [2, 3, 4, 5]
 var homePos    = [0.16, 0.40, 0.62, 0.86]
 var hueOffset  = [0, 0, 0.5, 0.5]       // primary, primary, complement, complement
-var voiceShade = [1, 0.45, 1, 0.45]     // full, darker, full, darker
+var voiceShade = [1, 0.62, 1, 0.62]     // full, darker, full, darker
 var env        = [0, 0, 0, 0]           // per-voice strike envelope, filled each frame
 
 // Tunables (live, via the sliders below).
 var bps        = 1.6   // bars per second (the tempo)
 var swing      = 0.0   // 0 = straight, up to ~0.4 = heavy lilt
-var bumpWidth  = 0.07  // half-width of each strike's glow, as a fraction of strip
+var bumpWidth  = 0.095 // half-width of each strike's glow, as a fraction of strip
 var paletteHue = 0.04  // base hue of the complementary set; slider spins it round
 var accentOn   = 1     // downbeat full-strip flash
 var accentEnv  = 0     // this frame's accent brightness
@@ -77,7 +77,7 @@ export function beforeRender(delta) {
   for (i = 0; i < 4; i++) {
     var vp = mod(barPhase * hitsPerBar[i], 1)   // this voice's own strike phase
     vp = applySwing(vp, swing)
-    env[i] = exp(-vp * 6)                        // instant attack, quick decay
+    env[i] = exp(-vp * 4)                        // instant attack, quick decay
   }
 
   // Grand downbeat: one bright flash as the bar wraps through 0.

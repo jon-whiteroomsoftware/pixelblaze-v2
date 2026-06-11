@@ -4,8 +4,8 @@
 // without Perlin or raymarching. Good for cubes, spheres, and sparse 3D clouds.
 
 export var speed = 0.42      // pulse speed
-export var spacing = 0.5     // lattice density
-export var nodeSize = 0.45   // node radius
+export var spacing = 0.32    // lattice density
+export var nodeSize = 0.82   // node radius
 export var hue = 0.52        // crystal colour
 
 export function sliderSpeed(v) { speed = v }

@@ -4,8 +4,8 @@
 // is intentionally tractable on Pixelblaze while still reading as volumetric.
 
 export var speed = 0.45       // pulse rate
-export var shellCount = 0.55  // shell density
-export var coreSize = 0.35    // central glow radius
+export var shellCount = 0.42  // shell density
+export var coreSize = 0.62    // central glow radius
 export var hue = 0.58         // base colour
 
 export function sliderSpeed(v) { speed = v }
@@ -34,6 +34,6 @@ export function render3D(index, x, y, z) {
 
   // A moving plane adds directional shimmer without noise.
   var plane = triangle(px * 1.7 + py * -0.9 + pz * 1.2 + t * 0.2)
-  var val = clamp(core + shell * (0.7 + plane * 0.55), 0, 1)
+  var val = clamp(core * 1.2 + shell * (0.82 + plane * 0.6) + 0.015, 0, 1)
   hsv(frac(hue + r * 0.35 + t * 0.02), 0.86 - core * 0.45, val)
 }

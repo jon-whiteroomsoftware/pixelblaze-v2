@@ -93,5 +93,5 @@ export function render(index) {
 
   var hue = baseHue + hueJit + colorShift * smoothstep(t0, t1, v)
   var sat = 0.85 - 0.85 * smoothstep(w0, 1, v)
-  hsv(hue, sat, v)
+  hsv(hue, sat, clamp(v * 1.25 + 0.025, 0, 1))
 }

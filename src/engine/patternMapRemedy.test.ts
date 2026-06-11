@@ -3,12 +3,12 @@ import { recommendedMapRemedy } from './patternMapRemedy'
 
 describe('recommendedMapRemedy', () => {
   it('offers a demo whose recommended map matches the pattern dimension', () => {
-    // NebulaSphere recommends seed-sphere-3d (a 3D stock map). The recommended preview
+    // NebulaSphere recommends sphere-volume (a 3D stock map). The recommended preview
     // pixel count is deliberately not carried — the map materializes to the device count.
     const remedy = recommendedMapRemedy('NebulaSphere', 3)
     expect(remedy).toEqual({
-      mapId: 'seed-sphere-3d',
-      mapName: 'Sphere shell',
+      mapId: 'sphere-volume',
+      mapName: 'Sphere volume',
       mapDim: 3,
     })
   })

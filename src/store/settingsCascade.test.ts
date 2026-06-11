@@ -52,8 +52,9 @@ describe('resolveActiveSettings', () => {
     usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
     const eff = resolveActiveSettings()
     expect(eff.mapId).toBe('seed-sphere-3d')
-    expect(eff.pixelCount).toBe(4096)
+    expect(eff.pixelCount).toBe(2048)
     expect(eff.solidity).toBe(1)
+    expect(eff.brightness).toBe(0.9)
   })
 })
 
@@ -88,7 +89,7 @@ describe('fork snapshot', () => {
     usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
     const snap = forkSettingsSnapshot()
     expect(snap.mapId).toBe('seed-sphere-3d')
-    expect(snap.pixelCount).toBe(4096)
+    expect(snap.pixelCount).toBe(2048)
     expect(snap.solidity).toBe(1)
     expect('fidelity' in snap).toBe(false)
   })
@@ -97,8 +98,8 @@ describe('fork snapshot', () => {
     // A different demo is "active"; the per-row fork still resolves by name.
     usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
     const snap = forkSettingsSnapshotForDemo('NebulaSphere')
-    expect(snap.mapId).toBe('seed-sphere-3d')
-    expect(snap.pixelCount).toBe(8192)
+    expect(snap.mapId).toBe('sphere-volume')
+    expect(snap.pixelCount).toBe(2048)
     expect('fidelity' in snap).toBe(false)
   })
 })
@@ -120,11 +121,11 @@ describe('writeHybrid', () => {
   })
 
   it('writes the global-sticky for a demo with no recommendation or override for the field', () => {
-    // AuroraSphere recommends no diffusion, so a first drag is a plain comfort pref.
-    usePatternStore.setState({ activePatternId: null, activeDemoName: 'AuroraSphere', userPatterns: [] })
+    // A demo with no recommendation falls back to the global comfort baseline.
+    usePatternStore.setState({ activePatternId: null, activeDemoName: 'UnrecommendedDemo', userPatterns: [] })
     writeHybrid('diffusion', 0.25)
     expect(usePreviewStore.getState().diffusionSticky).toBe(0.25)
-    expect(usePatternStore.getState().demoOverrides.AuroraSphere ?? {}).toEqual({})
+    expect(usePatternStore.getState().demoOverrides.UnrecommendedDemo ?? {}).toEqual({})
   })
 
   it('writes a per-demo override once the demo already has one for the field', () => {
@@ -149,7 +150,7 @@ describe('resolveActiveSettings — demo overrides', () => {
       demoOverrides: { AuroraSphere: { pixelCount: 1000 } },
     })
     const eff = resolveActiveSettings()
-    expect(eff.pixelCount).toBe(1000) // override beats recommended 4096
+    expect(eff.pixelCount).toBe(1000) // override beats recommended 2048
     expect(eff.mapId).toBe('seed-sphere-3d') // unspecified field still from recommendation
   })
 })
@@ -174,7 +175,7 @@ describe('resetActiveSettings', () => {
     await resetActiveSettings()
     expect(usePatternStore.getState().demoOverrides.AuroraSphere).toBeUndefined()
     // Back to the recommendation…
-    expect(useMapStore.getState().activePixelCount).toBe(4096)
+    expect(useMapStore.getState().activePixelCount).toBe(2048)
     // …but the personal light-size baseline (global-sticky) is untouched.
     expect(usePreviewStore.getState().lightSize).toBe(0.7)
   })

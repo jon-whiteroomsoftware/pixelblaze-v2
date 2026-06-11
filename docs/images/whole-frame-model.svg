@@ -19,7 +19,7 @@
 
   <text x="92" y="152" text-anchor="end" font-size="10" fill="#6b7480">after</text>
   <rect x="100" y="140" width="220" height="18" fill="#c7cdd4"/>
-  <text x="334" y="153" font-size="11" fill="#2b3036">hoist &#8594; +49.7% FPS (ControlsShowcase)</text>
+  <text x="334" y="153" font-size="11" fill="#2b3036">hoist &#8594; large FPS win on cheap frames</text>
 
   <!-- heavy body -->
   <text x="40" y="200" font-size="11" font-weight="bold" fill="#2b3036">heavy per-pixel body</text>

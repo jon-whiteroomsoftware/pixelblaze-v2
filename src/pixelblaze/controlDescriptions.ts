@@ -20,12 +20,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSpin: 'How fast the bright great-ring orbits — centred is still, higher spins faster.',
     sliderSpeed: 'How often the rings ratchet up a level — the tick rate of the bloom.',
   },
-  BinaryBeacon: {
-    sliderSpeed: 'How fast digital packets move around the strip.',
-    sliderPackets: 'Number of active packet heads.',
-    sliderWidth: 'Width of each packet pulse.',
-    sliderPalette: 'Base colour of the beacon.',
-  },
   Caustics: {
     sliderSpeed: 'How fast the water moves.',
     sliderDensity: 'Size of the light pools — higher packs in more, smaller cells.',
@@ -50,13 +44,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSweep: 'Strength of the scanning beam.',
     sliderHue: 'Base colour of the instrument glow.',
   },
-  ControlsShowcase: {
-    sliderSpeed: 'How fast the shapes orbit.',
-    sliderEdgeBlur: "Softness of the shapes' edges — sharp at low, glowing at high.",
-    sliderOrbitDist: 'How far the shapes swing out from the centre.',
-    toggleStarMode: 'Switch the orbiting shapes between circles and stars.',
-    hsvPickerColor: 'Base colour of the shapes.',
-  },
   CorePulse3D: {
     sliderSpeed: 'How fast the energy shells expand from the core.',
     sliderShellCount: 'How many concentric pulse shells fill the volume.',
@@ -75,12 +62,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderLength: 'Length of each falling crystal streak.',
     sliderHue: 'Base colour of the crystal rain.',
   },
-  EclipseFactory: {
-    sliderSpeed: 'How quickly the moons cross the sun.',
-    sliderMoonSize: 'Size of the eclipsing bodies.',
-    sliderCorona: 'Brightness and reach of the outer solar halo.',
-    sliderHue: 'Base solar colour.',
-  },
   FireflyChoir: {
     sliderCoupling:
       'How strongly the fireflies pull each other into sync — low stays in chaos, high snaps to a unified pulse.',
@@ -88,12 +69,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderSpread: "Variety in each firefly's natural rhythm — keeps the sync alive instead of freezing.",
     sliderColor: 'Base colour of the fireflies.',
     sliderVariance: 'Per-firefly colour jitter — low makes them identical, high scatters their tints.',
-  },
-  GearflowerClock: {
-    sliderSpeed: 'How fast the interlocking petals rotate.',
-    sliderTeeth: 'Density of gear-like tooth detail.',
-    sliderBloom: 'Brightness of the gear petals and hubs.',
-    sliderHue: 'Base brass-to-neon colour.',
   },
   GyroidGlow3D: {
     sliderSpeed: 'How fast the gyroid field drifts through the volume.',
@@ -174,12 +149,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderPulse: 'Brightness of packet glints travelling through the board.',
     sliderHue: 'Base colour of the neon traces.',
   },
-  OrbitingGlyphs: {
-    sliderSpeed: 'How fast the glyph symbols orbit.',
-    sliderSpacing: 'Radius of the symbol orbit.',
-    sliderGlow: 'Brightness of the glyph bloom.',
-    sliderHue: 'Base colour of the glyphs.',
-  },
   OrigamiLanterns: {
     sliderSpeed: 'How quickly the lanterns drift.',
     sliderFold: 'Strength of the folded paper seam pattern.',
@@ -232,18 +201,6 @@ export const CONTROL_DESCRIPTIONS: Record<string, Record<string, string>> = {
     sliderPaneSize: 'Density of stained-glass panes.',
     sliderStorm: 'Strength of rain and lightning flashes.',
     sliderTint: 'Base colour of the glass.',
-  },
-  TideClock: {
-    sliderSpeed: 'How fast the tide cycle moves.',
-    sliderSwell: 'Contrast of the overlapping wave tides.',
-    sliderFoam: 'Brightness of crest foam.',
-    sliderPalette: 'Base water colour.',
-  },
-  Trainyard: {
-    sliderSpeed: 'How fast pulses move around the virtual rail yard.',
-    sliderTraffic: 'Number of active trains.',
-    sliderTail: 'Length of each train trail.',
-    sliderPalette: 'Base hue of the rail-yard lights.',
   },
   TopographicBloom: {
     sliderSpeed: 'How quickly the flower shape breathes.',

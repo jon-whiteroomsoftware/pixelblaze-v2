@@ -303,13 +303,12 @@ accumulation, `sin(t)`/`cos(t)` for a rotation angle, palette coefficients,
 constants derived from sliders — computes once per frame there instead of once
 per pixel. The emulator bench shows the call-count drop directly.
 
-This one move accounts for nearly the entire scoreboard (§11). The exemplar is
-ControlsShowcase (+49.7%): four `cos`/`sin` orbit positions and the orbit/falloff
-geometry were recomputed for all 256 pixels though identical across the frame;
-lifting them into a new `beforeRender` nearly halved frame time, bit-identical.
-The catch is whole-frame dilution — see the whole-frame model (§2) and the
-scoreboard (§11) for
-where the same move buys ~0%.
+This one move accounts for much of the scoreboard (§11). A typical high-gain
+case is a cheap frame where several `sin`/`cos` positions and derived geometry
+are recomputed for every pixel despite being identical across the frame; lifting
+them into `beforeRender` can remove a large fraction of total CPU work while
+staying bit-identical. The catch is whole-frame dilution — see the whole-frame
+model (§2) and the scoreboard (§11) for where the same move buys ~0%.
 
 ### Precompute loop-index-only work into a table [bench-verifiable + hardware-wisdom]
 
@@ -495,12 +494,10 @@ noise-bound or rate-capped frames — §2 and the case studies (§10) explain bo
 | demo | what changed | FPS before→after | Δ |
 |---|---|---|---|
 | AuroraSphere | the general palette lookup scanned a stops array per pixel; a sampler specialized at load for the demo's fixed palette removes the per-pixel array walk | 11.29 → 18.78 | +66.3% |
-| ControlsShowcase | the demo had no `beforeRender` at all — `time()`, the four orbit `cos`/`sin` positions, and the orbit/edge-falloff geometry were recomputed for all 256 pixels though identical across the frame; adding one nearly halved frame time | 33.7 → 50.4 | +49.7% |
 | PulseLoom | four Gaussian bumps per pixel each cost an `exp(-(d*d)/bumpDenom)`; the bump profile is a pure function of index and width, so it's cached in four `pixelCount` arrays, refilled lazily when the width slider moves | 21.09 → 29.02 | +37.6% |
 | NeonSquircles | ~100 trig calls per pixel in the 20-ring loop depend only on the ring index (colour) or index+time (rotation, pulse weight); moved into a module-scope `cos` table at load and 20-entry `beforeRender` tables per frame | 2.46 → 3.08 | +25.3% |
 | ZippyZaps | the hot loop called `Shader.tanh` twice per iteration, two `exp` calls each; a local rational `fastTanh` approximation avoids the `exp`s entirely | 0.90 → 1.10 | +22.1% |
 | TestPattern2D | the two centre-dot trig calls and the breathe level are frame-constant; hoisted to `beforeRender` | 101.9 → 124.5\* | +22.1% |
-| GlowingOrb | the orb radius `wave(t)` was recomputed per pixel; hoisted to `beforeRender` | 100.4 → 115.0 | +14.5% |
 | KaleidoBloom | cell size, five derived radii, and the rainbow spread — all functions of sliders and time only — were recomputed per pixel; hoisted | 31.5 → 35.5 | +12.6% |
 | Kishimisu | five slider→range remaps hoisted to `beforeRender`, plus the time-invariant per-pixel `exp(-len0)` memoized into a lazily-filled `pixelCount` array | 8.7 → 9.43 | ~+8.4% |
 | ZippyZaps | one `pow` and seven `cos` per loop iteration depend only on the iteration index; precomputed into index tables | 0.83 → 0.89 | +7.4% |
@@ -511,8 +508,8 @@ noise-bound or rate-capped frames — §2 and the case studies (§10) explain bo
 \* *already at the firmware's ~124.5 FPS ceiling — the CPU work is still removed
 (it helps at larger pixel counts), but a rate-capped frame can't show it.*
 
-\*\* *measured on a flat bundled `ControlsShowcase` artifact to isolate the
-library helper change (`SDF`/`Coord`) from other demo edits.*
+\*\* *measured on a flat bundled benchmark artifact to isolate the library helper
+change (`SDF`/`Coord`) from other demo edits.*
 
 **Read the spread, not the average.** The same kind of move bought +49.7% on a
 cheap frame and, off the bottom of this table, ~0% on voronoi-bound Caustics
