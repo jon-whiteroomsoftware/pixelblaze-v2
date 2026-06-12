@@ -523,6 +523,6 @@ the whole story.
 - [`test/perf-harness/costs.md`](../../test/perf-harness/costs.md) — the measured
   cost table (source of record); regenerate with `npm run profile`.
 - `docs/reference/PXLBLZ Technical Reference.md` §2/§5 (fidelity & the
-  fixed-point engine), §11 (the porting toolkit), §16 (main-thread execution).
+  fixed-point engine), §11 (the porting toolkit), §17 (main-thread execution).
 - `test/perf-harness/` — the emulator bench, drift tool, hardware profiler, and
   hardware FPS bench.

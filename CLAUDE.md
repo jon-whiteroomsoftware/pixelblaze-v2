@@ -79,7 +79,7 @@ Library files go under `src/pixelblaze/lib/` as plain `.js` (not `.ts`) — Acor
 ### Key constraints
 
 - **Faithful fixed-point preview** (Tech Reference §2/§5): the preview *defaults* to emulating the device's 16.16 fixed-point arithmetic (Precise), with a float64 "Fast" escape hatch. Two divergence classes are accepted: transcendental precision and algorithmic identity (`perlin`/`prng`/`wave`); only pure integer arithmetic is bit-identical.
-- **Main thread execution** (Tech Reference §16): patterns run on the main thread via `new Function()` + rAF. A syntactically valid infinite loop freezes the tab. The periodic-sync-tick gate (not per-keystroke eval) reduces but does not eliminate this risk.
+- **Main thread execution** (Tech Reference §17): patterns run on the main thread via `new Function()` + rAF. A syntactically valid infinite loop freezes the tab. The periodic-sync-tick gate (not per-keystroke eval) reduces but does not eliminate this risk.
 
 ## Key docs
 

@@ -51,7 +51,7 @@ with **zero React imports**; UI components are thin views over engine functions
 and Zustand stores. Zustand specifically because the render loop and other engine
 code read and write state outside React. This split is load-bearing for testing:
 the tricky math and the transport-agnostic connectivity logic are unit-testable
-with no DOM (§15).
+with no DOM (§16).
 
 **Everything that crosses to hardware is plain Pixelblaze code.** The bundler
 only inlines and renames — never translates — so libraries are authored in the
@@ -787,7 +787,22 @@ The artifact is the only thing that crosses to hardware. Metadata, the
 fixed-point emit, and the whole settings cascade stay browser-side — the
 consistent rule of §2.
 
-## 15. Testing
+## 15. In-app docs viewer
+
+The user docs (Ecosystem Primer, Feature Guide, Optimization Guide) ship inside
+the app. `src/docs/catalog.ts` imports each markdown file `?raw` at build time,
+pairs it with its SVG assets (`?url`), and exposes hash routes (`#/docs/<id>`).
+`DocsReader` renders a block model produced by `src/engine/docsMarkdown.ts` — a
+small purpose-built parser covering exactly the subset the docs use: h1–h3
+headings (with slugged ids), paragraphs, blockquotes, ordered and unordered
+lists (hard-wrapped continuation lines fold into their item), fenced code, pipe
+tables, images, and rules, with strong/code/link inline spans. It is hand-rolled
+rather than a markdown dependency so no raw HTML can ever reach the DOM —
+unsupported syntax degrades to plain text. Relative links between catalog docs
+resolve to in-app hash routes; links to repo files outside the catalog fall back
+to GitHub URLs; image paths resolve through the bundled asset map.
+
+## 16. Testing
 
 Pure engine functions are the primary target: transpiler, validator, fixed-point
 ops, camera projection, map/shape/surface generators, normals, dimensionality,
@@ -799,7 +814,7 @@ microbenchmark (`test/perf-harness/`) profiles real per-built-in cost to guide
 pattern-perf advice. Husky runs `npm run lint && npm test` pre-commit; the live
 hardware tier is excluded from the gate and run out-of-band.
 
-## 16. Known limits & accepted divergences
+## 17. Known limits & accepted divergences
 
 - **Float64 vs 16.16** — Fast is float64; Precise is faithful 16.16 (±32768,
   1/65536, int32-wrap overflow).
@@ -828,7 +843,7 @@ hardware tier is excluded from the gate and run out-of-band.
 - **`fidelity` is pure-global by design** — a machine/performance choice, never
   recommended and never per-pattern; it persists as one global value.
 
-## 17. Pointers
+## 18. Pointers
 
 - **Feature guide** (using the IDE) — `docs/reference/PXLBLZ Feature Guide.md`
 - **Ecosystem primer** (the platform itself) —
