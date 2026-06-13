@@ -17,34 +17,34 @@ I started this project to address some wishlist features I had for Pixelblaze:
 1. Develop and debug patterns without a controller
 2. Store patterns and maps off-device
 3. Reusable code libraries
+4. Benchmarking and optimization tools
 
-The IDE provides these three features, and a few others:
+The IDE provides these four features, and a few others:
 
-- A Monaco editor with autocomplete, hover help, background compile errors, and
+- A rich editor with autocomplete, hover help, background compile errors, and
   quiet auto-save.
-- A live 1D / 2D / 3D preview that can run with Pixelblaze-style 16.16
-  fixed-point math when fidelity matters.
-- First-class maps, including stock 2D and 3D maps and savable custom maps.
+- A live 1D / 2D / 3D preview that can show patterns rendered as lines, rings,
+  poles, flat 2D maps, cylinders, shells, and volumes.
+- A software renderer with hardware-accurate 16.16 fixed-point math.
+- First-class maps (named, saveable), including stock 2D and 3D maps plus your
+  own.
 - Bundled libraries for SDFs, animation, color, coordinates, noise, and
   ShaderToy-style porting helpers.
-- Read-only demos that can be cloned into editable patterns.
-- Copy / download of a flat, tree-shaken `.js` controller-ready artifact.
+- Copy / download of a flat, tree-shaken `.js` controller-ready artifact, or push
+  it straight to your controller.
+- Benchmarking scripts that automate perf testing under emulation and on device.
 
-## What works today
+## What else works today
 
-- Edit user patterns in the browser and preview them live.
+- Connect to a Pixelblaze over the local network through the companion Chrome
+  extension. Run or save patterns and maps to a controller.
+- Uses ElectroMage's discovery service to find controllers on your local network.
+- Edit user patterns in the browser and preview them in the IDE or on a controller.
 - Import `.epe` files exported from Pixelblaze.
-- Clone shipped demos into editable local patterns.
-- Create, edit, clone, and preview map source.
-- Preview patterns on lines, rings, poles, flat 2D maps, cylinders, shells, and
-  volumes.
+- Clone shipped demos and stock maps into editable copies.
 - Tune preview-only display controls such as light size, diffusion, solidity,
   playback speed, and Fast / Precise rendering.
 - Use pattern controls and watch exported variables in the preview.
-- Connect to a Pixelblaze over the local network through the companion Chrome
-  extension.
-- Run or save the open pattern on a connected controller.
-- Push stock or custom maps to a connected controller.
 
 ## What it does not do
 
