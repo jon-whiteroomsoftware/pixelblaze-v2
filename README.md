@@ -12,21 +12,23 @@ want to connect to a controller, install the companion Chrome extension.
 
 ## Why it exists
 
-The built-in Pixelblaze editor is still the right place for device setup and
-day-to-day controller management. PXLBLZ-IDE is for the parts of pattern work
-that benefit from a bigger browser workspace:
+I started this project to address some wishlist features I had for Pixelblaze:
+
+1. Develop and debug patterns without a controller
+2. Store patterns and maps off-device
+3. Reusable code libraries
+
+The IDE provides these three features, and a few others:
 
 - A Monaco editor with autocomplete, hover help, background compile errors, and
   quiet auto-save.
 - A live 1D / 2D / 3D preview that can run with Pixelblaze-style 16.16
   fixed-point math when fidelity matters.
-- Patterns and maps stored in your browser instead of on one controller.
 - First-class maps, including stock 2D and 3D maps and savable custom maps.
 - Bundled libraries for SDFs, animation, color, coordinates, noise, and
   ShaderToy-style porting helpers.
 - Read-only demos that can be cloned into editable patterns.
-- Copy / download of a flat, tree-shaken `.js` artifact that is ready for the
-  hardware editor.
+- Copy / download of a flat, tree-shaken `.js` controller-ready artifact.
 
 ## What works today
 
@@ -60,14 +62,14 @@ fun, and a generous way into making electronics feel approachable.
 
 Open the **Code** menu in the app header for source and hover summaries.
 
-| Library | What it provides |
-|---|---|
-| `SDF` | 2D signed distance fields: circles, rects, rings, stars, polygons, smooth boolean ops |
-| `Anim` | Easing curves, oscillators, phase timing, looping primitives |
-| `Color` | HSV/RGB blends, palette interpolation, color math |
-| `Coord` | Polar coordinates, rect-to-polar conversion, transforms |
-| `Noise` | Value noise, Voronoi distance, organic variation |
-| `Shader` | GLSL gap-fillers such as `fract`, `step`, `dot`, palettes, and hardware-safe hashes |
+| Library  | What it provides                                                                      |
+| -------- | ------------------------------------------------------------------------------------- |
+| `SDF`    | 2D signed distance fields: circles, rects, rings, stars, polygons, smooth boolean ops |
+| `Anim`   | Easing curves, oscillators, phase timing, looping primitives                          |
+| `Color`  | HSV/RGB blends, palette interpolation, color math                                     |
+| `Coord`  | Polar coordinates, rect-to-polar conversion, transforms                               |
+| `Noise`  | Value noise, Voronoi distance, organic variation                                      |
+| `Shader` | GLSL gap-fillers such as `fract`, `step`, `dot`, palettes, and hardware-safe hashes   |
 
 ## Good to know
 
